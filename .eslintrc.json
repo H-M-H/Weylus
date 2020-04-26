@@ -1,0 +1,12 @@
+{
+    "parserOptions": {
+        "ecmaVersion": 6,
+        "sourceType": "script",
+        "ecmaFeatures": {}
+    },
+    "rules": {
+    },
+    "env": {
+        "es2020": true
+    }
+}

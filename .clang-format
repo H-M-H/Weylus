@@ -1,0 +1,18 @@
+Language: Cpp
+Standard: Latest
+BasedOnStyle: LLVM
+
+ColumnLimit: 100
+IndentWidth: 4
+TabWidth: 4
+UseTab: ForContinuationAndIndentation
+
+BreakBeforeBraces: Allman
+
+AccessModifierOffset: -4
+
+PointerAlignment: Left
+
+AlignAfterOpenBracket: AlwaysBreak
+BinPackArguments: false
+BinPackParameters: false

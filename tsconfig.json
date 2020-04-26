@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "lib": ["es2020", "dom", "es6"],
+    "module": "commonjs",
+    "outDir": "www",
+    "sourceMap": true,
+  },
+  "include": [
+    "ts/**/*.ts"
+  ]
+}
