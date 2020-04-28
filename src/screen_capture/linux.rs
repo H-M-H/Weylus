@@ -1,8 +1,8 @@
 use libc::{c_int, c_void};
-use rayon::prelude::*;
 use std::slice::from_raw_parts;
 
 use crate::cerror::CError;
+use crate::screen_capture::ScreenCapture;
 
 extern "C" {
     fn init_capture(err: *mut CError) -> *mut c_void;
@@ -35,13 +35,13 @@ impl CImage {
     }
 }
 
-pub struct ScreenCapture {
+pub struct ScreenCaptureX11 {
     handle: *mut c_void,
     rgb_buf: Vec<u8>,
     png_buf: Vec<u8>,
 }
 
-impl ScreenCapture {
+impl ScreenCaptureX11 {
     pub fn new() -> Result<Self, CError> {
         let mut err = CError::new();
         let handle = unsafe { init_capture(&mut err) };
@@ -54,15 +54,6 @@ impl ScreenCapture {
                 png_buf: Vec::<u8>::new(),
             });
         }
-    }
-
-    pub fn capture(&mut self) -> &[u8] {
-        let mut err = CError::new();
-        let mut img = CImage::new();
-        unsafe {
-            capture_sceen(self.handle, &mut img, &mut err);
-        }
-        self.convert_to_png(&img).unwrap()
     }
 
     fn convert_to_rgb(&mut self, img: &CImage) {
@@ -116,11 +107,22 @@ impl ScreenCapture {
     }
 }
 
-impl Drop for ScreenCapture {
+impl Drop for ScreenCaptureX11 {
     fn drop(&mut self) {
         let mut err = CError::new();
         unsafe {
             destroy_capture(self.handle, &mut err);
         }
+    }
+}
+
+impl ScreenCapture for ScreenCaptureX11 {
+    fn capture(&mut self) -> &[u8] {
+        let mut err = CError::new();
+        let mut img = CImage::new();
+        unsafe {
+            capture_sceen(self.handle, &mut img, &mut err);
+        }
+        self.convert_to_png(&img).unwrap()
     }
 }

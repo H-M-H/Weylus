@@ -1,19 +1,18 @@
-use websocket::ws::message::Message as MessageTrait;
+use std::sync::{Arc, Mutex};
 use websocket::Message;
 use websocket::OwnedMessage;
 
-use image::{DynamicImage, ImageOutputFormat};
 
-use log::warn;
+use tracing::warn;
 
 use crate::input::pointer::PointerDevice;
-use crate::protocol::{NetMessage, PointerEvent};
+use crate::protocol::{NetMessage};
 use crate::screen_capture::ScreenCapture;
 
-type WsWriter = websocket::sender::Writer<std::net::TcpStream>;
+type WsWriter = Arc<Mutex<websocket::sender::Writer<std::net::TcpStream>>>;
 
 pub trait StreamHandler {
-    fn process(&mut self, sender: &mut WsWriter, message: &OwnedMessage);
+    fn process(&mut self, sender: WsWriter, message: &OwnedMessage);
 }
 
 pub struct PointerStreamHandler<T: PointerDevice> {
@@ -27,7 +26,7 @@ impl<T: PointerDevice> PointerStreamHandler<T> {
 }
 
 impl<Device: PointerDevice> StreamHandler for PointerStreamHandler<Device> {
-    fn process(&mut self, _: &mut WsWriter, message: &OwnedMessage) {
+    fn process(&mut self, _: WsWriter, message: &OwnedMessage) {
         match message {
             OwnedMessage::Text(s) => {
                 println!("{}", &s);
@@ -35,7 +34,6 @@ impl<Device: PointerDevice> StreamHandler for PointerStreamHandler<Device> {
                 match message {
                     Ok(message) => match message {
                         NetMessage::PointerEvent(event) => self.device.send_event(&event),
-                        NetMessage::ClientConfig(config) => self.device.set_client_config(config),
                     },
                     Err(err) => warn!("Unable to parse message: {}", err),
                 }
@@ -45,40 +43,35 @@ impl<Device: PointerDevice> StreamHandler for PointerStreamHandler<Device> {
     }
 }
 
-pub struct ScreenStreamHandler {
-    screen_capture: ScreenCapture,
+pub struct ScreenStreamHandler<T: ScreenCapture> {
+    screen_capture: T,
     base64_buf: Vec<u8>,
 }
 
-impl ScreenStreamHandler {
-    pub fn new() -> Self {
+impl<T: ScreenCapture> ScreenStreamHandler<T> {
+    pub fn new(screen_capture: T) -> Self {
         Self {
-            screen_capture: ScreenCapture::new().unwrap(),
+            screen_capture: screen_capture,
             base64_buf: Vec::<u8>::new(),
         }
     }
 }
 
-impl StreamHandler for ScreenStreamHandler {
-    fn process(&mut self, sender: &mut WsWriter, message: &OwnedMessage) {
+impl<T: ScreenCapture> StreamHandler for ScreenStreamHandler<T> {
+    fn process(&mut self, sender: WsWriter, message: &OwnedMessage) {
         match message {
-            OwnedMessage::Text(s) => {
-                println!("{}", &s);
+            OwnedMessage::Text(_) => {
                 let img = self.screen_capture.capture();
                 let base64_size = img.len() * 4 / 3 + 4;
                 if self.base64_buf.len() < base64_size {
                     self.base64_buf.resize(base64_size * 2, 0);
                 }
-                //let bitmap = autopilot::bitmap::capture_screen().unwrap();
-                //let mut buf = vec![];
-                //let img: DynamicImage = bitmap.image;
-                //img.write_to(&mut buf, ImageOutputFormat::PNG).unwrap();
                 let base64_size =
                     base64::encode_config_slice(&img, base64::STANDARD, &mut self.base64_buf);
                 let msg = Message::text(unsafe {
                     std::str::from_utf8_unchecked(&self.base64_buf[0..base64_size])
                 });
-                if let Err(err) = sender.send_message(&msg) {
+                if let Err(err) = sender.lock().unwrap().send_message(&msg) {
                     warn!("Error sending video: {}", err);
                 }
             }

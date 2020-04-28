@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+
+	<head>
+		<title>Totally magic</title>
+		<link rel="stylesheet" href="style.css">
+		<script src="lib.js"></script>
+		<script>
+			let websocket_pointer_addr = "{{websocket_pointer_addr}}";
+			let websocket_video_addr = "{{websocket_video_addr}}";
+			run(websocket_pointer_addr, websocket_video_addr);
+		</script>
+	</head>
+
+	<body>
+		<canvas id="canvas">
+			Your browser does not support canvas element.
+		</canvas>
+	</body>
+
+</html>

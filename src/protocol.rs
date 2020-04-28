@@ -3,20 +3,7 @@ use serde::{Deserialize, Serialize, Deserializer};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum NetMessage {
-    ClientConfig(ClientConfig),
     PointerEvent(PointerEvent),
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ClientConfig {
-    pub width: i32,
-    pub height: i32,
-}
-
-impl ClientConfig {
-    pub fn default() -> Self {
-        Self {width: 800, height: 600}
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -71,13 +58,14 @@ pub struct PointerEvent {
     pub button: Button,
     #[serde(deserialize_with = "from_str")]
     pub buttons: Button,
-    pub screen_x: i64,
-    pub screen_y: i64,
+    pub x: f64,
+    pub y: f64,
     pub movement_x: i64,
     pub movement_y: i64,
     pub pressure: f64,
     pub tilt_x: i32,
     pub tilt_y: i32,
+    pub twist: i32,
     pub width: f64,
     pub height: f64,
 }

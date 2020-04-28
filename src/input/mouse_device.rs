@@ -1,6 +1,7 @@
 use autopilot::mouse;
+use autopilot::screen::size as screen_size;
 
-use log::warn;
+use tracing::warn;
 
 use crate::input::pointer::PointerDevice;
 use crate::protocol::Button;
@@ -21,8 +22,8 @@ impl PointerDevice for Mouse {
             return;
         }
         if let Err(err) = mouse::move_to(autopilot::geometry::Point::new(
-            event.screen_x as f64,
-            event.screen_y as f64,
+            event.x * screen_size().width,
+            event.y * screen_size().height,
         )) {
             warn!("Could not move mouse: {}", err);
         }

@@ -20,6 +20,12 @@ fn main() {
         }
     }
 
+    #[cfg(target_os = "linux")]
+    linux();
+}
+
+#[cfg(target_os = "linux")]
+fn linux() {
     println!("cargo:rerun-if-changed=lib/linux/error.h");
     println!("cargo:rerun-if-changed=lib/linux/error.c");
     println!("cargo:rerun-if-changed=lib/linux/uniput.c");

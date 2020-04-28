@@ -2,13 +2,12 @@ use libc::{c_int, c_uchar};
 
 use crate::input::pointer::PointerDevice;
 use crate::protocol::Button;
-use crate::protocol::ClientConfig;
 use crate::protocol::PointerEvent;
 use crate::protocol::PointerEventType;
 
 use crate::cerror::CError;
 
-use log::warn;
+use tracing::warn;
 
 extern "C" {
     fn init_uinput(err: *mut CError) -> c_int;
@@ -19,7 +18,6 @@ extern "C" {
 
 pub struct GraphicTablet {
     fd: c_int,
-    client_config: ClientConfig,
 }
 
 impl GraphicTablet {
@@ -31,18 +29,17 @@ impl GraphicTablet {
         }
         let tblt = Self {
             fd: fd,
-            client_config: ClientConfig::default(),
         };
         Ok(tblt)
     }
 
-    fn transform_x(&self, x: i64) -> i32 {
-        let x = x as f64 * 65535.0 / self.client_config.width as f64;
+    fn transform_x(&self, x: f64) -> i32 {
+        let x = x * 65535.0;
         x as i32
     }
 
-    fn transform_y(&self, y: i64) -> i32 {
-        let y = y as f64 * 65535.0 / self.client_config.height as f64;
+    fn transform_y(&self, y: f64) -> i32 {
+        let y = y * 65535.0;
         y as i32
     }
 
@@ -96,8 +93,8 @@ const ABS_MAX: c_int = 65535;
 
 impl PointerDevice for GraphicTablet {
     fn send_event(&self, event: &PointerEvent) {
-        self.send_event_safe(ET_ABSOLUTE, EC_ABSOLUTE_X, self.transform_x(event.screen_x));
-        self.send_event_safe(ET_ABSOLUTE, EC_ABSOLUTE_Y, self.transform_y(event.screen_y));
+        self.send_event_safe(ET_ABSOLUTE, EC_ABSOLUTE_X, self.transform_x(event.x));
+        self.send_event_safe(ET_ABSOLUTE, EC_ABSOLUTE_Y, self.transform_y(event.y));
         self.send_event_safe(
             ET_ABSOLUTE,
             EC_ABSOLUTE_PRESSURE,
@@ -115,9 +112,5 @@ impl PointerDevice for GraphicTablet {
             PointerEventType::MOVE => ()
         }
         self.send_event_safe(ET_SYNC, EC_SYNC_REPORT, 1);
-    }
-
-    fn set_client_config(&mut self, config: ClientConfig) {
-        self.client_config = config;
     }
 }
