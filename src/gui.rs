@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::net::{IpAddr, SocketAddr};
 use std::rc::Rc;
+use std::time::Duration;
 
 use std::sync::{mpsc, Arc, Mutex};
 use tokio::sync::mpsc as mpsc_tokio;
@@ -61,9 +62,15 @@ pub fn run() {
         .with_label("Websocket Video Port");
     input_ws_video_port.set_value("9002");
 
+    let input_limit_screen_updates = IntInput::default()
+        .with_size(width, height)
+        .below_of(&input_ws_video_port, padding)
+        .with_label("Limit screen updates\n(milliseconds)");
+    input_limit_screen_updates.set_value("0");
+
     let but_toggle = Button::default()
         .with_size(width, height)
-        .below_of(&input_ws_video_port, 3 * padding)
+        .below_of(&input_limit_screen_updates, 3 * padding)
         .with_label("Start");
 
     let mut output_buf = TextBuffer::default();
@@ -149,6 +156,8 @@ pub fn run() {
                     let web_port: u16 = input_port.value().parse()?;
                     let ws_pointer_port: u16 = input_ws_pointer_port.value().parse()?;
                     let ws_video_port: u16 = input_ws_video_port.value().parse()?;
+                    let screen_update_interval: u64 = input_limit_screen_updates.value().parse()?;
+                    let screen_update_interval = Duration::from_millis(screen_update_interval);
 
                     let (sender_gui2ws_tmp, receiver_gui2ws) = mpsc::channel();
                     sender_gui2ws = Some(sender_gui2ws_tmp);
@@ -158,6 +167,7 @@ pub fn run() {
                         SocketAddr::new(bind_addr, ws_pointer_port),
                         SocketAddr::new(bind_addr, ws_video_port),
                         password,
+                        screen_update_interval,
                     );
 
                     let (sender_gui2web_tmp, receiver_gui2web) = mpsc_tokio::channel(100);

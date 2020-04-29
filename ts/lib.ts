@@ -1,7 +1,3 @@
-async function delay(milliseconds: number) {
-    return new Promise(resolve => setTimeout(resolve, milliseconds));
-}
-
 function run(password: string, websocket_pointer_port: number, websocket_video_port: number) {
     window.onload = () => { init(password, websocket_pointer_port, websocket_video_port) };
 }
@@ -100,6 +96,12 @@ function init(password: string, websocket_pointer_port: number, websocket_video_
 
     let videoWebSocket = new WebSocket("ws://" + window.location.hostname + ":" + websocket_video_port, "video");
     videoWebSocket.onmessage = (event: MessageEvent) => {
+        if (event.data[0] == "@") {
+            let interval_millis: number = parseInt(event.data.slice(1, -1));
+            setTimeout(() => videoWebSocket.send(""), interval_millis);
+            return;
+        }
+
         let img = new Image();
         img.src = "data:image/png;base64," + event.data;
         let ctx = canvas.getContext("2d");

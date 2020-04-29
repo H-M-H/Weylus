@@ -5,6 +5,7 @@ use std::sync::{
     mpsc, Arc, Mutex,
 };
 use std::thread::spawn;
+use std::time::Duration;
 use tracing::{info, warn};
 
 use websocket::sender::Writer;
@@ -38,6 +39,7 @@ pub fn run(
     ws_pointer_socket_addr: SocketAddr,
     ws_video_socket_addr: SocketAddr,
     password: Option<&str>,
+    screen_update_interval: Duration,
 ) {
     let clients = Arc::new(Mutex::new(HashMap::<
         SocketAddr,
@@ -77,7 +79,7 @@ pub fn run(
             clients2,
             shutdown2,
             sender2,
-            &create_pointer_stream_handler,
+            create_graphic_tablet_stream_handler,
         )
     });
 
@@ -89,32 +91,39 @@ pub fn run(
             clients3,
             shutdown3,
             sender3,
-            &create_screen_stream_handler,
+            move || create_xscreen_stream_handler(screen_update_interval),
         )
     });
 }
 
 #[cfg(target_os = "linux")]
-fn create_pointer_stream_handler(
+fn create_graphic_tablet_stream_handler(
 ) -> Result<PointerStreamHandler<GraphicTablet>, Box<dyn std::error::Error>> {
     Ok(PointerStreamHandler::new(GraphicTablet::new()?))
 }
 
-#[cfg(not(target_os = "linux"))]
-fn create_pointer_stream_handler() -> Result<PointerStreamHandler<Mouse>, dyn std::error::Error> {
+fn create_mouse_stream_handler() -> Result<PointerStreamHandler<Mouse>, Box<dyn std::error::Error>>
+{
     Ok(PointerStreamHandler::new(Mouse::new()))
 }
 
 #[cfg(target_os = "linux")]
-fn create_screen_stream_handler(
+fn create_xscreen_stream_handler(
+    update_interval: Duration,
 ) -> Result<ScreenStreamHandler<ScreenCaptureX11>, Box<dyn std::error::Error>> {
-    Ok(ScreenStreamHandler::new(ScreenCaptureX11::new()?))
+    Ok(ScreenStreamHandler::new(
+        ScreenCaptureX11::new()?,
+        update_interval,
+    ))
 }
 
-#[cfg(not(target_os = "linux"))]
 fn create_screen_stream_handler(
+    update_interval: Duration,
 ) -> Result<ScreenStreamHandler<ScreenCaptureGeneric>, Box<dyn std::error::Error>> {
-    Ok(ScreenStreamHandler::new(ScreenCaptureGeneric::new()))
+    Ok(ScreenStreamHandler::new(
+        ScreenCaptureGeneric::new(),
+        update_interval,
+    ))
 }
 
 fn listen_websocket<T, F>(
@@ -123,10 +132,10 @@ fn listen_websocket<T, F>(
     clients: Arc<Mutex<HashMap<SocketAddr, Arc<Mutex<Writer<TcpStream>>>>>>,
     shutdown: Arc<AtomicBool>,
     sender: mpsc::Sender<Ws2GuiMessage>,
-    create_stream_handler: &'static F,
+    create_stream_handler: F,
 ) where
     T: StreamHandler,
-    F: Fn() -> Result<T, Box<dyn std::error::Error>> + Sync,
+    F: Fn() -> Result<T, Box<dyn std::error::Error>> + Send + 'static + Clone,
 {
     let server = Server::bind(addr);
     if let Err(err) = server {
@@ -156,6 +165,7 @@ fn listen_websocket<T, F>(
         }
         let clients = clients.clone();
         let password = password.clone();
+        let create_stream_handler = create_stream_handler.clone();
         match server.accept() {
             Ok(request) => {
                 spawn(move || {
