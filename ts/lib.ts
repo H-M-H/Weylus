@@ -2,8 +2,8 @@ async function delay(milliseconds: number) {
     return new Promise(resolve => setTimeout(resolve, milliseconds));
 }
 
-function run(websocket_pointer_addr: string, websocket_video_addr: string) {
-    window.onload = () => { init(websocket_pointer_addr, websocket_video_addr) };
+function run(password: string, websocket_pointer_port: number, websocket_video_port: number) {
+    window.onload = () => { init(password, websocket_pointer_port, websocket_video_port) };
 }
 
 class ClientConfig {
@@ -34,8 +34,9 @@ class PEvent {
     width: number;
     height: number;
 
-    constructor(eventType: String, event: PointerEvent, canvas: HTMLCanvasElement) {
+    constructor(eventType: string, event: PointerEvent, canvas: HTMLCanvasElement) {
         let canvasRect = canvas.getBoundingClientRect();
+        let diag_len = Math.sqrt(canvas.width * canvas.width + canvas.height * canvas.height)
         this.event_type = eventType.toString();
         this.pointer_id = event.pointerId;
         this.is_primary = event.isPrimary;
@@ -49,9 +50,9 @@ class PEvent {
         this.pressure = event.pressure;
         this.tilt_x = event.tiltX;
         this.tilt_y = event.tiltY;
-        this.width = event.width;
+        this.width = event.width / diag_len;
+        this.height = event.height / diag_len;
         this.twist = event.twist;
-        this.height = event.height;
     }
 }
 
@@ -85,17 +86,19 @@ class PointerHandler {
     }
 }
 
-function init(websocket_pointer_addr: string, websocket_video_addr: string) {
-    let webSocket = new WebSocket("ws://" + websocket_pointer_addr, "pointer");
+function init(password: string, websocket_pointer_port: number, websocket_video_port: number) {
+    let webSocket = new WebSocket("ws://" + window.location.hostname + ":" + websocket_pointer_port, "pointer");
     let canvas = document.getElementById("canvas") as HTMLCanvasElement;
     webSocket.onopen = function(event) {
+        if (password)
+            webSocket.send(password);
         let pointerHandler = new PointerHandler(canvas, webSocket);
     }
     webSocket.onmessage = function(event) {
     }
 
 
-    let videoWebSocket = new WebSocket("ws://" + websocket_video_addr, "video");
+    let videoWebSocket = new WebSocket("ws://" + window.location.hostname + ":" + websocket_video_port, "video");
     videoWebSocket.onmessage = (event: MessageEvent) => {
         let img = new Image();
         img.src = "data:image/png;base64," + event.data;
@@ -107,10 +110,12 @@ function init(websocket_pointer_addr: string, websocket_video_addr: string) {
                 canvas.width = img.width;
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         };
-        videoWebSocket.send("gimme gimme !");
+        videoWebSocket.send("");
     }
     videoWebSocket.onopen = () => {
-        videoWebSocket.send("gimme gimme !");
+        if (password)
+            videoWebSocket.send(password);
+        videoWebSocket.send("");
     }
 }
 

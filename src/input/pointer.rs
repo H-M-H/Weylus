@@ -1,5 +1,5 @@
 use crate::protocol::PointerEvent;
 
 pub trait PointerDevice {
-    fn send_event(&self, event: &PointerEvent);
+    fn send_event(&mut self, event: &PointerEvent);
 }

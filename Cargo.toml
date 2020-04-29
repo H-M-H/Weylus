@@ -9,6 +9,7 @@ description = "Use your iPad or Android tablet as graphic tablet."
 
 [dependencies]
 hyper = "^0.13"
+url = "2.1.1"
 tokio = { version = "0.2", features = ["full"] }
 handlebars = "3.0.1"
 websocket = "0.24.0"

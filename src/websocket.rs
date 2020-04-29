@@ -9,6 +9,7 @@ use tracing::{info, warn};
 
 use websocket::sender::Writer;
 use websocket::sync::Server;
+use websocket::OwnedMessage;
 
 use crate::input::mouse_device::Mouse;
 #[cfg(target_os = "linux")]
@@ -19,7 +20,14 @@ use crate::screen_capture::generic::ScreenCaptureGeneric;
 #[cfg(target_os = "linux")]
 use crate::screen_capture::linux::ScreenCaptureX11;
 
-pub enum Ws2GuiMessage {}
+#[cfg(target_os = "linux")]
+use crate::cerror::CError;
+
+pub enum Ws2GuiMessage {
+    Error(String),
+    Warning(String),
+    Info(String),
+}
 pub enum Gui2WsMessage {
     Shutdown,
 }
@@ -30,128 +38,188 @@ pub fn run(
     ws_pointer_socket_addr: SocketAddr,
     ws_video_socket_addr: SocketAddr,
     password: Option<&str>,
-) -> Result<(), String> {
+) {
     let clients = Arc::new(Mutex::new(HashMap::<
         SocketAddr,
         Arc<Mutex<Writer<TcpStream>>>,
     >::new()));
     let clients2 = clients.clone();
     let clients3 = clients.clone();
-    let (tx, rx) = mpsc::channel::<Result<(), String>>();
     let shutdown = Arc::new(AtomicBool::new(false));
     let shutdown2 = shutdown.clone();
     let shutdown3 = shutdown.clone();
+    let sender2 = sender.clone();
+    let sender3 = sender.clone();
+
     spawn(move || loop {
         match receiver.recv() {
             Err(_) | Ok(Gui2WsMessage::Shutdown) => {
                 let clients = clients.lock().unwrap();
                 for client in clients.values() {
                     let client = client.lock().unwrap();
-                    client.shutdown_all();
+                    if let Err(err) = client.shutdown_all() {
+                        sender.send(Ws2GuiMessage::Error(format!(
+                            "Could not shutdown websocket: {}",
+                            err
+                        )));
+                    }
                 }
                 shutdown.store(true, Ordering::Relaxed);
+                return;
             }
         }
     });
+    let pass: Option<String> = password.map_or(None, |s| Some(s.to_string()));
     spawn(move || {
         listen_websocket(
             ws_pointer_socket_addr,
+            pass,
             clients2,
             shutdown2,
-            tx,
+            sender2,
             &create_pointer_stream_handler,
         )
     });
-    match rx.recv() {
-        Ok(Ok(_)) => Ok(()),
-        Ok(Err(err)) => Err(err.to_string()),
-        Err(err) => Err(err.to_string()),
-    }
-    .unwrap();
 
-    let (tx, rx) = mpsc::channel::<Result<(), String>>();
+    let pass: Option<String> = password.map_or(None, |s| Some(s.to_string()));
     spawn(move || {
         listen_websocket(
             ws_video_socket_addr,
+            pass,
             clients3,
             shutdown3,
-            tx,
+            sender3,
             &create_screen_stream_handler,
         )
     });
-    match rx.recv() {
-        Ok(Ok(_)) => Ok(()),
-        Ok(Err(err)) => Err(err.to_string()),
-        Err(err) => Err(err.to_string()),
-    }
 }
 
 #[cfg(target_os = "linux")]
-fn create_pointer_stream_handler() -> PointerStreamHandler<GraphicTablet> {
-    PointerStreamHandler::new(GraphicTablet::new().unwrap())
+fn create_pointer_stream_handler(
+) -> Result<PointerStreamHandler<GraphicTablet>, Box<dyn std::error::Error>> {
+    Ok(PointerStreamHandler::new(GraphicTablet::new()?))
 }
 
 #[cfg(not(target_os = "linux"))]
-fn create_pointer_stream_handler() -> PointerStreamHandler<Mouse> {
-    PointerStreamHandler::new(Mouse::new())
+fn create_pointer_stream_handler() -> Result<PointerStreamHandler<Mouse>, dyn std::error::Error> {
+    Ok(PointerStreamHandler::new(Mouse::new()))
 }
 
 #[cfg(target_os = "linux")]
-fn create_screen_stream_handler() -> ScreenStreamHandler<ScreenCaptureX11> {
-    ScreenStreamHandler::new(ScreenCaptureX11::new().unwrap())
+fn create_screen_stream_handler(
+) -> Result<ScreenStreamHandler<ScreenCaptureX11>, Box<dyn std::error::Error>> {
+    Ok(ScreenStreamHandler::new(ScreenCaptureX11::new()?))
 }
 
 #[cfg(not(target_os = "linux"))]
-fn create_screen_stream_handler() -> ScreenStreamHandler<ScreenCaptureGeneric> {
-    ScreenStreamHandler::new(ScreenCaptureGeneric::new())
+fn create_screen_stream_handler(
+) -> Result<ScreenStreamHandler<ScreenCaptureGeneric>, Box<dyn std::error::Error>> {
+    Ok(ScreenStreamHandler::new(ScreenCaptureGeneric::new()))
 }
 
 fn listen_websocket<T, F>(
     addr: SocketAddr,
+    password: Option<String>,
     clients: Arc<Mutex<HashMap<SocketAddr, Arc<Mutex<Writer<TcpStream>>>>>>,
     shutdown: Arc<AtomicBool>,
-    tx: mpsc::Sender<Result<(), String>>,
+    sender: mpsc::Sender<Ws2GuiMessage>,
     create_stream_handler: &'static F,
 ) where
     T: StreamHandler,
-    F: Fn() -> T + Sync,
+    F: Fn() -> Result<T, Box<dyn std::error::Error>> + Sync,
 {
     let server = Server::bind(addr);
     if let Err(err) = server {
-        tx.send(Err(err.to_string()))
-            .expect("Could not report back to calling thread, aborting!");
+        sender.send(Ws2GuiMessage::Error(format!(
+            "Failed binding to socket: {}",
+            err
+        )));
         return;
     }
-    tx.send(Ok(()))
-        .expect("Could not report back to calling thread, aborting!");
-
     let mut server = server.unwrap();
-    server.set_nonblocking(true).unwrap();
+    if let Err(err) = server.set_nonblocking(true) {
+        sender.send(Ws2GuiMessage::Warning(format!(
+            "Could not set websocket to non-blocking, graceful shutdown may be impossible now: {}",
+            err
+        )));
+    }
+
     loop {
         std::thread::sleep(std::time::Duration::from_millis(10));
+        let sender = sender.clone();
         if shutdown.load(Ordering::Relaxed) {
+            sender.send(Ws2GuiMessage::Info(format!(
+                "Shutting down websocket: {}",
+                addr
+            )));
             return;
         }
         let clients = clients.clone();
+        let password = password.clone();
         match server.accept() {
             Ok(request) => {
                 spawn(move || {
-                    let client = request.accept().unwrap();
-                    let peer_addr = client.peer_addr().unwrap();
-                    let (mut receiver, sender) = client.split().unwrap();
+                    let client = request.accept();
+                    if let Err((_, err)) = client {
+                        sender.send(Ws2GuiMessage::Warning(format!(
+                            "Failed to accept client: {}",
+                            err
+                        )));
+                        return;
+                    }
+                    let client = client.unwrap();
+                    let peer_addr = client.peer_addr();
+                    if let Err(err) = peer_addr {
+                        sender.send(Ws2GuiMessage::Warning(format!(
+                            "Failed to retrieve client address: {}",
+                            err
+                        )));
+                        return;
+                    }
+                    let peer_addr = peer_addr.unwrap();
+                    let client = client.split();
+                    if let Err(err) = client {
+                        sender.send(Ws2GuiMessage::Warning(format!(
+                            "Failed to setup connection: {}",
+                            err
+                        )));
+                        return;
+                    }
+                    let (mut ws_receiver, ws_sender) = client.unwrap();
 
-                    let sender = Arc::new(Mutex::new(sender));
+                    let ws_sender = Arc::new(Mutex::new(ws_sender));
 
                     {
                         let mut clients = clients.lock().unwrap();
-                        clients.insert(peer_addr, sender.clone());
+                        clients.insert(peer_addr, ws_sender.clone());
                     }
 
-                    let mut stream_handler = create_stream_handler();
-                    for msg in receiver.incoming_messages() {
+                    let stream_handler = create_stream_handler();
+                    if let Err(err) = stream_handler {
+                        sender.send(Ws2GuiMessage::Error(format!(
+                            "Failed to create stream handler: {}",
+                            err
+                        )));
+                        return;
+                    }
+
+                    let mut authed = password.is_none();
+                    let password = password.unwrap_or("".into());
+                    let mut stream_handler = stream_handler.unwrap();
+                    for msg in ws_receiver.incoming_messages() {
                         match msg {
                             Ok(msg) => {
-                                stream_handler.process(sender.clone(), &msg);
+                                if !authed {
+                                    if let OwnedMessage::Text(pw) = &msg {
+                                        if pw == &password {
+                                            authed = true;
+                                        } else {
+                                            return;
+                                        }
+                                    }
+                                } else {
+                                    stream_handler.process(ws_sender.clone(), &msg);
+                                }
                                 if msg.is_close() {
                                     return;
                                 }

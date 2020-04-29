@@ -1,21 +1,25 @@
+use std::cell::RefCell;
+use std::net::{IpAddr, SocketAddr};
 use std::rc::Rc;
 
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc, Mutex};
 use tokio::sync::mpsc as mpsc_tokio;
 
 use fltk::{
     app::App,
-    button::{Button, CheckButton},
+    button::Button,
     input::{Input, IntInput},
     menu::{Choice, MenuFlag},
-    output::MultilineOutput,
+    output::Output,
     prelude::*,
+    text::{TextBuffer, TextDisplay},
     window::Window,
 };
+
 use pnet::datalink;
 
-use crate::web::Gui2WebMessage;
-use crate::websocket::Gui2WsMessage;
+use crate::web::{Gui2WebMessage, Web2GuiMessage};
+use crate::websocket::{Gui2WsMessage, Ws2GuiMessage};
 
 pub fn run() {
     let width = 200;
@@ -28,136 +32,200 @@ pub fn run() {
         .center_screen()
         .with_label("WebTablet");
 
-    let mut input_bind_addr = Input::default()
+    let input_password = Input::default()
         .with_pos(200, 30)
+        .with_size(width, height)
+        .with_label("Password");
+
+    let input_bind_addr = Input::default()
+        .below_of(&input_password, padding)
         .with_size(width, height)
         .with_label("Bind Address");
     input_bind_addr.set_value("0.0.0.0");
 
-    let mut input_port = IntInput::default()
+    let input_port = IntInput::default()
         .with_size(width, height)
         .below_of(&input_bind_addr, padding)
         .with_label("Port");
     input_port.set_value("1701");
 
-    let mut input_ws_pointer_port = IntInput::default()
+    let input_ws_pointer_port = IntInput::default()
         .with_size(width, height)
         .below_of(&input_port, padding)
         .with_label("Websocket Pointer Port");
     input_ws_pointer_port.set_value("9001");
 
-    let mut input_ws_video_port = IntInput::default()
+    let input_ws_video_port = IntInput::default()
         .with_size(width, height)
         .below_of(&input_ws_pointer_port, padding)
         .with_label("Websocket Video Port");
     input_ws_video_port.set_value("9002");
 
-    let mut check_custom_ip_addr = CheckButton::default()
-        .with_size(height, height)
-        .below_of(&input_ws_video_port, 2 * padding)
-        .with_label("Custom IP-Address");
-
-    let mut choice_ip_addr = Choice::default()
+    let but_toggle = Button::default()
         .with_size(width, height)
-        .below_of(&check_custom_ip_addr, padding)
-        .with_label("IP-Address for Browser\nto connect to");
-
-    for iface in datalink::interfaces() {
-        for ip_net in iface.ips {
-            choice_ip_addr.add(
-                &format!("{} ({})", ip_net.ip(), iface.name),
-                Shortcut::None,
-                MenuFlag::Normal,
-                Box::new(|| {}),
-            );
-        }
-    }
-
-    let mut input_custom_ip_addr = Input::default()
-        .with_size(width, height)
-        .with_label("IP-Address for Browser\nto connect to")
-        .below_of(&check_custom_ip_addr, padding);
-    input_custom_ip_addr.deactivate();
-    input_custom_ip_addr.hide();
-
-    let mut but_toggle = Button::default()
-        .with_size(width, height)
-        .below_of(&input_custom_ip_addr, 3 * padding)
+        .below_of(&input_ws_video_port, 3 * padding)
         .with_label("Start");
 
-    let mut output = MultilineOutput::default()
-        .with_size(600, 7 * height)
-        .with_pos(30, 600 - 30 - 7 * height);
+    let mut output_buf = TextBuffer::default();
+    let output = TextDisplay::default(&mut output_buf)
+        .with_size(600, 6 * height)
+        .with_pos(30, 600 - 30 - 6 * height);
 
-    let but_toggle_ref = Rc::<*mut Button>::new(&mut but_toggle);
+    let mut output_server_addr = Output::default()
+        .with_size(500, height)
+        .with_pos(130, 600 - 30 - 7 * height - 3 * padding)
+        .with_label("Connect your\ntablet to:");
+    output_server_addr.hide();
+
+    let but_toggle_ref = Rc::new(RefCell::new(but_toggle));
+    let output_server_addr = Arc::new(Mutex::new(output_server_addr));
+    let output = Arc::new(Mutex::new(output));
 
     let (sender_ws2gui, receiver_ws2gui) = mpsc::channel();
     let (sender_web2gui, receiver_web2gui) = mpsc::channel();
+
+    {
+        let output = output.clone();
+        std::thread::spawn(move || {
+            while let Ok(message) = receiver_ws2gui.recv() {
+                let output = output.lock().unwrap();
+                match message {
+                    Ws2GuiMessage::Info(s) => {
+                        output.insert(&format!("Info from Websocket: {}\n", s))
+                    }
+                    Ws2GuiMessage::Warning(s) => {
+                        output.insert(&format!("Warning from Websocket: {}\n", s))
+                    }
+                    Ws2GuiMessage::Error(s) => {
+                        output.insert(&format!("Error from Websocket: {}\n", s))
+                    }
+                }
+            }
+        });
+    }
+
+    {
+        let output = output.clone();
+        let output_server_addr = output_server_addr.clone();
+        std::thread::spawn(move || {
+            while let Ok(message) = receiver_web2gui.recv() {
+                let output = output.lock().unwrap();
+                match message {
+                    Web2GuiMessage::Info(s) => {
+                        output.insert(&format!("Info from Webserver: {}\n", s))
+                    }
+                    Web2GuiMessage::Error(s) => {
+                        output.insert(&format!("Error from Webserver: {}\n", s))
+                    }
+                    Web2GuiMessage::Shutdown => {
+                        let mut output_server_addr = output_server_addr.lock().unwrap();
+                        output_server_addr.hide();
+                    }
+                }
+            }
+        });
+    }
+
     let mut sender_gui2ws: Option<mpsc::Sender<Gui2WsMessage>> = None;
     let mut sender_gui2web: Option<mpsc_tokio::Sender<Gui2WebMessage>> = None;
 
     let mut is_server_running = false;
 
-    but_toggle.set_callback(Box::new(move || {
-        let but = unsafe { (*but_toggle_ref.clone()).as_mut().unwrap() };
+    but_toggle_ref
+        .clone()
+        .borrow_mut()
+        .set_callback(Box::new(move || {
+            if let Err(err) = || -> Result<(), Box<dyn std::error::Error>> {
+                let but_toggle_ref = but_toggle_ref.clone();
+                let mut but = but_toggle_ref.try_borrow_mut()?;
 
-        if !is_server_running {
-            input_bind_addr.deactivate();
-            let (sender_gui2ws_tmp, receiver_gui2ws) = mpsc::channel();
-            sender_gui2ws = Some(sender_gui2ws_tmp);
-            crate::websocket::run(
-                sender_ws2gui.clone(),
-                receiver_gui2ws,
-                ([0, 0, 0, 0], 9001).into(),
-                ([0, 0, 0, 0], 9002).into(),
-                None,
-            )
-            .unwrap();
+                if !is_server_running {
+                    let password_string = input_password.value();
+                    let password = match password_string.as_str() {
+                        "" => None,
+                        pw => Some(pw),
+                    };
+                    let bind_addr: IpAddr = input_bind_addr.value().parse()?;
+                    let web_port: u16 = input_port.value().parse()?;
+                    let ws_pointer_port: u16 = input_ws_pointer_port.value().parse()?;
+                    let ws_video_port: u16 = input_ws_video_port.value().parse()?;
 
-            let (sender_gui2web_tmp, receiver_gui2web) = mpsc_tokio::channel(100);
-            sender_gui2web = Some(sender_gui2web_tmp);
-            crate::web::run(
-                sender_web2gui.clone(),
-                receiver_gui2web,
-                &([0, 0, 0, 0], 1701).into(),
-                "dirac.freedesk.lan",
-                9001,
-                9002,
-                None,
-            );
-            but.set_label("Stop");
-        } else {
-            if let Some(mut sender_gui2web) = sender_gui2web.clone() {
-                sender_gui2web.try_send(Gui2WebMessage::Shutdown);
-            }
+                    let (sender_gui2ws_tmp, receiver_gui2ws) = mpsc::channel();
+                    sender_gui2ws = Some(sender_gui2ws_tmp);
+                    crate::websocket::run(
+                        sender_ws2gui.clone(),
+                        receiver_gui2ws,
+                        SocketAddr::new(bind_addr, ws_pointer_port),
+                        SocketAddr::new(bind_addr, ws_video_port),
+                        password,
+                    );
 
-            if let Some(mut sender_gui2ws) = sender_gui2ws.clone() {
-                sender_gui2ws.send(Gui2WsMessage::Shutdown);
-            }
-            but.set_label("Start");
-        }
-        is_server_running = !is_server_running;
-    }));
+                    let (sender_gui2web_tmp, receiver_gui2web) = mpsc_tokio::channel(100);
+                    sender_gui2web = Some(sender_gui2web_tmp);
+                    let mut web_sock = SocketAddr::new(bind_addr, web_port);
+                    crate::web::run(
+                        sender_web2gui.clone(),
+                        receiver_gui2web,
+                        &web_sock,
+                        ws_pointer_port,
+                        ws_video_port,
+                        password,
+                    );
+                    if web_sock.ip().is_unspecified() {
+                        // try to guess an ip
+                        let mut ips = Vec::<IpAddr>::new();
+                        for iface in datalink::interfaces()
+                            .iter()
+                            .filter(|iface| iface.is_up() && !iface.is_loopback())
+                        {
+                            for ipnetw in &iface.ips {
+                                if (ipnetw.is_ipv4() && web_sock.ip().is_ipv4())
+                                    || (ipnetw.is_ipv6() && web_sock.ip().is_ipv6())
+                                {
+                                    // filtering ipv6 unicast requires nightly or more fiddling,
+                                    // lets wait for nightlies to stabilize...
+                                    ips.push(ipnetw.ip())
+                                }
+                            }
+                        }
+                        if ips.len() > 0 {
+                            web_sock.set_ip(ips[0]);
+                        }
+                        if ips.len() > 1 {
+                            let output = output.lock()?;
+                            output.insert(
+                                "Info: Found more than one IP address for browsers to connect to,\nInfo: other urls are:\n"
+                            );
+                            for ip in &ips[1..] {
+                                output.insert(&format!("Info: http://{}\n", SocketAddr::new(*ip, web_port)));
+                            }
+                        }
+                    }
+                    let mut output_server_addr = output_server_addr.lock()?;
+                    output_server_addr.set_value(&format!("http://{}", web_sock.to_string()));
+                    output_server_addr.show();
+                    but.set_label("Stop");
+                } else {
+                    if let Some(mut sender_gui2web) = sender_gui2web.clone() {
+                        sender_gui2web.try_send(Gui2WebMessage::Shutdown)?;
+                    }
 
-    let mut custom_ip = false;
-    check_custom_ip_addr.set_callback(Box::new(move || {
-        if !custom_ip {
-            choice_ip_addr.deactivate();
-            choice_ip_addr.hide();
-            input_custom_ip_addr.activate();
-            input_custom_ip_addr.show();
-        } else {
-            choice_ip_addr.activate();
-            choice_ip_addr.show();
-            input_custom_ip_addr.deactivate();
-            input_custom_ip_addr.hide();
-        }
-        custom_ip = !custom_ip;
-    }));
+                    if let Some(sender_gui2ws) = sender_gui2ws.clone() {
+                        sender_gui2ws.send(Gui2WsMessage::Shutdown)?;
+                    }
+                    but.set_label("Start");
+                }
+                is_server_running = !is_server_running;
+                Ok(())
+            }() {
+                let output = output.lock().unwrap();
+                output.insert(&format!("Error: {}\n", err));
+            };
+        }));
 
     wind.make_resizable(true);
     wind.end();
     wind.show();
 
-    app.run();
+    app.run().expect("Failed to run Gui!");
 }

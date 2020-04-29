@@ -17,7 +17,7 @@ impl Mouse {
 }
 
 impl PointerDevice for Mouse {
-    fn send_event(&self, event: &PointerEvent) {
+    fn send_event(&mut self, event: &PointerEvent) {
         if !event.is_primary {
             return;
         }

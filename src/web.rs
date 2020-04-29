@@ -2,15 +2,17 @@ use handlebars::Handlebars;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
 use serde::Serialize;
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::mpsc;
-use tokio::sync::mpsc as mpsc_tokio;
 use std::sync::Arc;
+use tokio::sync::mpsc as mpsc_tokio;
 
 #[derive(Serialize)]
 struct WebConfig {
-    websocket_pointer_addr: String,
-    websocket_video_addr: String,
+    password: Option<String>,
+    websocket_pointer_port: u16,
+    websocket_video_port: u16,
 }
 
 fn response_from_str(s: &str, content_type: &str) -> Response<Body> {
@@ -35,17 +37,40 @@ async fn serve<'a>(
     sender: mpsc::Sender<Web2GuiMessage>,
 ) -> Result<Response<Body>, hyper::Error> {
     let context = &*context;
+    let mut authed = false;
+    if let Some(password) = &context.password {
+        if req.method() == Method::GET && req.uri().path() == "/" {
+            use url::form_urlencoded;
+            if let Some(query) = req.uri().query() {
+                let params = form_urlencoded::parse(query.as_bytes())
+                    .into_owned()
+                    .collect::<HashMap<String, String>>();
+                if let Some(pass) = params.get("password") {
+                    if pass == password {
+                        authed = true;
+                        sender.send(Web2GuiMessage::Info(format!("User authed.")));
+                    }
+                }
+            }
+        }
+    } else {
+        authed = true;
+    }
     if req.method() != Method::GET {
         return Ok(response_not_found());
     }
     match req.uri().path() {
         "/" => {
+            if !authed {
+                return Ok(response_from_str(
+                    std::include_str!("../www/static/password.html"),
+                    "text/html; charset=utf-8",
+                ));
+            }
             let config = WebConfig {
-                websocket_pointer_addr: format!(
-                    "{}:{}",
-                    context.connect_addr, context.ws_pointer_port
-                ),
-                websocket_video_addr: format!("{}:{}", context.connect_addr, context.ws_video_port),
+                password: context.password.clone(),
+                websocket_pointer_port: context.ws_pointer_port,
+                websocket_video_port: context.ws_video_port,
             };
 
             Ok(response_from_str(
@@ -65,42 +90,18 @@ async fn serve<'a>(
     }
 }
 
-/*#[get("/")]
-fn index(state: State<Handlebars>) -> Content<String> {
-    let context = WebConfig {
-        websocket_pointer_addr: "dirac.freedesk.lan:9001".to_string(),
-        websocket_video_addr: "dirac.freedesk.lan:9002".to_string(),
-    };
-    Content(
-        ContentType::HTML,
-        (*state).render("index", &context).unwrap(),
-    )
-}
-
-#[get("/<file_name>")]
-fn static_files(file_name: String) -> Option<Content<&'static str>> {
-    match file_name.as_str() {
-        "lib.js" => Some(Content(
-            ContentType::JavaScript,
-            std::include_str!("../www/static/lib.js"),
-        )),
-        "style.css" => Some(Content(
-            ContentType::CSS,
-            std::include_str!("../www/static/style.css"),
-        )),
-        _ => None,
-    }
-}
-*/
-
+#[derive(Debug)]
 pub enum Gui2WebMessage {
     Shutdown,
 }
-pub enum Web2GuiMessage {}
+pub enum Web2GuiMessage {
+    Info(String),
+    Error(String),
+    Shutdown,
+}
 
 struct Context<'a> {
     bind_addr: SocketAddr,
-    connect_addr: String,
     ws_pointer_port: u16,
     ws_video_port: u16,
     password: Option<String>,
@@ -111,7 +112,6 @@ pub fn run(
     sender: mpsc::Sender<Web2GuiMessage>,
     receiver: mpsc_tokio::Receiver<Gui2WebMessage>,
     bind_addr: &SocketAddr,
-    connect_addr: &str,
     ws_pointer_port: u16,
     ws_video_port: u16,
     password: Option<&str>,
@@ -128,7 +128,6 @@ pub fn run(
 
     let context = Context {
         bind_addr: *bind_addr,
-        connect_addr: connect_addr.into(),
         ws_pointer_port: ws_pointer_port,
         ws_video_port: ws_video_port,
         password: password,
@@ -146,6 +145,8 @@ async fn run_server(
     let addr = context.bind_addr;
     let context = Arc::new(context);
 
+    let sender = sender.clone();
+    let sender2 = sender.clone();
     let service = make_service_fn(move |_| {
         let context = context.clone();
         let sender = sender.clone();
@@ -165,5 +166,16 @@ async fn run_server(
             }
         }
     });
-    server.await.unwrap();
+    sender2.send(Web2GuiMessage::Info(format!(
+        "Webserver listening at {}...",
+        addr
+    )));
+    match server.await {
+        Ok(_) => sender2.send(Web2GuiMessage::Info("Webserver shutdown!".into())),
+        Err(err) => sender2.send(Web2GuiMessage::Error(format!(
+            "Webserver exited error: {}",
+            err
+        ))),
+    };
+    sender2.send(Web2GuiMessage::Shutdown);
 }
