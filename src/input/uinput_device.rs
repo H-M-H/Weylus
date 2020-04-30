@@ -1,4 +1,4 @@
-use libc::{c_int, c_uchar};
+use std::os::raw::{c_int, c_uchar};
 
 use crate::input::pointer::PointerDevice;
 use crate::protocol::Button;

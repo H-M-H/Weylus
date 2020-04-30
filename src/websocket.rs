@@ -18,11 +18,11 @@ use crate::input::uinput_device::GraphicTablet;
 use crate::stream_handler::{PointerStreamHandler, ScreenStreamHandler, StreamHandler};
 
 use crate::screen_capture::generic::ScreenCaptureGeneric;
-#[cfg(target_os = "linux")]
-use crate::screen_capture::linux::ScreenCaptureX11;
 
 #[cfg(target_os = "linux")]
 use crate::cerror::CError;
+#[cfg(target_os = "linux")]
+use crate::screen_capture::linux::{ScreenCaptureX11, WindowInfo};
 
 pub enum Ws2GuiMessage {
     Error(String),
@@ -40,6 +40,9 @@ pub fn run(
     ws_video_socket_addr: SocketAddr,
     password: Option<&str>,
     screen_update_interval: Duration,
+    stylus_support: bool,
+    faster_capture: bool,
+    capture_window: WindowInfo,
 ) {
     let clients = Arc::new(Mutex::new(HashMap::<
         SocketAddr,
@@ -72,6 +75,34 @@ pub fn run(
         }
     });
     let pass: Option<String> = password.map_or(None, |s| Some(s.to_string()));
+    #[cfg(target_os = "linux")]
+    {
+        if stylus_support {
+            spawn(move || {
+                listen_websocket(
+                    ws_pointer_socket_addr,
+                    pass,
+                    clients2,
+                    shutdown2,
+                    sender2,
+                    create_graphic_tablet_stream_handler,
+                )
+            });
+        } else {
+            spawn(move || {
+                listen_websocket(
+                    ws_pointer_socket_addr,
+                    pass,
+                    clients2,
+                    shutdown2,
+                    sender2,
+                    create_mouse_stream_handler,
+                )
+            });
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
     spawn(move || {
         listen_websocket(
             ws_pointer_socket_addr,
@@ -79,11 +110,39 @@ pub fn run(
             clients2,
             shutdown2,
             sender2,
-            create_graphic_tablet_stream_handler,
+            create_mouse_stream_handler,
         )
     });
 
     let pass: Option<String> = password.map_or(None, |s| Some(s.to_string()));
+    #[cfg(target_os = "linux")]
+    {
+        if faster_capture {
+            spawn(move || {
+                listen_websocket(
+                    ws_video_socket_addr,
+                    pass,
+                    clients3,
+                    shutdown3,
+                    sender3,
+                    move || create_xscreen_stream_handler(capture_window, screen_update_interval),
+                )
+            });
+        } else {
+            spawn(move || {
+                listen_websocket(
+                    ws_video_socket_addr,
+                    pass,
+                    clients3,
+                    shutdown3,
+                    sender3,
+                    move || create_screen_stream_handler(screen_update_interval),
+                )
+            });
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
     spawn(move || {
         listen_websocket(
             ws_video_socket_addr,
@@ -91,7 +150,7 @@ pub fn run(
             clients3,
             shutdown3,
             sender3,
-            move || create_xscreen_stream_handler(screen_update_interval),
+            move || create_screen_stream_handler(screen_update_interval),
         )
     });
 }
@@ -109,10 +168,11 @@ fn create_mouse_stream_handler() -> Result<PointerStreamHandler<Mouse>, Box<dyn 
 
 #[cfg(target_os = "linux")]
 fn create_xscreen_stream_handler(
+    capture_window: WindowInfo,
     update_interval: Duration,
 ) -> Result<ScreenStreamHandler<ScreenCaptureX11>, Box<dyn std::error::Error>> {
     Ok(ScreenStreamHandler::new(
-        ScreenCaptureX11::new()?,
+        ScreenCaptureX11::new(capture_window)?,
         update_interval,
     ))
 }

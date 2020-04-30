@@ -1,7 +1,8 @@
 use std::error::Error;
+use std::ffi::CStr;
 use std::fmt;
 
-use libc::{c_int, c_uchar};
+use std::os::raw::{c_int, c_uchar};
 
 #[repr(C)]
 pub struct CError {
@@ -24,17 +25,15 @@ impl CError {
 
 impl fmt::Display for CError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "CError: code: {} message: {}",
-            self.code, String::from_utf8_lossy(&self.error_str)
-        )
+        write!(f, "CError: code: {} message: {}", self.code, unsafe {
+            CStr::from_bytes_with_nul_unchecked(&self.error_str).to_string_lossy()
+        })
     }
 }
 
 impl fmt::Debug for CError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.fmt(f)
+        fmt::Display::fmt(self, f)
     }
 }
 

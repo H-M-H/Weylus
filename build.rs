@@ -30,10 +30,13 @@ fn linux() {
     println!("cargo:rerun-if-changed=lib/linux/error.c");
     println!("cargo:rerun-if-changed=lib/linux/uniput.c");
     println!("cargo:rerun-if-changed=lib/linux/capture.c");
+    println!("cargo:rerun-if-changed=lib/linux/xwindows.c");
+    println!("cargo:rerun-if-changed=lib/linux/xwindows.h");
     cc::Build::new()
         .file("lib/linux/error.c")
         .file("lib/linux/uinput.c")
         .file("lib/linux/capture.c")
+        .file("lib/linux/xwindows.c")
         .compile("linux");
     println!("cargo:rustc-link-lib=X11");
     println!("cargo:rustc-link-lib=Xext");

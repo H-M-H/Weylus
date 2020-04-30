@@ -5,12 +5,12 @@ use std::time::Duration;
 
 use std::sync::{mpsc, Arc, Mutex};
 use tokio::sync::mpsc as mpsc_tokio;
+use tracing::info;
 
 use fltk::{
     app::App,
-    button::Button,
+    button::{Button, CheckButton},
     input::{Input, IntInput},
-    menu::{Choice, MenuFlag},
     output::Output,
     prelude::*,
     text::{TextBuffer, TextDisplay},
@@ -22,7 +22,20 @@ use pnet::datalink;
 use crate::web::{Gui2WebMessage, Web2GuiMessage};
 use crate::websocket::{Gui2WsMessage, Ws2GuiMessage};
 
+#[cfg(target_os = "linux")]
+use crate::screen_capture::linux::X11Context;
+
 pub fn run() {
+    #[cfg(target_os = "linux")]
+    let mut X11_context = X11Context::new().unwrap();
+
+    for w in X11_context.windows().unwrap() {
+        info!("{}", w);
+    }
+    for w in X11_context.windows().unwrap() {
+        info!("{}", w);
+    }
+
     let width = 200;
     let height = 30;
     let padding = 10;
@@ -39,8 +52,8 @@ pub fn run() {
         .with_label("Password");
 
     let input_bind_addr = Input::default()
-        .below_of(&input_password, padding)
         .with_size(width, height)
+        .below_of(&input_password, padding)
         .with_label("Bind Address");
     input_bind_addr.set_value("0.0.0.0");
 
@@ -73,6 +86,34 @@ pub fn run() {
         .below_of(&input_limit_screen_updates, 3 * padding)
         .with_label("Start");
 
+    let mut check_stylus = CheckButton::default()
+        .with_pos(430, 30 + 2 * (padding + height))
+        .with_size(width, 2 * height);
+    #[cfg(target_os = "linux")]
+    {
+        check_stylus.set_label("Stylus/Pen support\nRequires access to\n/dev/uinput");
+        check_stylus.set_checked(true);
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        check_stylus.set_label("Stylus/Pen support\n(works only on\nLinux)");
+        check_stylus.deactivate();
+    }
+
+    let mut check_faster_screencapture = CheckButton::default()
+        .with_size(width, 2 * height)
+        .below_of(&check_stylus, 2 * padding);
+    #[cfg(target_os = "linux")]
+    {
+        check_faster_screencapture.set_checked(true);
+        check_faster_screencapture.set_label("Faster screencapture");
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        check_faster_screencapture.set_label("Faster screencapture\n(works only on\nLinux)");
+        check_faster_screencapture.deactivate();
+    }
+
     let mut output_buf = TextBuffer::default();
     let output = TextDisplay::default(&mut output_buf)
         .with_size(600, 6 * height)
@@ -83,6 +124,10 @@ pub fn run() {
         .with_pos(130, 600 - 30 - 7 * height - 3 * padding)
         .with_label("Connect your\ntablet to:");
     output_server_addr.hide();
+
+    wind.make_resizable(true);
+    wind.end();
+    wind.show();
 
     let but_toggle_ref = Rc::new(RefCell::new(but_toggle));
     let output_server_addr = Arc::new(Mutex::new(output_server_addr));
@@ -168,6 +213,9 @@ pub fn run() {
                         SocketAddr::new(bind_addr, ws_video_port),
                         password,
                         screen_update_interval,
+                        check_stylus.is_checked(),
+                        check_faster_screencapture.is_checked(),
+                        X11_context.windows().unwrap()[1].clone(),
                     );
 
                     let (sender_gui2web_tmp, receiver_gui2web) = mpsc_tokio::channel(100);
@@ -232,10 +280,6 @@ pub fn run() {
                 output.insert(&format!("Error: {}\n", err));
             };
         }));
-
-    wind.make_resizable(true);
-    wind.end();
-    wind.show();
 
     app.run().expect("Failed to run Gui!");
 }
