@@ -40,5 +40,5 @@ depends = "$auto"
 section = "utility"
 priority = "optional"
 assets = [
-    ["target/release/weylus", "usr/bin/", "755"],
+    ["target/release/Weylus", "usr/bin/weylus", "755"],
 ]

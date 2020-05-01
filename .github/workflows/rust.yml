@@ -17,16 +17,16 @@ jobs:
         include:
         - os: ubuntu-latest
           build-cmd: npm install -g typescript && cargo install cargo-deb && cargo deb
-          package-file: target/debian/weylus*.deb
-          exec-file: target/release/weylus
+          package-file: target/debian/Weylus*.deb
+          exec-file: target/release/Weylus
         - os: macOS-latest
           build-cmd: npm install -g typescript && cargo install cargo-bundle && cargo bundle --release
           package-file: target/release/bundle/osx/Weylus.app
-          exec-file: target/release/weylus
+          exec-file: target/release/Weylus
         - os: windows-latest
           build-cmd: npm install -g typescript && npm run build && cargo install cargo-bundle && cargo bundle --release
-          package-file: target/release/weylus
-          exec-file: target/release/weylus
+          package-file: target/release/Weylus
+          exec-file: target/release/Weylus
 
     steps:
     - name: Download deps
