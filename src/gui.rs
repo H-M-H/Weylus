@@ -5,12 +5,15 @@ use std::time::Duration;
 
 use std::sync::{mpsc, Arc, Mutex};
 use tokio::sync::mpsc as mpsc_tokio;
-use tracing::info;
+use tracing::{info, warn, error};
 
 use fltk::{
     app::App,
     button::{Button, CheckButton},
+    enums::{Shortcut},
+    frame::Frame,
     input::{Input, IntInput},
+    menu::{Choice, MenuFlag},
     output::Output,
     prelude::*,
     text::{TextBuffer, TextDisplay},
@@ -23,19 +26,11 @@ use crate::web::{Gui2WebMessage, Web2GuiMessage};
 use crate::websocket::{Gui2WsMessage, Ws2GuiMessage};
 
 #[cfg(target_os = "linux")]
-use crate::screen_capture::linux::X11Context;
+use crate::x11helper::X11Context;
 
 pub fn run() {
-    #[cfg(target_os = "linux")]
-    let mut X11_context = X11Context::new().unwrap();
-
-    for w in X11_context.windows().unwrap() {
-        info!("{}", w);
-    }
-    for w in X11_context.windows().unwrap() {
-        info!("{}", w);
-    }
-
+    fltk::app::lock().unwrap();
+    fltk::app::unlock();
     let width = 200;
     let height = 30;
     let padding = 10;
@@ -87,7 +82,7 @@ pub fn run() {
         .with_label("Start");
 
     let mut check_stylus = CheckButton::default()
-        .with_pos(430, 30 + 2 * (padding + height))
+        .with_pos(430, 30 + (padding + height))
         .with_size(width, 2 * height);
     #[cfg(target_os = "linux")]
     {
@@ -113,6 +108,20 @@ pub fn run() {
         check_faster_screencapture.set_label("Faster screencapture\n(works only on\nLinux)");
         check_faster_screencapture.deactivate();
     }
+
+    let label_window_choice = Frame::default()
+        .with_size(width, height)
+        .below_of(&check_faster_screencapture, padding)
+        .with_label("Window to capture:");
+
+    let mut choice_window = Choice::default()
+        .with_size(width, height)
+        .below_of(&label_window_choice, 0);
+
+    let mut but_update_windows = Button::default()
+        .with_size(width, height)
+        .below_of(&choice_window, padding)
+        .with_label("Refresh");
 
     let mut output_buf = TextBuffer::default();
     let output = TextDisplay::default(&mut output_buf)
@@ -143,12 +152,15 @@ pub fn run() {
                 let output = output.lock().unwrap();
                 match message {
                     Ws2GuiMessage::Info(s) => {
+                        info!("Websocket: {}", s);
                         output.insert(&format!("Info from Websocket: {}\n", s))
                     }
                     Ws2GuiMessage::Warning(s) => {
+                        warn!("Websocket: {}", s);
                         output.insert(&format!("Warning from Websocket: {}\n", s))
                     }
                     Ws2GuiMessage::Error(s) => {
+                        error!("Websocket: {}", s);
                         output.insert(&format!("Error from Websocket: {}\n", s))
                     }
                 }
@@ -164,18 +176,65 @@ pub fn run() {
                 let output = output.lock().unwrap();
                 match message {
                     Web2GuiMessage::Info(s) => {
+                        info!("Webserver: {}", s);
                         output.insert(&format!("Info from Webserver: {}\n", s))
                     }
                     Web2GuiMessage::Error(s) => {
+                        error!("Webserver: {}", s);
                         output.insert(&format!("Error from Webserver: {}\n", s))
                     }
                     Web2GuiMessage::Shutdown => {
+                        info!("Webserver: shutdown!" );
                         let mut output_server_addr = output_server_addr.lock().unwrap();
                         output_server_addr.hide();
                     }
                 }
             }
         });
+    }
+
+    #[cfg(target_os = "linux")]
+    let mut x11_context = X11Context::new().unwrap();
+    #[cfg(target_os = "linux")]
+    let capture_window = Rc::new(RefCell::new(x11_context.root_window().unwrap()));
+
+    #[cfg(target_os = "linux")]
+    {
+        let capture_window = capture_window.clone();
+        but_update_windows.set_callback(Box::new(move || {
+            choice_window.clear();
+            {
+                let root_window = x11_context.root_window().unwrap();
+                let capture_window = capture_window.clone();
+                choice_window.add(
+                    "",
+                    Shortcut::None,
+                    MenuFlag::Normal,
+                    Box::new(move || {
+                        let capture_window = capture_window.clone();
+                        capture_window.replace(root_window);
+                    }),
+                );
+            }
+            for window in x11_context.windows().unwrap() {
+                let capture_window = capture_window.clone();
+                choice_window.add(
+                    &window
+                        .name()
+                        .replace("\\", "\\\\")
+                        .replace("/", "\\/")
+                        .replace("_", "\\_")
+                        .replace("&", "\\&"),
+                    Shortcut::None,
+                    MenuFlag::Normal,
+                    Box::new(move || {
+                        capture_window.replace(window);
+                    }),
+                );
+            }
+        }));
+
+        but_update_windows.do_callback();
     }
 
     let mut sender_gui2ws: Option<mpsc::Sender<Gui2WsMessage>> = None;
@@ -215,7 +274,7 @@ pub fn run() {
                         screen_update_interval,
                         check_stylus.is_checked(),
                         check_faster_screencapture.is_checked(),
-                        X11_context.windows().unwrap()[1].clone(),
+                        capture_window.clone().borrow().clone(),
                     );
 
                     let (sender_gui2web_tmp, receiver_gui2web) = mpsc_tokio::channel(100);

@@ -16,9 +16,9 @@
 struct WindowInfo
 {
 	Display* disp;
-	Window* win;
+	Window win;
 	signed long desktop_id;
-	char* title;
+	char title[MAX_PROPERTY_VALUE_LEN];
 };
 
 typedef struct WindowInfo WindowInfo;

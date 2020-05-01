@@ -20,9 +20,9 @@ use crate::stream_handler::{PointerStreamHandler, ScreenStreamHandler, StreamHan
 use crate::screen_capture::generic::ScreenCaptureGeneric;
 
 #[cfg(target_os = "linux")]
-use crate::cerror::CError;
+use crate::screen_capture::linux::ScreenCaptureX11;
 #[cfg(target_os = "linux")]
-use crate::screen_capture::linux::{ScreenCaptureX11, WindowInfo};
+use crate::x11helper::WindowInfo;
 
 pub enum Ws2GuiMessage {
     Error(String),
@@ -77,6 +77,7 @@ pub fn run(
     let pass: Option<String> = password.map_or(None, |s| Some(s.to_string()));
     #[cfg(target_os = "linux")]
     {
+        let capture_window = capture_window.clone();
         if stylus_support {
             spawn(move || {
                 listen_websocket(
@@ -85,7 +86,7 @@ pub fn run(
                     clients2,
                     shutdown2,
                     sender2,
-                    create_graphic_tablet_stream_handler,
+                    move || create_graphic_tablet_stream_handler(capture_window),
                 )
             });
         } else {
@@ -96,7 +97,7 @@ pub fn run(
                     clients2,
                     shutdown2,
                     sender2,
-                    create_mouse_stream_handler,
+                    move || create_mouse_stream_handler(capture_window),
                 )
             });
         }
@@ -156,14 +157,14 @@ pub fn run(
 }
 
 #[cfg(target_os = "linux")]
-fn create_graphic_tablet_stream_handler(
+fn create_graphic_tablet_stream_handler(winfo: WindowInfo
 ) -> Result<PointerStreamHandler<GraphicTablet>, Box<dyn std::error::Error>> {
-    Ok(PointerStreamHandler::new(GraphicTablet::new()?))
+    Ok(PointerStreamHandler::new(GraphicTablet::new(winfo)?))
 }
 
-fn create_mouse_stream_handler() -> Result<PointerStreamHandler<Mouse>, Box<dyn std::error::Error>>
+fn create_mouse_stream_handler(winfo: WindowInfo) -> Result<PointerStreamHandler<Mouse>, Box<dyn std::error::Error>>
 {
-    Ok(PointerStreamHandler::new(Mouse::new()))
+    Ok(PointerStreamHandler::new(Mouse::new(winfo)))
 }
 
 #[cfg(target_os = "linux")]

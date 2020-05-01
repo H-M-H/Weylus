@@ -1,35 +1,14 @@
-use std::ffi::CStr;
-use std::fmt;
-use std::os::raw::{c_char, c_int, c_long, c_uint, c_void};
+use std::os::raw::{c_int, c_void};
 use std::slice::from_raw_parts;
 
 use crate::cerror::CError;
 use crate::screen_capture::ScreenCapture;
+use crate::x11helper::WindowInfo;
 
 extern "C" {
     fn init_capture(window: *const WindowInfo, ctx: *mut c_void, err: *mut CError) -> *mut c_void;
     fn capture_sceen(handle: *mut c_void, img: *mut CImage, err: *mut CError);
     fn destroy_capture(handle: *mut c_void, err: *mut CError);
-
-    fn free_window_info(windows: *mut WindowInfo, size: isize);
-
-    fn create_window_info(
-        disp: *mut c_void,
-        windows: *mut *mut WindowInfo,
-        err: *mut CError,
-    ) -> isize;
-
-    fn get_window_geometry(
-        winfo: *const WindowInfo,
-        x: *mut c_int,
-        y: *mut c_int,
-        width: *mut c_uint,
-        height: *mut c_uint,
-        err: *mut CError,
-    );
-
-    fn XOpenDisplay(name: *const c_char) -> *mut c_void;
-    fn XCloseDisplay(disp: *mut c_void) -> c_int;
 }
 
 #[repr(C)]
@@ -37,101 +16,6 @@ struct CImage {
     data: *const u8,
     width: c_int,
     height: c_int,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct WindowInfo {
-    disp: *const c_void,
-    win: *const c_void,
-    desktop_id: c_long,
-    title: *const c_char,
-}
-
-unsafe impl Send for WindowInfo {}
-
-impl WindowInfo {
-    pub fn name(&self) -> String {
-        unsafe { CStr::from_ptr(self.title).to_string_lossy().into() }
-    }
-
-    pub fn geometry(&self) -> WindowGeometry {
-        let mut x: c_int = 0;
-        let mut y: c_int = 0;
-        let mut width: c_uint = 0;
-        let mut height: c_uint = 0;
-        let mut err = CError::new();
-        unsafe {
-            get_window_geometry(self, &mut x, &mut y, &mut width, &mut height, &mut err);
-        }
-        WindowGeometry {
-            x: x.into(),
-            y: y.into(),
-            width: width.into(),
-            height: height.into(),
-        }
-    }
-}
-
-impl fmt::Display for WindowInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.name())
-    }
-}
-
-pub struct WindowGeometry {
-    pub x: i64,
-    pub y: i64,
-    pub width: u64,
-    pub height: u64,
-}
-
-pub struct X11Context {
-    disp: *mut c_void,
-    window_info: Option<*mut WindowInfo>,
-    window_count: usize,
-}
-
-impl X11Context {
-    pub fn new() -> Option<Self> {
-        let disp = unsafe { XOpenDisplay(std::ptr::null()) };
-        if disp.is_null() {
-            return None;
-        }
-        Some(Self {
-            disp: disp,
-            window_info: None,
-            window_count: 0,
-        })
-    }
-
-    pub fn windows(&mut self) -> Result<&[WindowInfo], CError> {
-        if let Some(window_info) = self.window_info {
-            unsafe {
-                free_window_info(window_info, self.window_count as isize);
-            }
-        }
-        let mut err = CError::new();
-        let mut window_infos: *mut WindowInfo = std::ptr::null_mut();
-        unsafe {
-            self.window_count = create_window_info(self.disp, &mut window_infos, &mut err) as usize;
-        }
-        if err.is_err() {
-            return Err(err);
-        }
-        Ok(unsafe { std::slice::from_raw_parts(window_infos, self.window_count) })
-    }
-}
-
-impl Drop for X11Context {
-    fn drop(&mut self) {
-        unsafe { XCloseDisplay(self.disp) };
-        if let Some(window_info) = self.window_info {
-            unsafe {
-                free_window_info(window_info, self.window_count as isize);
-            }
-        }
-    }
 }
 
 impl CImage {
@@ -161,7 +45,9 @@ pub struct ScreenCaptureX11 {
 impl ScreenCaptureX11 {
     pub fn new(window: WindowInfo) -> Result<Self, CError> {
         let mut err = CError::new();
+        fltk::app::lock().unwrap();
         let handle = unsafe { init_capture(&window, std::ptr::null_mut(), &mut err) };
+        fltk::app::unlock();
         if err.is_err() {
             return Err(err);
         } else {
@@ -227,9 +113,11 @@ impl ScreenCaptureX11 {
 impl Drop for ScreenCaptureX11 {
     fn drop(&mut self) {
         let mut err = CError::new();
+        fltk::app::lock().unwrap();
         unsafe {
             destroy_capture(self.handle, &mut err);
         }
+        fltk::app::unlock();
     }
 }
 
@@ -237,9 +125,11 @@ impl ScreenCapture for ScreenCaptureX11 {
     fn capture(&mut self) -> &[u8] {
         let mut err = CError::new();
         let mut img = CImage::new();
+        fltk::app::lock().unwrap();
         unsafe {
             capture_sceen(self.handle, &mut img, &mut err);
         }
+        fltk::app::unlock();
         self.convert_to_png(&img).unwrap()
     }
 }

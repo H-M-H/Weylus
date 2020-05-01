@@ -1,10 +1,10 @@
-use std::os::raw::{c_int, c_uchar};
+use std::os::raw::c_int;
 
 use crate::input::pointer::PointerDevice;
-use crate::protocol::Button;
 use crate::protocol::PointerEvent;
 use crate::protocol::PointerEventType;
 use crate::protocol::PointerType;
+use crate::x11helper::WindowInfo;
 
 use crate::cerror::CError;
 
@@ -25,10 +25,15 @@ pub struct GraphicTablet {
     pointer_fd: c_int,
     multitouch_fd: c_int,
     multi_touches: [Option<MultiTouch>; 5],
+    winfo: WindowInfo,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
 }
 
 impl GraphicTablet {
-    pub fn new() -> Result<Self, CError> {
+    pub fn new(winfo: WindowInfo) -> Result<Self, CError> {
         let mut err = CError::new();
         let pointer_fd = unsafe { init_uinput_pointer(&mut err) };
         if err.is_err() {
@@ -42,17 +47,22 @@ impl GraphicTablet {
             pointer_fd: pointer_fd,
             multitouch_fd: 0, // multitouch_fd,
             multi_touches: Default::default(),
+            winfo: winfo,
+            x: 0.0,
+            y: 0.0,
+            width: 1.0,
+            height: 1.0,
         };
         Ok(tblt)
     }
 
     fn transform_x(&self, x: f64) -> i32 {
-        let x = x * 65535.0;
+        let x = (x * self.width + self.x) * 65535.0;
         x as i32
     }
 
     fn transform_y(&self, y: f64) -> i32 {
-        let y = y * 65535.0;
+        let y = (y * self.height + self.y) * 65535.0;
         y as i32
     }
 
@@ -152,6 +162,11 @@ const ABS_MAX: c_int = 65535;
 
 impl PointerDevice for GraphicTablet {
     fn send_event(&mut self, event: &PointerEvent) {
+        let geometry = self.winfo.geometry().unwrap();
+        self.x = geometry.x;
+        self.y = geometry.y;
+        self.width = geometry.width;
+        self.height = geometry.height;
         match event.pointer_type {
             /*PointerType::Touch => {
                 match event.event_type {
@@ -269,9 +284,9 @@ impl PointerDevice for GraphicTablet {
                     self.transform_pressure(1.0),
                 );
                 match event.event_type {
-                    PointerEventType::DOWN => self.send(ET_KEY, EC_KEY_TOOL_PEN, 1),
+                    PointerEventType::DOWN => self.send(ET_KEY, EC_KEY_MOUSE_LEFT, 1),
                     PointerEventType::MOVE => (),
-                    _ => self.send(ET_KEY, EC_KEY_TOOL_PEN, 0),
+                    _ => self.send(ET_KEY, EC_KEY_MOUSE_LEFT, 0),
                 }
                 self.send(ET_SYNC, EC_SYNC_REPORT, 1);
             }

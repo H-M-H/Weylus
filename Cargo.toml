@@ -22,8 +22,9 @@ bitflags = "1.2"
 image = "0.22.4"
 base64 = "0.12"
 mtpng = "0.3.4"
-fltk = "^0.3.9"
+fltk = { git = "https://github.com/MoAlyousef/fltk-rs" }
 pnet = "0.25"
+c_helper = { path = "c_helper" }
 
 [target.'cfg(target_os = "linux")'.build-dependencies]
 cc = "1.0"

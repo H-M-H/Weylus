@@ -1,8 +1,10 @@
 #include "xwindows.h"
 #include "error.h"
 #include <X11/X.h>
+#include <X11/Xlib.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 int locale_to_utf8(char* src, char* dest, size_t size)
 {
@@ -53,13 +55,13 @@ char* get_property(
 			&ret_bytes_after,
 			&ret_prop) != Success)
 	{
-		fill_error(err, 1, "Cannot get %s property.\n", prop_name);
+		fill_error(err, 1, "Cannot get %s property.", prop_name);
 		return NULL;
 	}
 
 	if (xa_ret_type != xa_prop_type)
 	{
-		fill_error(err, 1, "Invalid type of %s property.\n", prop_name);
+		fill_error(err, 1, "Invalid type of %s property.", prop_name);
 		XFree(ret_prop);
 		return NULL;
 	}
@@ -154,16 +156,7 @@ Window* get_client_list(Display* disp, unsigned long* size, Error* err)
 	return client_list;
 }
 
-void free_window_info(WindowInfo* windows, size_t size)
-{
-	for (int i = 0; i < size; ++i)
-	{
-		free(windows[i].title);
-	}
-	free(windows->win);
-}
-
-size_t create_window_info(Display* disp, WindowInfo** window_info, Error* err)
+size_t get_window_info(Display* disp, WindowInfo* windows, size_t size, Error* err)
 {
 	Window* client_list;
 	unsigned long client_list_size;
@@ -175,10 +168,9 @@ size_t create_window_info(Display* disp, WindowInfo** window_info, Error* err)
 	}
 
 	size_t num_windows = client_list_size / sizeof(Window);
-	WindowInfo* windows = malloc(num_windows * sizeof(WindowInfo));
 
 	/* print the list */
-	for (int i = 0; i < num_windows; i++)
+	for (int i = 0; i < num_windows && i < size; i++)
 	{
 		char* title_utf8 = get_window_title(disp, client_list[i], NULL);
 		if (title_utf8 == NULL)
@@ -196,24 +188,16 @@ size_t create_window_info(Display* disp, WindowInfo** window_info, Error* err)
 				disp, client_list[i], XA_CARDINAL, "_WIN_WORKSPACE", NULL, NULL);
 		}
 
-		/* special desktop ID -1 means "all desktops", so we
-		   have to convert the desktop value to signed long */
-		printf(
-			"0x%.8lx %2ld %s\n", client_list[i], desktop ? (signed long)*desktop : 0, title_utf8);
-
 		windows[i].disp = disp;
-
-		// remeber to free those:
-		windows[i].win = &client_list[i];
-		// use -2 to indicate that we have no clue
+		windows[i].win = client_list[i];
+		// special desktop ID -1 means "all desktops"
+		// use -2 to indicate that no desktop has been found
 		windows[i].desktop_id = desktop ? *desktop : -2;
-		windows[i].title = title_utf8;
-
-		*window_info = windows;
-
+		strncpy(windows[i].title, title_utf8, sizeof(windows->title));
+		free(title_utf8);
 		free(desktop);
 	}
-
+	free(client_list);
 	return num_windows;
 }
 
@@ -224,9 +208,49 @@ void get_window_geometry(
 	int junkx, junky;
 	unsigned int bw, depth;
 	if (!XGetGeometry(
-			winfo->disp, *winfo->win, &junkroot, &junkx, &junky, width, height, &bw, &depth))
+			winfo->disp, winfo->win, &junkroot, &junkx, &junky, width, height, &bw, &depth))
 	{
 		ERROR(err, 1, "Failed to get window geometry!");
 	}
-	XTranslateCoordinates(winfo->disp, *winfo->win, junkroot, junkx, junky, x, y, &junkroot);
+	XTranslateCoordinates(winfo->disp, winfo->win, junkroot, junkx, junky, x, y, &junkroot);
+}
+
+void get_window_geometry_relative(
+	WindowInfo* winfo, float* x, float* y, float* width, float* height, Error* err)
+{
+	Window junkroot;
+	int junkx, junky;
+	unsigned int bw, depth;
+	int x_tmp, y_tmp;
+
+	XWindowAttributes window_attributes;
+	if (!XGetWindowAttributes(winfo->disp, winfo->win, &window_attributes))
+	{
+		ERROR(err, 1, "Failed to get window attributes for window: 0x%.8lx", winfo->win);
+	}
+	if (!XTranslateCoordinates(winfo->disp, winfo->win, window_attributes.root, junkx, junky, &x_tmp, &y_tmp, &junkroot))
+	{
+		// we are on a different screen or some error occured
+		ERROR(err, 1, "Failed to get window coordinates relative to its root!");
+	}
+	*x = x_tmp / (float)window_attributes.screen->width;
+	*y = y_tmp / (float)window_attributes.screen->height;
+	*width = window_attributes.width / (float)window_attributes.screen->width;
+	*height = window_attributes.height / (float)window_attributes.screen->height;
+}
+
+void get_root_window_info(Display* disp, WindowInfo* winfo, Error* err)
+{
+	Window root = DefaultRootWindow(disp);
+	char* title_utf8 = get_window_title(disp, root, NULL);
+	if (title_utf8 == NULL)
+	{
+		title_utf8 = malloc(13);
+		snprintf(title_utf8, 13, "UNKNOWN Root");
+	}
+	winfo->disp = disp;
+	strncpy(winfo->title, title_utf8, sizeof(winfo->title));
+	winfo->win = root;
+	winfo->desktop_id = -1;
+	free(title_utf8);
 }

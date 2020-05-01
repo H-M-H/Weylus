@@ -1,0 +1,18 @@
+[package]
+name = "c_helper"
+version = "0.1.0"
+authors = ["HMH <henry@freedesk.net>"]
+edition = "2018"
+
+[lib]
+name = "c_helper"
+path = "src/lib.rs"
+proc-macro = true
+
+[dependencies]
+syn = "^1.0"
+quote = "^1.0"
+
+[build-dependencies]
+cc = "1.0"
+

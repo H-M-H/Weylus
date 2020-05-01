@@ -47,7 +47,7 @@ void* init_capture(WindowInfo* winfo, CaptureContext* ctx, Error* err)
 		ctx = malloc(sizeof(CaptureContext));
 	ctx->winfo = *winfo;
 	XWindowAttributes window_attributes;
-	if (!XGetWindowAttributes(winfo->disp, *winfo->win, &window_attributes))
+	if (!XGetWindowAttributes(winfo->disp, winfo->win, &window_attributes))
 	{
 		fill_error(err, 1, "Failed to get window attributes for window: 0x%.8lx", ctx->winfo.win);
 		return NULL;
@@ -100,7 +100,7 @@ void capture_sceen(CaptureContext* ctx, struct Image* img, Error* err)
 	unsigned int width, height;
 	unsigned int bw, depth;
 	if (!XGetGeometry(
-			ctx->winfo.disp, *ctx->winfo.win, &junkroot, &x, &y, &width, &height, &bw, &depth))
+			ctx->winfo.disp, ctx->winfo.win, &junkroot, &x, &y, &width, &height, &bw, &depth))
 	{
 		ERROR(err, 1, "Failed to get window geometry!");
 	}
@@ -116,9 +116,8 @@ void capture_sceen(CaptureContext* ctx, struct Image* img, Error* err)
 			return;
 		}
 	}
-	XShmGetImage(ctx->winfo.disp, *ctx->winfo.win, ctx->ximg, 0, 0, 0x00ffffff);
+	XShmGetImage(ctx->winfo.disp, ctx->winfo.win, ctx->ximg, 0, 0, 0x00ffffff);
 	img->width = ctx->ximg->width;
 	img->height = ctx->ximg->height;
 	img->data = ctx->ximg->data;
 }
-
