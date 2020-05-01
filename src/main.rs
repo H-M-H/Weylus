@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate bitflags;
 
+#[cfg(target_os = "linux")]
 #[macro_use]
 extern crate c_helper;
 

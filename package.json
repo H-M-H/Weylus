@@ -1,0 +1,9 @@
+{
+  "name": "weylus",
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^3.8.3"
+  }
+}

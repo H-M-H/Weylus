@@ -33,6 +33,7 @@ pub enum Gui2WsMessage {
     Shutdown,
 }
 
+#[cfg(target_os = "linux")]
 pub fn run(
     sender: mpsc::Sender<Ws2GuiMessage>,
     receiver: mpsc::Receiver<Gui2WsMessage>,
@@ -75,7 +76,6 @@ pub fn run(
         }
     });
     let pass: Option<String> = password.map_or(None, |s| Some(s.to_string()));
-    #[cfg(target_os = "linux")]
     {
         let capture_window = capture_window.clone();
         if stylus_support {
@@ -103,20 +103,7 @@ pub fn run(
         }
     }
 
-    #[cfg(not(target_os = "linux"))]
-    spawn(move || {
-        listen_websocket(
-            ws_pointer_socket_addr,
-            pass,
-            clients2,
-            shutdown2,
-            sender2,
-            create_mouse_stream_handler,
-        )
-    });
-
     let pass: Option<String> = password.map_or(None, |s| Some(s.to_string()));
-    #[cfg(target_os = "linux")]
     {
         if faster_capture {
             spawn(move || {
@@ -142,8 +129,62 @@ pub fn run(
             });
         }
     }
+}
 
-    #[cfg(not(target_os = "linux"))]
+#[cfg(not(target_os = "linux"))]
+pub fn run(
+    sender: mpsc::Sender<Ws2GuiMessage>,
+    receiver: mpsc::Receiver<Gui2WsMessage>,
+    ws_pointer_socket_addr: SocketAddr,
+    ws_video_socket_addr: SocketAddr,
+    password: Option<&str>,
+    screen_update_interval: Duration,
+) {
+    let clients = Arc::new(Mutex::new(HashMap::<
+        SocketAddr,
+        Arc<Mutex<Writer<TcpStream>>>,
+    >::new()));
+    let clients2 = clients.clone();
+    let clients3 = clients.clone();
+    let shutdown = Arc::new(AtomicBool::new(false));
+    let shutdown2 = shutdown.clone();
+    let shutdown3 = shutdown.clone();
+    let sender2 = sender.clone();
+    let sender3 = sender.clone();
+
+    spawn(move || loop {
+        match receiver.recv() {
+            Err(_) | Ok(Gui2WsMessage::Shutdown) => {
+                let clients = clients.lock().unwrap();
+                for client in clients.values() {
+                    let client = client.lock().unwrap();
+                    if let Err(err) = client.shutdown_all() {
+                        sender.send(Ws2GuiMessage::Error(format!(
+                            "Could not shutdown websocket: {}",
+                            err
+                        )));
+                    }
+                }
+                shutdown.store(true, Ordering::Relaxed);
+                return;
+            }
+        }
+    });
+    let pass: Option<String> = password.map_or(None, |s| Some(s.to_string()));
+
+    spawn(move || {
+        listen_websocket(
+            ws_pointer_socket_addr,
+            pass,
+            clients2,
+            shutdown2,
+            sender2,
+            create_mouse_stream_handler,
+        )
+    });
+
+    let pass: Option<String> = password.map_or(None, |s| Some(s.to_string()));
+
     spawn(move || {
         listen_websocket(
             ws_video_socket_addr,
@@ -157,14 +198,16 @@ pub fn run(
 }
 
 #[cfg(target_os = "linux")]
-fn create_graphic_tablet_stream_handler(winfo: WindowInfo
+fn create_graphic_tablet_stream_handler(
+    winfo: WindowInfo,
 ) -> Result<PointerStreamHandler<GraphicTablet>, Box<dyn std::error::Error>> {
     Ok(PointerStreamHandler::new(GraphicTablet::new(winfo)?))
 }
 
 #[cfg(target_os = "linux")]
-fn create_mouse_stream_handler(winfo: WindowInfo) -> Result<PointerStreamHandler<Mouse>, Box<dyn std::error::Error>>
-{
+fn create_mouse_stream_handler(
+    winfo: WindowInfo,
+) -> Result<PointerStreamHandler<Mouse>, Box<dyn std::error::Error>> {
     Ok(PointerStreamHandler::new(Mouse::new(winfo)))
 }
 

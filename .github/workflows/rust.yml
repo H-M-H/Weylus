@@ -1,0 +1,53 @@
+name: Rust
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macOS-latest, windows-latest]
+        include:
+        - os: ubuntu-latest
+          build-cmd: npm install -g typescript && cargo install cargo-deb && cargo deb
+          package-file: target/debian/weylus*.deb
+          exec-file: target/release/weylus
+        - os: macOS-latest
+          build-cmd: npm install -g typescript && cargo install cargo-bundle && cargo bundle --release
+          package-file: target/release/weylus
+          exec-file: target/release/weylus
+        - os: windows-latest
+          build-cmd: npm install -g typescript && npm run build && cargo install cargo-bundle && cargo bundle --release
+          package-file: target/release/weylus
+          exec-file: target/release/weylus
+
+    steps:
+    - name: Download deps
+      run: |
+         if [ "$RUNNER_OS" == "Linux" ]; then
+          sudo apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libxtst-dev
+         fi
+      shell: bash
+    - uses: actions/checkout@v2
+    - uses: actions/setup-node@v1
+    - name: Build
+      run: ${{ matrix.build-cmd }}
+
+    - name: Upload execs
+      uses: actions/upload-artifact@v2
+      with:
+        name: weylus-exec-${{ matrix.os }}
+        path: ${{ matrix.exec-file }}
+
+    - name: Upload pkgs
+      uses: actions/upload-artifact@v2
+      with:
+        name: weylus-${{ matrix.os }}
+        path: ${{ matrix.package-file }}

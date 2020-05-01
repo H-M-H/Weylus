@@ -22,6 +22,8 @@ base64 = "0.12"
 mtpng = "0.3.4"
 fltk = { git = "https://github.com/MoAlyousef/fltk-rs" }
 pnet = "0.25"
+
+[target.'cfg(target_os = "linux")'.dependencies]
 c_helper = { path = "c_helper" }
 
 [target.'cfg(target_os = "linux")'.build-dependencies]
@@ -30,4 +32,11 @@ cc = "1.0"
 [package.metadata.bundle]
 name = "Weylus"
 identifier = "io.github.h-m-h.weylus"
-version = "0.5"
+
+[package.metadata.deb]
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/weylus", "usr/bin/", "755"],
+]

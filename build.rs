@@ -2,11 +2,10 @@ use std::process::Command;
 
 fn main() {
     println!("cargo:rerun-if-changed=ts/lib.ts");
-    match Command::new("tsc")
-        .status()
-    {
+    #[cfg(not(target_os = "windows"))]
+    match Command::new("npm").arg("run").arg("build").status() {
         Err(err) => {
-            println!("cargo:warning=Failed to call tsc: {}", err);
+            println!("cargo:warning=Failed to call npm: {}", err);
             std::process::exit(1);
         }
         Ok(status) => {

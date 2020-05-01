@@ -121,7 +121,7 @@ pub fn run() {
         .below_of(&check_faster_screencapture, padding)
         .with_label("Capturing windows is\nonly supported on Linux!");
 
-    let choice_window = Choice::default()
+    let mut choice_window = Choice::default()
         .with_size(width, height)
         .below_of(&label_window_choice, 0);
     #[cfg(not(target_os = "linux"))]
@@ -300,6 +300,7 @@ pub fn run() {
 
                     let (sender_gui2ws_tmp, receiver_gui2ws) = mpsc::channel();
                     sender_gui2ws = Some(sender_gui2ws_tmp);
+                    #[cfg(target_os = "linux")]
                     crate::websocket::run(
                         sender_ws2gui.clone(),
                         receiver_gui2ws,
@@ -310,6 +311,15 @@ pub fn run() {
                         check_stylus.is_checked(),
                         check_faster_screencapture_ref.borrow().is_checked(),
                         capture_window.clone().borrow().clone(),
+                    );
+                    #[cfg(not(target_os = "linux"))]
+                    crate::websocket::run(
+                        sender_ws2gui.clone(),
+                        receiver_gui2ws,
+                        SocketAddr::new(bind_addr, ws_pointer_port),
+                        SocketAddr::new(bind_addr, ws_video_port),
+                        password,
+                        screen_update_interval,
                     );
 
                     let (sender_gui2web_tmp, receiver_gui2web) = mpsc_tokio::channel(100);

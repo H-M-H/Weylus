@@ -40,11 +40,13 @@ impl PointerDevice for Mouse {
         }
         #[cfg(target_os = "linux")]
         {
-            if self.winfo.activate().is_err() {
+            if let Err(err) = self.winfo.activate() {
+                warn!("Failed to activate window, sending no input ({})", err);
                 return;
             }
             let geometry = self.winfo.geometry();
-            if geometry.is_err() {
+            if let Err(err) = geometry {
+                warn!("Failed to get window geometry, sending no input ({})", err);
                 return;
             }
             let geometry = geometry.unwrap();
