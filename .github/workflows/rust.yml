@@ -21,7 +21,7 @@ jobs:
           exec-file: target/release/weylus
         - os: macOS-latest
           build-cmd: npm install -g typescript && cargo install cargo-bundle && cargo bundle --release
-          package-file: target/release/weylus
+          package-file: target/release/bundle/osx/Weylus.app
           exec-file: target/release/weylus
         - os: windows-latest
           build-cmd: npm install -g typescript && npm run build && cargo install cargo-bundle && cargo bundle --release

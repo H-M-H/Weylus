@@ -20,6 +20,7 @@ use fltk::{
     window::Window,
 };
 
+#[cfg(not(target_os = "windows"))]
 use pnet::datalink;
 
 use crate::web::{Gui2WebMessage, Web2GuiMessage};
@@ -333,6 +334,9 @@ pub fn run() {
                         ws_video_port,
                         password,
                     );
+
+                    #[cfg(not(target_os = "windows"))]
+                    {
                     if web_sock.ip().is_unspecified() {
                         // try to guess an ip
                         let mut ips = Vec::<IpAddr>::new();
@@ -363,8 +367,19 @@ pub fn run() {
                             }
                         }
                     }
+                    }
                     let mut output_server_addr = output_server_addr.lock()?;
+
+                    #[cfg(not(target_os = "windows"))]
                     output_server_addr.set_value(&format!("http://{}", web_sock.to_string()));
+                    #[cfg(target_os = "windows")]
+                    {
+                        if web_sock.ip().is_unspecified() {
+                            output_server_addr.set_value("http://<your ip address>");
+                        } else {
+                            output_server_addr.set_value(&format!("http://{}", web_sock.to_string()));
+                        }
+                    }
                     output_server_addr.show();
                     but.set_label("Stop");
                 } else {

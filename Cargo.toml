@@ -1,5 +1,5 @@
 [package]
-name = "weylus"
+name = "Weylus"
 version = "0.1.0"
 authors = ["HMH <henry@freedesk.net>"]
 edition = "2018"
@@ -21,6 +21,8 @@ image = "0.22.4"
 base64 = "0.12"
 mtpng = "0.3.4"
 fltk = { git = "https://github.com/MoAlyousef/fltk-rs" }
+
+[target.'cfg(not(target_os = "windows"))'.dependencies]
 pnet = "0.25"
 
 [target.'cfg(target_os = "linux")'.dependencies]
