@@ -18,6 +18,8 @@ extern "C" {
         err: *mut CError,
     );
 
+    fn activate_window(window: *const WindowInfo, err: *mut CError);
+
     fn XOpenDisplay(name: *const c_char) -> *mut c_void;
     fn XCloseDisplay(disp: *mut c_void) -> c_int;
 }
@@ -48,6 +50,18 @@ impl WindowInfo {
             width: width.into(),
             height: height.into(),
         })
+    }
+
+    pub fn activate(&self) -> Result<(), CError> {
+        let mut err = CError::new();
+        fltk::app::lock().unwrap();
+        unsafe { activate_window(self, &mut err) }
+        fltk::app::unlock();
+        if err.is_err() {
+            Err(err)
+        } else {
+            Ok(())
+        }
     }
 }
 

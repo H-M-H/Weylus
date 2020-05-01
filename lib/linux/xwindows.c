@@ -228,7 +228,15 @@ void get_window_geometry_relative(
 	{
 		ERROR(err, 1, "Failed to get window attributes for window: 0x%.8lx", winfo->win);
 	}
-	if (!XTranslateCoordinates(winfo->disp, winfo->win, window_attributes.root, junkx, junky, &x_tmp, &y_tmp, &junkroot))
+	if (!XTranslateCoordinates(
+			winfo->disp,
+			winfo->win,
+			window_attributes.root,
+			junkx,
+			junky,
+			&x_tmp,
+			&y_tmp,
+			&junkroot))
 	{
 		// we are on a different screen or some error occured
 		ERROR(err, 1, "Failed to get window coordinates relative to its root!");
@@ -253,4 +261,76 @@ void get_root_window_info(Display* disp, WindowInfo* winfo, Error* err)
 	winfo->win = root;
 	winfo->desktop_id = -1;
 	free(title_utf8);
+}
+
+void client_msg(
+	Display* disp,
+	Window win,
+	char* msg,
+	unsigned long data0,
+	unsigned long data1,
+	unsigned long data2,
+	unsigned long data3,
+	unsigned long data4,
+	Error* err)
+{
+	XEvent event;
+	long mask = SubstructureRedirectMask | SubstructureNotifyMask;
+
+	event.xclient.type = ClientMessage;
+	event.xclient.serial = 0;
+	event.xclient.send_event = True;
+	event.xclient.message_type = XInternAtom(disp, msg, False);
+	event.xclient.window = win;
+	event.xclient.format = 32;
+	event.xclient.data.l[0] = data0;
+	event.xclient.data.l[1] = data1;
+	event.xclient.data.l[2] = data2;
+	event.xclient.data.l[3] = data3;
+	event.xclient.data.l[4] = data4;
+
+	if (!XSendEvent(disp, DefaultRootWindow(disp), False, mask, &event))
+	{
+		ERROR(err, 1, "Cannot send %s event.", msg);
+	}
+}
+
+void activate_window(WindowInfo* winfo, Error* err)
+{
+
+	Window* active_window = 0;
+	unsigned long size;
+
+	// do not need to activate the root window
+	if (winfo->win == DefaultRootWindow(winfo->disp))
+		return;
+
+	active_window = (Window*)get_property(
+		winfo->disp, DefaultRootWindow(winfo->disp), XA_WINDOW, "_NET_ACTIVE_WINDOW", &size, err);
+	if (*active_window == winfo->win)
+	{
+		// nothing to do window is active already
+		free(active_window);
+		return;
+	}
+
+	unsigned long* desktop;
+	/* desktop ID */
+	if ((desktop = (unsigned long*)get_property(
+			 winfo->disp, winfo->win, XA_CARDINAL, "_NET_WM_DESKTOP", NULL, err)) == NULL)
+	{
+		if ((desktop = (unsigned long*)get_property(
+				 winfo->disp, winfo->win, XA_CARDINAL, "_WIN_WORKSPACE", NULL, err)) == NULL)
+		{
+			ERROR(err, 1, "Cannot find desktop ID of the window.");
+		}
+	}
+	XEvent event;
+	client_msg(winfo->disp, DefaultRootWindow(winfo->disp), "_NET_CURRENT_DESKTOP", *desktop, 0, 0, 0, 0, err);
+	free(desktop);
+	OK_OR_ABORT(err);
+
+	client_msg(winfo->disp, winfo->win, "_NET_ACTIVE_WINDOW", 0, 0, 0, 0, 0, err);
+	OK_OR_ABORT(err);
+	XMapRaised(winfo->disp, winfo->win);
 }

@@ -31,6 +31,5 @@ pub fn xwindow_info_struct(attr: TokenStream, input: TokenStream) -> TokenStream
         unsafe impl Send for #ident {}
         #input
     };
-    println!("{}", gen);
     gen.into()
 }

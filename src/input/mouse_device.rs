@@ -28,7 +28,7 @@ impl Mouse {
 
 #[cfg(not(target_os = "linux"))]
 impl Mouse {
-    pub fn new(winfo: WindowInfo) -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 }
@@ -40,7 +40,14 @@ impl PointerDevice for Mouse {
         }
         #[cfg(target_os = "linux")]
         {
-            let geometry = self.winfo.geometry().unwrap();
+            if self.winfo.activate().is_err() {
+                return;
+            }
+            let geometry = self.winfo.geometry();
+            if geometry.is_err() {
+                return;
+            }
+            let geometry = geometry.unwrap();
             if let Err(err) = mouse::move_to(autopilot::geometry::Point::new(
                 (event.x * geometry.width + geometry.x) * screen_size().width,
                 (event.y * geometry.height + geometry.y) * screen_size().height,

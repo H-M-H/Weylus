@@ -162,9 +162,16 @@ fn create_graphic_tablet_stream_handler(winfo: WindowInfo
     Ok(PointerStreamHandler::new(GraphicTablet::new(winfo)?))
 }
 
+#[cfg(target_os = "linux")]
 fn create_mouse_stream_handler(winfo: WindowInfo) -> Result<PointerStreamHandler<Mouse>, Box<dyn std::error::Error>>
 {
     Ok(PointerStreamHandler::new(Mouse::new(winfo)))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn create_mouse_stream_handler() -> Result<PointerStreamHandler<Mouse>, Box<dyn std::error::Error>>
+{
+    Ok(PointerStreamHandler::new(Mouse::new()))
 }
 
 #[cfg(target_os = "linux")]

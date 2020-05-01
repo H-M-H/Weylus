@@ -162,7 +162,16 @@ const ABS_MAX: c_int = 65535;
 
 impl PointerDevice for GraphicTablet {
     fn send_event(&mut self, event: &PointerEvent) {
-        let geometry = self.winfo.geometry().unwrap();
+        if let Err(err) = self.winfo.activate() {
+            warn!("Failed to activate window, sending no input ({})", err);
+            return;
+        }
+        let geometry = self.winfo.geometry();
+        if let Err(err) = geometry {
+            warn!("Failed to get window geometry, sending no input ({})", err);
+            return;
+        }
+        let geometry = geometry.unwrap();
         self.x = geometry.x;
         self.y = geometry.y;
         self.width = geometry.width;

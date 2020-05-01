@@ -5,12 +5,12 @@ use std::time::Duration;
 
 use std::sync::{mpsc, Arc, Mutex};
 use tokio::sync::mpsc as mpsc_tokio;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 use fltk::{
     app::App,
     button::{Button, CheckButton},
-    enums::{Shortcut},
+    enums::Shortcut,
     frame::Frame,
     input::{Input, IntInput},
     menu::{Choice, MenuFlag},
@@ -109,19 +109,30 @@ pub fn run() {
         check_faster_screencapture.deactivate();
     }
 
+    #[cfg(target_os = "linux")]
     let label_window_choice = Frame::default()
         .with_size(width, height)
         .below_of(&check_faster_screencapture, padding)
         .with_label("Window to capture:");
 
-    let mut choice_window = Choice::default()
+    #[cfg(not(target_os = "linux"))]
+    let label_window_choice = Frame::default()
+        .with_size(width, height)
+        .below_of(&check_faster_screencapture, padding)
+        .with_label("Capturing windows is\nonly supported on Linux!");
+
+    let choice_window = Choice::default()
         .with_size(width, height)
         .below_of(&label_window_choice, 0);
+    #[cfg(not(target_os = "linux"))]
+    choice_window.deactivate();
 
     let mut but_update_windows = Button::default()
         .with_size(width, height)
         .below_of(&choice_window, padding)
         .with_label("Refresh");
+    #[cfg(not(target_os = "linux"))]
+    but_update_windows.deactivate();
 
     let mut output_buf = TextBuffer::default();
     let output = TextDisplay::default(&mut output_buf)
@@ -139,6 +150,8 @@ pub fn run() {
     wind.show();
 
     let but_toggle_ref = Rc::new(RefCell::new(but_toggle));
+    let choice_window_ref = Rc::new(RefCell::new(choice_window));
+    let check_faster_screencapture_ref = Rc::new(RefCell::new(check_faster_screencapture));
     let output_server_addr = Arc::new(Mutex::new(output_server_addr));
     let output = Arc::new(Mutex::new(output));
 
@@ -184,7 +197,7 @@ pub fn run() {
                         output.insert(&format!("Error from Webserver: {}\n", s))
                     }
                     Web2GuiMessage::Shutdown => {
-                        info!("Webserver: shutdown!" );
+                        info!("Webserver: shutdown!");
                         let mut output_server_addr = output_server_addr.lock().unwrap();
                         output_server_addr.hide();
                     }
@@ -201,40 +214,62 @@ pub fn run() {
     #[cfg(target_os = "linux")]
     {
         let capture_window = capture_window.clone();
-        but_update_windows.set_callback(Box::new(move || {
-            choice_window.clear();
-            {
-                let root_window = x11_context.root_window().unwrap();
-                let capture_window = capture_window.clone();
-                choice_window.add(
-                    "",
-                    Shortcut::None,
-                    MenuFlag::Normal,
-                    Box::new(move || {
-                        let capture_window = capture_window.clone();
-                        capture_window.replace(root_window);
-                    }),
-                );
-            }
-            for window in x11_context.windows().unwrap() {
-                let capture_window = capture_window.clone();
-                choice_window.add(
-                    &window
-                        .name()
-                        .replace("\\", "\\\\")
-                        .replace("/", "\\/")
-                        .replace("_", "\\_")
-                        .replace("&", "\\&"),
-                    Shortcut::None,
-                    MenuFlag::Normal,
-                    Box::new(move || {
-                        capture_window.replace(window);
-                    }),
-                );
-            }
-        }));
+
+        {
+            let choice_window_ref = choice_window_ref.clone();
+            but_update_windows.set_callback(Box::new(move || {
+                let mut choice_window = choice_window_ref.borrow_mut();
+                choice_window.clear();
+                {
+                    let root_window = x11_context.root_window().unwrap();
+                    let capture_window = capture_window.clone();
+                    choice_window.add(
+                        "",
+                        Shortcut::None,
+                        MenuFlag::Normal,
+                        Box::new(move || {
+                            let capture_window = capture_window.clone();
+                            capture_window.replace(root_window);
+                        }),
+                    );
+                }
+                for window in x11_context.windows().unwrap() {
+                    let capture_window = capture_window.clone();
+                    choice_window.add(
+                        &window
+                            .name()
+                            .replace("\\", "\\\\")
+                            .replace("/", "\\/")
+                            .replace("_", "\\_")
+                            .replace("&", "\\&"),
+                        Shortcut::None,
+                        MenuFlag::Normal,
+                        Box::new(move || {
+                            capture_window.replace(window);
+                        }),
+                    );
+                }
+            }));
+        }
 
         but_update_windows.do_callback();
+
+        let check_faster_screencapture_ref = check_faster_screencapture_ref.clone();
+
+        check_faster_screencapture_ref
+            .clone()
+            .borrow_mut()
+            .set_callback(Box::new(move || {
+                let checked = !check_faster_screencapture_ref.borrow().is_checked();
+                let mut choice_window = choice_window_ref.borrow_mut();
+                if checked {
+                    choice_window.deactivate();
+                    but_update_windows.deactivate();
+                } else {
+                    choice_window.activate();
+                    but_update_windows.activate();
+                }
+            }));
     }
 
     let mut sender_gui2ws: Option<mpsc::Sender<Gui2WsMessage>> = None;
@@ -273,7 +308,7 @@ pub fn run() {
                         password,
                         screen_update_interval,
                         check_stylus.is_checked(),
-                        check_faster_screencapture.is_checked(),
+                        check_faster_screencapture_ref.borrow().is_checked(),
                         capture_window.clone().borrow().clone(),
                     );
 
