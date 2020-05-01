@@ -25,7 +25,7 @@ jobs:
           exec-file: target/release/Weylus
         - os: windows-latest
           build-cmd: npm install -g typescript && npm run build && cargo install cargo-bundle && cargo bundle --release
-          package-file: target/release/Weylus
+          package-file: target/release/windows/Weylus.zip
           exec-file: target/release/Weylus
 
     steps:
