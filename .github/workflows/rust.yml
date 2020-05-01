@@ -19,16 +19,18 @@ jobs:
         include:
         - os: ubuntu-latest
           build-cmd: npm install -g typescript && cargo install cargo-deb && cargo deb
-          package-file: target/debian/Weylus*.deb
-          exec-file: target/release/Weylus
+          package-files: |
+             target/release/linux.zip
+             target/debian/Weylus*.deb
+          pkg-cmd: cd taget/release/ && zip linux.zip Weylus
         - os: macOS-latest
           build-cmd: npm install -g typescript && cargo install cargo-bundle && cargo bundle --release
-          package-file: target/release/bundle/osx
-          exec-file: target/release/Weylus
+          package-files: target/release/bundle/osx/macOS.zip
+          pkg-cmd: cd target/release/bundle/osx/ && zip -r macOS.zip Weylus.app
         - os: windows-latest
           build-cmd: npm install -g typescript && npm run build && cargo build --release --verbose
-          package-file: target/release/Weylus.exe
-          exec-file: target/release/Weylus.exe
+          package-files: target/release/Windows.zip
+          pkg-cmd: cd target/release/ && zip Windows.zip Weylus.exe
 
     steps:
     - name: Download deps
@@ -41,26 +43,14 @@ jobs:
     - uses: actions/setup-node@v1
     - name: Build
       run: ${{ matrix.build-cmd }}
-
-    - name: Upload execs
-      uses: actions/upload-artifact@v2
-      with:
-        name: weylus-exec-${{ matrix.os }}
-        path: ${{ matrix.exec-file }}
-
-    - name: Upload pkgs
-      uses: actions/upload-artifact@v2
-      with:
-        name: weylus-${{ matrix.os }}
-        path: ${{ matrix.package-file }}
-
+    - name: Package
+      run: ${{ matrix.pkg-cmd }}
     - name: Publish
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
       with:
           files: |
-            ${{matrix.package-file}}
-            ${{matrix.exec-file}}
+            ${{ matrix.package-files }}
           prerelease: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
