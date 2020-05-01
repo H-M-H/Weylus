@@ -289,6 +289,9 @@ fn listen_websocket<T, F>(
                         return;
                     }
                     let client = client.unwrap();
+                    if let Err(err) = client.set_nonblocking(false) {
+                        warn!("Failed to set client to blocking mode: {}", err);
+                    }
                     let peer_addr = client.peer_addr();
                     if let Err(err) = peer_addr {
                         sender.send(Ws2GuiMessage::Warning(format!(
