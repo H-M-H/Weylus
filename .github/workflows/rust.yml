@@ -24,9 +24,9 @@ jobs:
           package-file: target/release/bundle/osx/Weylus.app
           exec-file: target/release/Weylus
         - os: windows-latest
-          build-cmd: npm install -g typescript && npm run build && cargo install cargo-bundle && cargo bundle --release
-          package-file: target/release/windows/Weylus.zip
-          exec-file: target/release/Weylus
+          build-cmd: npm install -g typescript && npm run build && cargo build --release --verbose
+          package-file: target/release/Weylus.exe
+          exec-file: target/release/Weylus.exe
 
     steps:
     - name: Download deps
