@@ -1,11 +1,9 @@
 [package]
-name = "web-tablet"
+name = "weylus"
 version = "0.1.0"
 authors = ["HMH <henry@freedesk.net>"]
 edition = "2018"
 description = "Use your iPad or Android tablet as graphic tablet."
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 hyper = "^0.13"
@@ -30,6 +28,6 @@ c_helper = { path = "c_helper" }
 cc = "1.0"
 
 [package.metadata.bundle]
-name = "WebTablet"
-identifier = "io.github.h-m-h.web-tablet"
+name = "Weylus"
+identifier = "io.github.h-m-h.weylus"
 version = "0.5"

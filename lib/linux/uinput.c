@@ -86,7 +86,7 @@ void init_pointer(int fd, Error* err)
 	setup_abs(fd, ABS_TILT_Y, -90, 90, err);
 	OK_OR_ABORT(err);
 
-	setup(fd, "WebTabletPointer", 1, err);
+	setup(fd, "Weylus", 1, err);
 	OK_OR_ABORT(err);
 
 	if (ioctl(fd, UI_DEV_CREATE) < 0)
@@ -158,7 +158,7 @@ void init_multitouch(int fd, Error* err)
 	setup_abs(fd, ABS_MT_ORIENTATION, 0, 1, err);
 	OK_OR_ABORT(err);
 
-	setup(fd, "WebTabletMultiTouch", 2, err);
+	setup(fd, "WeylusMultiTouch", 2, err);
 	OK_OR_ABORT(err);
 
 	if (ioctl(fd, UI_DEV_CREATE) < 0)

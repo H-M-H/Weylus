@@ -39,7 +39,7 @@ pub fn run() {
     let mut wind = Window::default()
         .with_size(660, 600)
         .center_screen()
-        .with_label("WebTablet");
+        .with_label("Weylus");
 
     let input_password = Input::default()
         .with_pos(200, 30)
