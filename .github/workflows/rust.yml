@@ -22,7 +22,7 @@ jobs:
           package-files: |
              target/release/linux.zip
              target/debian/Weylus*.deb
-          pkg-cmd: cd taget/release/ && zip linux.zip Weylus
+          pkg-cmd: cd target/release/ && zip linux.zip Weylus
         - os: macOS-latest
           build-cmd: npm install -g typescript && cargo install cargo-bundle && cargo bundle --release
           package-files: target/release/bundle/osx/macOS.zip
@@ -30,7 +30,7 @@ jobs:
         - os: windows-latest
           build-cmd: npm install -g typescript && npm run build && cargo build --release --verbose
           package-files: target/release/Windows.zip
-          pkg-cmd: cd target/release/ && zip Windows.zip Weylus.exe
+          pkg-cmd: cd target/release/ && 7z a Windows.zip Weylus.exe
 
     steps:
     - name: Download deps
