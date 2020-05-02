@@ -4,12 +4,6 @@ body, html {
     margin: 0;
     padding: 0;
     overflow: hidden;
-}
-canvas {
-    position:absolute;
-    width: 100%;
-    height: 100%;
-    background: #002b36;
     touch-action: none;
     -webkit-touch-callout: none;
     -webkit-user-select: none;
@@ -17,4 +11,10 @@ canvas {
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
+}
+canvas {
+    position:absolute;
+    width: 100%;
+    height: 100%;
+    background: #002b36;
 }

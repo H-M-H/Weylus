@@ -1,22 +1,21 @@
 <!DOCTYPE html>
 <html>
+    <head>
+        <title>Weylus</title>
+        <link rel="stylesheet" href="style.css">
+        <script src="lib.js"></script>
+        <script>
+            let password = "{{password}}";
+            let websocket_pointer_port = "{{websocket_pointer_port}}";
+            let websocket_video_port = "{{websocket_video_port}}";
+            run(password, websocket_pointer_port, websocket_video_port);
+        </script>
+    </head>
 
-	<head>
-		<title>Weylus</title>
-		<link rel="stylesheet" href="style.css">
-		<script src="lib.js"></script>
-		<script>
-			let password = "{{password}}";
-			let websocket_pointer_port = "{{websocket_pointer_port}}";
-			let websocket_video_port = "{{websocket_video_port}}";
-			run(password, websocket_pointer_port, websocket_video_port);
-		</script>
-	</head>
-
-	<body>
-		<canvas id="canvas">
-			Your browser does not support canvas element.
-		</canvas>
-	</body>
+    <body>
+        <canvas id="canvas">
+            Your browser does not support canvas element.
+        </canvas>
+    </body>
 
 </html>
