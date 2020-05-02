@@ -1,6 +1,7 @@
 use std::os::raw::c_int;
 
-use crate::input::pointer::PointerDevice;
+use crate::input::device::InputDevice;
+use crate::protocol::Button;
 use crate::protocol::PointerEvent;
 use crate::protocol::PointerEventType;
 use crate::protocol::PointerType;
@@ -11,20 +12,22 @@ use crate::cerror::CError;
 use tracing::warn;
 
 extern "C" {
-    fn init_uinput_pointer(err: *mut CError) -> c_int;
-//    fn init_uinput_multitouch(err: *mut CError) -> c_int;
+    fn init_uinput_stylus(err: *mut CError) -> c_int;
+    fn init_uinput_mouse(err: *mut CError) -> c_int;
+    fn init_uinput_touch(err: *mut CError) -> c_int;
     fn destroy_uinput_device(fd: c_int);
     fn send_uinput_event(device: c_int, typ: c_int, code: c_int, value: c_int, err: *mut CError);
 }
 
-/*struct MultiTouch {
+struct MultiTouch {
     id: i64,
-}*/
+}
 
 pub struct GraphicTablet {
-    pointer_fd: c_int,
-//    multitouch_fd: c_int,
-//    multi_touches: [Option<MultiTouch>; 5],
+    stylus_fd: c_int,
+    mouse_fd: c_int,
+    touch_fd: c_int,
+    touches: [Option<MultiTouch>; 5],
     winfo: WindowInfo,
     x: f64,
     y: f64,
@@ -35,18 +38,26 @@ pub struct GraphicTablet {
 impl GraphicTablet {
     pub fn new(winfo: WindowInfo) -> Result<Self, CError> {
         let mut err = CError::new();
-        let pointer_fd = unsafe { init_uinput_pointer(&mut err) };
+        let stylus_fd = unsafe { init_uinput_stylus(&mut err) };
         if err.is_err() {
             return Err(err);
         }
-        /*let multitouch_fd = unsafe { init_uinput_multitouch(&mut err) };
+        let mouse_fd = unsafe { init_uinput_mouse(&mut err) };
         if err.is_err() {
+            unsafe { destroy_uinput_device(stylus_fd) };
             return Err(err);
-        }*/
+        }
+        let touch_fd = unsafe { init_uinput_touch(&mut err) };
+        if err.is_err() {
+            unsafe { destroy_uinput_device(stylus_fd) };
+            unsafe { destroy_uinput_device(mouse_fd) };
+            return Err(err);
+        }
         let tblt = Self {
-            pointer_fd: pointer_fd,
-//            multitouch_fd: 0, // multitouch_fd,
-//            multi_touches: Default::default(),
+            stylus_fd: stylus_fd,
+            mouse_fd: mouse_fd,
+            touch_fd: touch_fd,
+            touches: Default::default(),
             winfo: winfo,
             x: 0.0,
             y: 0.0,
@@ -57,25 +68,25 @@ impl GraphicTablet {
     }
 
     fn transform_x(&self, x: f64) -> i32 {
-        let x = (x * self.width + self.x) * 65535.0;
+        let x = (x * self.width + self.x) * ABS_MAX;
         x as i32
     }
 
     fn transform_y(&self, y: f64) -> i32 {
-        let y = (y * self.height + self.y) * 65535.0;
+        let y = (y * self.height + self.y) * ABS_MAX;
         y as i32
     }
 
     fn transform_pressure(&self, p: f64) -> i32 {
-        (p * 65535.0) as i32
+        (p * ABS_MAX) as i32
     }
 
-    /*fn transform_touch_size(&self, s: f64) -> i32 {
-        (s * 65535.0) as i32
+    fn transform_touch_size(&self, s: f64) -> i32 {
+        (s * ABS_MAX) as i32
     }
 
     fn find_slot(&self, id: i64) -> Option<usize> {
-        self.multi_touches
+        self.touches
             .iter()
             .enumerate()
             .find_map(|(slot, mt)| match mt {
@@ -88,34 +99,25 @@ impl GraphicTablet {
                 }
                 _ => None,
             })
-    }*/
+    }
 
-    fn send(&self, typ: c_int, code: c_int, value: c_int) {
+    fn send(&self, fd: c_int, typ: c_int, code: c_int, value: c_int) {
         let mut err = CError::new();
         unsafe {
-            send_uinput_event(self.pointer_fd, typ, code, value, &mut err);
+            send_uinput_event(fd, typ, code, value, &mut err);
         }
         if err.is_err() {
             warn!("{}", err);
         }
     }
-
-    /*fn send_touch(&self, typ: c_int, code: c_int, value: c_int) {
-        let mut err = CError::new();
-        unsafe {
-            send_uinput_event(self.multitouch_fd, typ, code, value, &mut err);
-        }
-        if err.is_err() {
-            warn!("{}", err);
-        }
-    }*/
 }
 
 impl Drop for GraphicTablet {
     fn drop(&mut self) {
         unsafe {
-            destroy_uinput_device(self.pointer_fd);
-            // destroy_uinput_device(self.multitouch_fd);
+            destroy_uinput_device(self.stylus_fd);
+            destroy_uinput_device(self.mouse_fd);
+            destroy_uinput_device(self.touch_fd);
         };
     }
 }
@@ -125,21 +127,21 @@ const ET_SYNC: c_int = 0x00;
 const ET_KEY: c_int = 0x01;
 //const ET_RELATIVE: c_int = 0x02;
 const ET_ABSOLUTE: c_int = 0x03;
+const ET_MSC: c_int = 0x04;
 
 // Event Codes
-const EC_SYNC_REPORT: c_int = 1;
-//const EC_SYNC_MT_REPORT: c_int = 2;
+const EC_SYNC_REPORT: c_int = 0;
 
 const EC_KEY_MOUSE_LEFT: c_int = 0x110;
+const EC_KEY_MOUSE_RIGHT: c_int = 0x111;
+const EC_KEY_MOUSE_MIDDLE: c_int = 0x112;
 const EC_KEY_TOOL_PEN: c_int = 0x140;
-//const EC_KEY_TOUCH: c_int = 0x14a;
-//const EC_KEY_STYLUS: c_int = 0x14b;
-//const EC_KEY_TOOL_FINGER: c_int = 0x145;
-//const EC_KEY_TOOL_DOUBLETAP: c_int = 0x14d;
-//const EC_KEY_TOOL_TRIPLETAP: c_int = 0x14e;
-//const EC_KEY_TOOL_QUADTAP: c_int = 0x14f; /* Four fingers on trackpad */
-//const EC_KEY_TOOL_QUINTTAP: c_int = 0x148; /* Five fingers on trackpad */
-
+const EC_KEY_TOUCH: c_int = 0x14a;
+const EC_KEY_TOOL_FINGER: c_int = 0x145;
+const EC_KEY_TOOL_DOUBLETAP: c_int = 0x14d;
+const EC_KEY_TOOL_TRIPLETAP: c_int = 0x14e;
+const EC_KEY_TOOL_QUADTAP: c_int = 0x14f; /* Four fingers on trackpad */
+const EC_KEY_TOOL_QUINTTAP: c_int = 0x148; /* Five fingers on trackpad */
 //const EC_RELATIVE_X: c_int = 0x00;
 //const EC_RELATIVE_Y: c_int = 0x01;
 
@@ -148,7 +150,7 @@ const EC_ABSOLUTE_Y: c_int = 0x01;
 const EC_ABSOLUTE_PRESSURE: c_int = 0x18;
 const EC_ABSOLUTE_TILT_X: c_int = 0x1a;
 const EC_ABSOLUTE_TILT_Y: c_int = 0x1b;
-/*const EC_ABS_MT_SLOT: c_int = 0x2f; /* MT slot being modified */
+const EC_ABS_MT_SLOT: c_int = 0x2f; /* MT slot being modified */
 const EC_ABS_MT_TOUCH_MAJOR: c_int = 0x30; /* Major axis of touching ellipse */
 const EC_ABS_MT_TOUCH_MINOR: c_int = 0x31; /* Minor axis (omit if circular) */
 const EC_ABS_MT_ORIENTATION: c_int = 0x34; /* Ellipse orientation */
@@ -157,10 +159,14 @@ const EC_ABS_MT_POSITION_Y: c_int = 0x36; /* Center Y touch position */
 const EC_ABS_MT_TRACKING_ID: c_int = 0x39; /* Unique ID of initiated contact */
 const EC_ABS_MT_PRESSURE: c_int = 0x3a; /* Pressure on contact area */
 
-// Maximum for Absolute Values
-const ABS_MAX: c_int = 65535;*/
+const EC_MSC_TIMESTAMP: c_int = 0x05;
 
-impl PointerDevice for GraphicTablet {
+// This is choosen somewhat arbitrarily
+// describes maximum value for ABS_X, ABS_Y, ABS_...
+// This corresponds to PointerEvent values of 1.0
+const ABS_MAX: f64 = 65535.0;
+
+impl InputDevice for GraphicTablet {
     fn send_event(&mut self, event: &PointerEvent) {
         if let Err(err) = self.winfo.activate() {
             warn!("Failed to activate window, sending no input ({})", err);
@@ -177,7 +183,7 @@ impl PointerDevice for GraphicTablet {
         self.width = geometry.width;
         self.height = geometry.height;
         match event.pointer_type {
-            /*PointerType::Touch => {
+            PointerType::Touch => {
                 match event.event_type {
                     PointerEventType::DOWN | PointerEventType::MOVE => {
                         let slot: usize;
@@ -187,14 +193,17 @@ impl PointerDevice for GraphicTablet {
                         } else {
                             // this event is not assigned to a slot, lets try to do so now
                             // find the first unused slot
-                            if let Some(s) = self.multi_touches.iter().enumerate().find_map(
-                                |(slot, mt)| match mt {
-                                    None => Some(slot),
-                                    Some(_) => None,
-                                },
-                            ) {
+                            if let Some(s) =
+                                self.touches
+                                    .iter()
+                                    .enumerate()
+                                    .find_map(|(slot, mt)| match mt {
+                                        None => Some(slot),
+                                        Some(_) => None,
+                                    })
+                            {
                                 slot = s;
-                                self.multi_touches[slot] = Some(MultiTouch {
+                                self.touches[slot] = Some(MultiTouch {
                                     id: event.pointer_id,
                                 })
                             } else {
@@ -202,19 +211,33 @@ impl PointerDevice for GraphicTablet {
                                 return;
                             }
                         };
-                        self.send_touch(ET_ABSOLUTE, EC_ABS_MT_SLOT, slot as i32);
-                        self.send_touch(ET_ABSOLUTE, EC_ABS_MT_TRACKING_ID, slot as i32);
-                        self.send_touch(
+                        self.send(self.touch_fd, ET_ABSOLUTE, EC_ABS_MT_SLOT, slot as i32);
+                        self.send(
+                            self.touch_fd,
                             ET_ABSOLUTE,
-                            EC_ABS_MT_POSITION_X,
-                            self.transform_x(event.x),
+                            EC_ABS_MT_TRACKING_ID,
+                            slot as i32,
                         );
-                        self.send_touch(
-                            ET_ABSOLUTE,
-                            EC_ABS_MT_POSITION_Y,
-                            self.transform_y(event.y),
-                        );
-                        self.send_touch(
+
+                        if let PointerEventType::DOWN = event.event_type {
+                            self.send(self.touch_fd, ET_KEY, EC_KEY_TOUCH, 1);
+                            match slot {
+                                1 => self.send(self.touch_fd, ET_KEY, EC_KEY_TOOL_FINGER, 0),
+                                2 => self.send(self.touch_fd, ET_KEY, EC_KEY_TOOL_DOUBLETAP, 0),
+                                3 => self.send(self.touch_fd, ET_KEY, EC_KEY_TOOL_TRIPLETAP, 0),
+                                4 => self.send(self.touch_fd, ET_KEY, EC_KEY_TOOL_QUADTAP, 0),
+                                _ => self.send(self.touch_fd, ET_KEY, EC_KEY_TOOL_QUINTTAP, 0),
+                            }
+                            match slot {
+                                1 => self.send(self.touch_fd, ET_KEY, EC_KEY_TOOL_DOUBLETAP, 1),
+                                2 => self.send(self.touch_fd, ET_KEY, EC_KEY_TOOL_TRIPLETAP, 1),
+                                3 => self.send(self.touch_fd, ET_KEY, EC_KEY_TOOL_QUADTAP, 1),
+                                4 => self.send(self.touch_fd, ET_KEY, EC_KEY_TOOL_QUINTTAP, 1),
+                                _ => self.send(self.touch_fd, ET_KEY, EC_KEY_TOOL_FINGER, 1),
+                            }
+                        }
+                        self.send(
+                            self.touch_fd,
                             ET_ABSOLUTE,
                             EC_ABS_MT_PRESSURE,
                             self.transform_pressure(event.pressure),
@@ -230,74 +253,169 @@ impl PointerDevice for GraphicTablet {
                             minor = self.transform_touch_size(event.height);
                             1
                         };
-                        self.send_touch(ET_ABSOLUTE, EC_ABS_MT_TOUCH_MAJOR, major);
-                        self.send_touch(ET_ABSOLUTE, EC_ABS_MT_TOUCH_MINOR, minor);
-                        self.send_touch(ET_ABSOLUTE, EC_ABS_MT_ORIENTATION, orientation);
-                        self.send_touch(ET_ABSOLUTE, EC_ABSOLUTE_X, self.transform_x(event.x));
-                        self.send_touch(ET_ABSOLUTE, EC_ABSOLUTE_Y, self.transform_x(event.y));
-                        self.send_touch(ET_KEY, EC_KEY_TOUCH, 1);
-                        self.send_touch(ET_KEY, EC_KEY_TOOL_FINGER, 1);
-                        self.send_touch(ET_SYNC, EC_SYNC_REPORT, 1);
-                        for (i, mt) in self.multi_touches.iter().enumerate() {
-                            info!(
-                                "slot: {} id: {}",
-                                i,
-                                if let Some(mt) = mt {
-                                    mt.id.to_string()
-                                } else {
-                                    "".to_string()
-                                }
-                            );
-                        }
+                        self.send(self.touch_fd, ET_ABSOLUTE, EC_ABS_MT_TOUCH_MAJOR, major);
+                        self.send(self.touch_fd, ET_ABSOLUTE, EC_ABS_MT_TOUCH_MINOR, minor);
+                        self.send(
+                            self.touch_fd,
+                            ET_ABSOLUTE,
+                            EC_ABS_MT_ORIENTATION,
+                            orientation,
+                        );
+                        self.send(
+                            self.touch_fd,
+                            ET_ABSOLUTE,
+                            EC_ABS_MT_POSITION_X,
+                            self.transform_x(event.x),
+                        );
+                        self.send(
+                            self.touch_fd,
+                            ET_ABSOLUTE,
+                            EC_ABS_MT_POSITION_Y,
+                            self.transform_y(event.y),
+                        );
+                        self.send(
+                            self.touch_fd,
+                            ET_ABSOLUTE,
+                            EC_ABSOLUTE_X,
+                            self.transform_x(event.x),
+                        );
+                        self.send(
+                            self.touch_fd,
+                            ET_ABSOLUTE,
+                            EC_ABSOLUTE_Y,
+                            self.transform_y(event.y),
+                        );
+                        self.send(
+                            self.touch_fd,
+                            ET_MSC,
+                            EC_MSC_TIMESTAMP,
+                            event.timestamp as i32,
+                        );
+                        self.send(self.touch_fd, ET_SYNC, EC_SYNC_REPORT, 0);
                     }
                     PointerEventType::CANCEL | PointerEventType::UP => {
                         // remove from slot
                         if let Some(slot) = self.find_slot(event.pointer_id) {
-                            self.send_touch(ET_ABSOLUTE, EC_ABS_MT_SLOT, slot as i32);
-                            self.send_touch(ET_ABSOLUTE, EC_ABS_MT_TRACKING_ID, -1);
-                            self.multi_touches[slot] = None;
+                            self.send(self.touch_fd, ET_ABSOLUTE, EC_ABS_MT_SLOT, slot as i32);
+                            self.send(self.touch_fd, ET_ABSOLUTE, EC_ABS_MT_TRACKING_ID, -1);
+                            self.send(self.touch_fd, ET_KEY, EC_KEY_TOUCH, 0);
+                            self.send(self.touch_fd, ET_KEY, EC_KEY_TOOL_FINGER, 0);
+                            match slot {
+                                1 => self.send(self.touch_fd, ET_KEY, EC_KEY_TOOL_DOUBLETAP, 0),
+                                2 => self.send(self.touch_fd, ET_KEY, EC_KEY_TOOL_TRIPLETAP, 0),
+                                3 => self.send(self.touch_fd, ET_KEY, EC_KEY_TOOL_QUADTAP, 0),
+                                4 => self.send(self.touch_fd, ET_KEY, EC_KEY_TOOL_QUINTTAP, 0),
+                                _ => (),
+                            }
+                            self.send(
+                                self.touch_fd,
+                                ET_MSC,
+                                EC_MSC_TIMESTAMP,
+                                event.timestamp as i32,
+                            );
+                            self.send(self.touch_fd, ET_SYNC, EC_SYNC_REPORT, 0);
+                            self.touches[slot] = None;
                         }
                     }
                 };
-            }*/
+            }
             PointerType::Pen => {
-                self.send(ET_ABSOLUTE, EC_ABSOLUTE_X, self.transform_x(event.x));
-                self.send(ET_ABSOLUTE, EC_ABSOLUTE_Y, self.transform_y(event.y));
-                self.send(
-                    ET_ABSOLUTE,
-                    EC_ABSOLUTE_PRESSURE,
-                    self.transform_pressure(event.pressure),
-                );
-                self.send(ET_ABSOLUTE, EC_ABSOLUTE_TILT_X, event.tilt_x);
-                self.send(ET_ABSOLUTE, EC_ABSOLUTE_TILT_Y, event.tilt_y);
                 match event.event_type {
-                    PointerEventType::DOWN => {
-                        self.send(ET_KEY, EC_KEY_TOOL_PEN, 1);
+                    PointerEventType::DOWN | PointerEventType::MOVE => {
+                        if let PointerEventType::DOWN = event.event_type {
+                            self.send(self.stylus_fd, ET_KEY, EC_KEY_TOOL_PEN, 1);
+                        }
+                        self.send(
+                            self.stylus_fd,
+                            ET_ABSOLUTE,
+                            EC_ABSOLUTE_X,
+                            self.transform_x(event.x),
+                        );
+                        self.send(
+                            self.stylus_fd,
+                            ET_ABSOLUTE,
+                            EC_ABSOLUTE_Y,
+                            self.transform_y(event.y),
+                        );
+                        self.send(
+                            self.stylus_fd,
+                            ET_ABSOLUTE,
+                            EC_ABSOLUTE_PRESSURE,
+                            self.transform_pressure(event.pressure),
+                        );
+                        self.send(
+                            self.stylus_fd,
+                            ET_ABSOLUTE,
+                            EC_ABSOLUTE_TILT_X,
+                            event.tilt_x,
+                        );
+                        self.send(
+                            self.stylus_fd,
+                            ET_ABSOLUTE,
+                            EC_ABSOLUTE_TILT_Y,
+                            event.tilt_y,
+                        );
                     }
                     PointerEventType::UP | PointerEventType::CANCEL => {
-                        self.send(ET_KEY, EC_KEY_TOOL_PEN, 0);
+                        self.send(self.stylus_fd, ET_KEY, EC_KEY_TOOL_PEN, 0);
                     }
-                    PointerEventType::MOVE => (),
                 }
-                self.send(ET_SYNC, EC_SYNC_REPORT, 1);
-            }
-            PointerType::Mouse | PointerType::Unknown | PointerType::Touch => {
-                if !event.is_primary {
-                    return;
-                }
-                self.send(ET_ABSOLUTE, EC_ABSOLUTE_X, self.transform_x(event.x));
-                self.send(ET_ABSOLUTE, EC_ABSOLUTE_Y, self.transform_y(event.y));
                 self.send(
-                    ET_ABSOLUTE,
-                    EC_ABSOLUTE_PRESSURE,
-                    self.transform_pressure(0.5),
+                    self.stylus_fd,
+                    ET_MSC,
+                    EC_MSC_TIMESTAMP,
+                    event.timestamp as i32,
                 );
+                self.send(self.stylus_fd, ET_SYNC, EC_SYNC_REPORT, 0);
+            }
+            PointerType::Mouse | PointerType::Unknown => {
                 match event.event_type {
-                    PointerEventType::DOWN => self.send(ET_KEY, EC_KEY_MOUSE_LEFT, 1),
-                    PointerEventType::MOVE => (),
-                    _ => self.send(ET_KEY, EC_KEY_MOUSE_LEFT, 0),
+                    PointerEventType::DOWN | PointerEventType::MOVE => {
+                        if let PointerEventType::DOWN = event.event_type {
+                            match event.button {
+                                Button::PRIMARY => {
+                                    self.send(self.mouse_fd, ET_KEY, EC_KEY_MOUSE_LEFT, 1)
+                                }
+                                Button::SECONDARY => {
+                                    self.send(self.mouse_fd, ET_KEY, EC_KEY_MOUSE_RIGHT, 1)
+                                }
+                                Button::AUXILARY => {
+                                    self.send(self.mouse_fd, ET_KEY, EC_KEY_MOUSE_MIDDLE, 1)
+                                }
+                                _ => (),
+                            }
+                        }
+                        self.send(
+                            self.mouse_fd,
+                            ET_ABSOLUTE,
+                            EC_ABSOLUTE_X,
+                            self.transform_x(event.x),
+                        );
+                        self.send(
+                            self.mouse_fd,
+                            ET_ABSOLUTE,
+                            EC_ABSOLUTE_Y,
+                            self.transform_y(event.y),
+                        );
+                    }
+                    PointerEventType::UP | PointerEventType::CANCEL => match event.button {
+                        Button::PRIMARY => self.send(self.mouse_fd, ET_KEY, EC_KEY_MOUSE_LEFT, 0),
+                        Button::SECONDARY => {
+                            self.send(self.mouse_fd, ET_KEY, EC_KEY_MOUSE_RIGHT, 0)
+                        }
+                        Button::AUXILARY => {
+                            self.send(self.mouse_fd, ET_KEY, EC_KEY_MOUSE_MIDDLE, 0)
+                        }
+                        _ => (),
+                    },
                 }
-                self.send(ET_SYNC, EC_SYNC_REPORT, 1);
+                self.send(
+                    self.mouse_fd,
+                    ET_MSC,
+                    EC_MSC_TIMESTAMP,
+                    event.timestamp as i32,
+                );
+                self.send(self.mouse_fd, ET_SYNC, EC_SYNC_REPORT, 0);
             }
         }
     }

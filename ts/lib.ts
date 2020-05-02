@@ -15,6 +15,7 @@ class ClientConfig {
 class PEvent {
     event_type: string;
     pointer_id: number;
+    timestamp: number;
     is_primary: boolean;
     pointer_type: string;
     button: number;
@@ -35,6 +36,7 @@ class PEvent {
         let diag_len = Math.sqrt(canvas.width * canvas.width + canvas.height * canvas.height)
         this.event_type = eventType.toString();
         this.pointer_id = event.pointerId;
+        this.timestamp = Math.round(event.timeStamp * 1000);
         this.is_primary = event.isPrimary;
         this.pointer_type = event.pointerType;
         this.button = event.button < 0 ? 0 : 1 << event.button;

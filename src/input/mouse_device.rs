@@ -3,7 +3,7 @@ use autopilot::screen::size as screen_size;
 
 use tracing::warn;
 
-use crate::input::pointer::PointerDevice;
+use crate::input::device::InputDevice;
 use crate::protocol::Button;
 use crate::protocol::PointerEvent;
 use crate::protocol::PointerEventType;
@@ -33,7 +33,7 @@ impl Mouse {
     }
 }
 
-impl PointerDevice for Mouse {
+impl InputDevice for Mouse {
     fn send_event(&mut self, event: &PointerEvent) {
         if !event.is_primary {
             return;

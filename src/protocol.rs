@@ -52,6 +52,7 @@ fn from_str<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Button, D::Err
 pub struct PointerEvent {
     pub event_type: PointerEventType,
     pub pointer_id: i64,
+    pub timestamp: u32,
     pub is_primary: bool,
     pub pointer_type: PointerType,
     #[serde(deserialize_with = "from_str")]

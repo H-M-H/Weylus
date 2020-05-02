@@ -1,4 +1,4 @@
-pub mod pointer;
+pub mod device;
 pub mod mouse_device;
 
 #[cfg(target_os = "linux")]
