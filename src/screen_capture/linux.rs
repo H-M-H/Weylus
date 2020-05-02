@@ -1,4 +1,4 @@
-use std::os::raw::{c_int, c_void};
+use std::os::raw::{c_uint, c_void};
 use std::slice::from_raw_parts;
 
 use crate::cerror::CError;
@@ -14,8 +14,8 @@ extern "C" {
 #[repr(C)]
 struct CImage {
     data: *const u8,
-    width: c_int,
-    height: c_int,
+    width: c_uint,
+    height: c_uint,
 }
 
 impl CImage {
@@ -38,7 +38,6 @@ impl CImage {
 
 pub struct ScreenCaptureX11 {
     handle: *mut c_void,
-    rgb_buf: Vec<u8>,
     png_buf: Vec<u8>,
 }
 
@@ -53,30 +52,9 @@ impl ScreenCaptureX11 {
         } else {
             return Ok(Self {
                 handle: handle,
-                rgb_buf: Vec::<u8>::new(),
                 png_buf: Vec::<u8>::new(),
             });
         }
-    }
-
-    fn convert_to_rgb(&mut self, img: &CImage) {
-        let buf_size = (img.height * img.width * 3) as usize;
-        if buf_size > self.rgb_buf.len() {
-            self.rgb_buf = vec![0; buf_size];
-        }
-        let data = img.data();
-        self.rgb_buf[0..buf_size]
-            .iter_mut()
-            .enumerate()
-            .for_each(|(i, byte)| {
-                let j = i / 3 * 4;
-                match i % 3 {
-                    0 => *byte = data[j + 2],
-                    1 => *byte = data[j + 1],
-                    2 => *byte = data[j],
-                    _ => (),
-                }
-            });
     }
 
     fn convert_to_png(&mut self, img: &CImage) -> Result<&[u8], std::io::Error> {

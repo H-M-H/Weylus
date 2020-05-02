@@ -9,8 +9,7 @@
 int locale_to_utf8(char* src, char* dest, size_t size)
 {
 	iconv_t icd = iconv_open("UTF-8//IGNORE", "");
-	size_t src_size = strlen(src);
-	size_t inbytes = src_size;
+	size_t src_size = size;
 	size_t outbytes_left = MAX_PROPERTY_VALUE_LEN - 1;
 	int ret = iconv(icd, &src, &src_size, &dest, &outbytes_left);
 	iconv_close(icd);
@@ -160,7 +159,6 @@ size_t get_window_info(Display* disp, WindowInfo* windows, size_t size, Error* e
 {
 	Window* client_list;
 	unsigned long client_list_size;
-	int max_client_machine_len = 0;
 
 	if ((client_list = get_client_list(disp, &client_list_size, err)) == NULL)
 	{
@@ -170,13 +168,13 @@ size_t get_window_info(Display* disp, WindowInfo* windows, size_t size, Error* e
 	size_t num_windows = client_list_size / sizeof(Window);
 
 	/* print the list */
-	for (int i = 0; i < num_windows && i < size; i++)
+	for (size_t i = 0; i < num_windows && i < size; i++)
 	{
 		char* title_utf8 = get_window_title(disp, client_list[i], NULL);
 		if (title_utf8 == NULL)
 		{
-			title_utf8 = malloc(16);
-			snprintf(title_utf8, 16, "UNKNOWN %d", i);
+			title_utf8 = malloc(32);
+			snprintf(title_utf8, 32, "UNKNOWN %lu", i);
 		}
 		unsigned long* desktop;
 
@@ -192,7 +190,7 @@ size_t get_window_info(Display* disp, WindowInfo* windows, size_t size, Error* e
 		windows[i].win = client_list[i];
 		// special desktop ID -1 means "all desktops"
 		// use -2 to indicate that no desktop has been found
-		windows[i].desktop_id = desktop ? *desktop : -2;
+		windows[i].desktop_id = desktop ? (signed long)*desktop : -2;
 		strncpy(windows[i].title, title_utf8, sizeof(windows->title));
 		free(title_utf8);
 		free(desktop);
@@ -219,8 +217,6 @@ void get_window_geometry_relative(
 	WindowInfo* winfo, float* x, float* y, float* width, float* height, Error* err)
 {
 	Window junkroot;
-	int junkx, junky;
-	unsigned int bw, depth;
 	int x_tmp, y_tmp;
 
 	XWindowAttributes window_attributes;
@@ -232,8 +228,8 @@ void get_window_geometry_relative(
 			winfo->disp,
 			winfo->win,
 			window_attributes.root,
-			junkx,
-			junky,
+			window_attributes.x,
+			window_attributes.y,
 			&x_tmp,
 			&y_tmp,
 			&junkroot))
@@ -247,15 +243,11 @@ void get_window_geometry_relative(
 	*height = window_attributes.height / (float)window_attributes.screen->height;
 }
 
-void get_root_window_info(Display* disp, WindowInfo* winfo, Error* err)
+void get_root_window_info(Display* disp, WindowInfo* winfo)
 {
 	Window root = DefaultRootWindow(disp);
-	char* title_utf8 = get_window_title(disp, root, NULL);
-	if (title_utf8 == NULL)
-	{
-		title_utf8 = malloc(13);
-		snprintf(title_utf8, 13, "UNKNOWN Root");
-	}
+	char* title_utf8 = malloc(12);
+	snprintf(title_utf8, 12, "Root Window");
 	winfo->disp = disp;
 	strncpy(winfo->title, title_utf8, sizeof(winfo->title));
 	winfo->win = root;
@@ -325,7 +317,6 @@ void activate_window(WindowInfo* winfo, Error* err)
 			ERROR(err, 1, "Cannot find desktop ID of the window.");
 		}
 	}
-	XEvent event;
 	client_msg(winfo->disp, DefaultRootWindow(winfo->disp), "_NET_CURRENT_DESKTOP", *desktop, 0, 0, 0, 0, err);
 	free(desktop);
 	OK_OR_ABORT(err);

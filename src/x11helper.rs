@@ -1,13 +1,13 @@
 use std::ffi::CStr;
 use std::fmt;
-use std::os::raw::{c_char, c_float, c_int, c_uint, c_void};
+use std::os::raw::{c_char, c_float, c_int, c_void};
 
 use crate::cerror::CError;
 
 extern "C" {
     fn get_window_info(disp: *mut c_void, windows: *mut WindowInfo, err: *mut CError) -> isize;
 
-    fn get_root_window_info(disp: *mut c_void, root: *mut WindowInfo, err: *mut CError);
+    fn get_root_window_info(disp: *mut c_void, root: *mut WindowInfo);
 
     fn get_window_geometry_relative(
         winfo: *const WindowInfo,
@@ -106,18 +106,14 @@ impl X11Context {
         ))
     }
 
-    pub fn root_window(&mut self) -> Result<WindowInfo, CError> {
-        let mut err = CError::new();
+    pub fn root_window(&mut self) -> WindowInfo {
         let mut root_window_info = WindowInfo::new();
         fltk::app::lock().unwrap();
         unsafe {
-            get_root_window_info(self.disp, &mut root_window_info, &mut err);
+            get_root_window_info(self.disp, &mut root_window_info);
         }
         fltk::app::unlock();
-        if err.is_err() {
-            return Err(err);
-        }
-        Ok(root_window_info)
+        root_window_info
     }
 }
 

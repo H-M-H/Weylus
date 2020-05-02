@@ -37,8 +37,8 @@ typedef struct CaptureContext CaptureContext;
 struct Image
 {
 	char* data;
-	int width;
-	int height;
+	unsigned int width;
+	unsigned int height;
 };
 
 void* init_capture(WindowInfo* winfo, CaptureContext* ctx, Error* err)
@@ -89,7 +89,9 @@ void destroy_capture(CaptureContext* ctx, Error* err)
 {
 	XShmDetach(ctx->winfo.disp, &ctx->shminfo);
 	XDestroyImage(ctx->ximg);
-	shmdt(ctx->shminfo.shmaddr);
+	if (shmdt(ctx->shminfo.shmaddr) != 0) {
+		fill_error(err, 1, "Failed to detach shared memory!");
+	}
 	free(ctx);
 }
 
@@ -105,7 +107,7 @@ void capture_sceen(CaptureContext* ctx, struct Image* img, Error* err)
 		ERROR(err, 1, "Failed to get window geometry!");
 	}
 	// if window resized, create new capture...
-	if (width != ctx->ximg->width || height != ctx->ximg->height)
+	if (width != (unsigned int)ctx->ximg->width || height != (unsigned int)ctx->ximg->height)
 	{
 		XShmDetach(ctx->winfo.disp, &ctx->shminfo);
 		XDestroyImage(ctx->ximg);

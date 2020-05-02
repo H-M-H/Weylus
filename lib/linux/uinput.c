@@ -35,7 +35,7 @@ void setup(int fd, const char* name, int product, Error* err)
 
 	struct uinput_setup setup;
 	memset(&setup, 0, sizeof(setup));
-	strncpy(setup.name, name, UINPUT_MAX_NAME_SIZE);
+	strncpy(setup.name, name, UINPUT_MAX_NAME_SIZE - 1);
 	setup.id.bustype = BUS_VIRTUAL;
 	setup.id.vendor = 0x1;
 	setup.id.product = product;
@@ -113,7 +113,6 @@ void init_multitouch(int fd, Error* err)
 		ERROR(err, 1, "error: ioctl UI_SET_KEYBIT");
 	if (ioctl(fd, UI_SET_KEYBIT, BTN_TOOL_QUINTTAP) < 0)
 		ERROR(err, 1, "error: ioctl UI_SET_KEYBIT");
-
 
 	if (ioctl(fd, UI_SET_EVBIT, EV_ABS) < 0)
 		ERROR(err, 1, "error: ioctl UI_SET_EVBIT EV_ABS");

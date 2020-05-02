@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use websocket::Message;
 use websocket::OwnedMessage;
 
-use tracing::warn;
+use tracing::{trace, warn};
 
 use crate::input::pointer::PointerDevice;
 use crate::protocol::NetMessage;
@@ -29,7 +29,7 @@ impl<Device: PointerDevice> StreamHandler for PointerStreamHandler<Device> {
     fn process(&mut self, _: WsWriter, message: &OwnedMessage) {
         match message {
             OwnedMessage::Text(s) => {
-                println!("{}", &s);
+                trace!("Pointerevent: {}", &s);
                 let message: Result<NetMessage, _> = serde_json::from_str(&s);
                 match message {
                     Ok(message) => match message {

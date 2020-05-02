@@ -8,23 +8,23 @@ use crate::x11helper::WindowInfo;
 
 use crate::cerror::CError;
 
-use tracing::{info, warn};
+use tracing::warn;
 
 extern "C" {
     fn init_uinput_pointer(err: *mut CError) -> c_int;
-    fn init_uinput_multitouch(err: *mut CError) -> c_int;
+//    fn init_uinput_multitouch(err: *mut CError) -> c_int;
     fn destroy_uinput_device(fd: c_int);
     fn send_uinput_event(device: c_int, typ: c_int, code: c_int, value: c_int, err: *mut CError);
 }
 
-struct MultiTouch {
+/*struct MultiTouch {
     id: i64,
-}
+}*/
 
 pub struct GraphicTablet {
     pointer_fd: c_int,
-    multitouch_fd: c_int,
-    multi_touches: [Option<MultiTouch>; 5],
+//    multitouch_fd: c_int,
+//    multi_touches: [Option<MultiTouch>; 5],
     winfo: WindowInfo,
     x: f64,
     y: f64,
@@ -45,8 +45,8 @@ impl GraphicTablet {
         }*/
         let tblt = Self {
             pointer_fd: pointer_fd,
-            multitouch_fd: 0, // multitouch_fd,
-            multi_touches: Default::default(),
+//            multitouch_fd: 0, // multitouch_fd,
+//            multi_touches: Default::default(),
             winfo: winfo,
             x: 0.0,
             y: 0.0,
@@ -70,7 +70,7 @@ impl GraphicTablet {
         (p * 65535.0) as i32
     }
 
-    fn transform_touch_size(&self, s: f64) -> i32 {
+    /*fn transform_touch_size(&self, s: f64) -> i32 {
         (s * 65535.0) as i32
     }
 
@@ -88,7 +88,7 @@ impl GraphicTablet {
                 }
                 _ => None,
             })
-    }
+    }*/
 
     fn send(&self, typ: c_int, code: c_int, value: c_int) {
         let mut err = CError::new();
@@ -100,7 +100,7 @@ impl GraphicTablet {
         }
     }
 
-    fn send_touch(&self, typ: c_int, code: c_int, value: c_int) {
+    /*fn send_touch(&self, typ: c_int, code: c_int, value: c_int) {
         let mut err = CError::new();
         unsafe {
             send_uinput_event(self.multitouch_fd, typ, code, value, &mut err);
@@ -108,7 +108,7 @@ impl GraphicTablet {
         if err.is_err() {
             warn!("{}", err);
         }
-    }
+    }*/
 }
 
 impl Drop for GraphicTablet {
@@ -123,32 +123,32 @@ impl Drop for GraphicTablet {
 // Event Types
 const ET_SYNC: c_int = 0x00;
 const ET_KEY: c_int = 0x01;
-const ET_RELATIVE: c_int = 0x02;
+//const ET_RELATIVE: c_int = 0x02;
 const ET_ABSOLUTE: c_int = 0x03;
 
 // Event Codes
 const EC_SYNC_REPORT: c_int = 1;
-const EC_SYNC_MT_REPORT: c_int = 2;
+//const EC_SYNC_MT_REPORT: c_int = 2;
 
 const EC_KEY_MOUSE_LEFT: c_int = 0x110;
 const EC_KEY_TOOL_PEN: c_int = 0x140;
-const EC_KEY_TOUCH: c_int = 0x14a;
-const EC_KEY_STYLUS: c_int = 0x14b;
-const EC_KEY_TOOL_FINGER: c_int = 0x145;
-const EC_KEY_TOOL_DOUBLETAP: c_int = 0x14d;
-const EC_KEY_TOOL_TRIPLETAP: c_int = 0x14e;
-const EC_KEY_TOOL_QUADTAP: c_int = 0x14f; /* Four fingers on trackpad */
-const EC_KEY_TOOL_QUINTTAP: c_int = 0x148; /* Five fingers on trackpad */
+//const EC_KEY_TOUCH: c_int = 0x14a;
+//const EC_KEY_STYLUS: c_int = 0x14b;
+//const EC_KEY_TOOL_FINGER: c_int = 0x145;
+//const EC_KEY_TOOL_DOUBLETAP: c_int = 0x14d;
+//const EC_KEY_TOOL_TRIPLETAP: c_int = 0x14e;
+//const EC_KEY_TOOL_QUADTAP: c_int = 0x14f; /* Four fingers on trackpad */
+//const EC_KEY_TOOL_QUINTTAP: c_int = 0x148; /* Five fingers on trackpad */
 
-const EC_RELATIVE_X: c_int = 0x00;
-const EC_RELATIVE_Y: c_int = 0x01;
+//const EC_RELATIVE_X: c_int = 0x00;
+//const EC_RELATIVE_Y: c_int = 0x01;
 
 const EC_ABSOLUTE_X: c_int = 0x00;
 const EC_ABSOLUTE_Y: c_int = 0x01;
 const EC_ABSOLUTE_PRESSURE: c_int = 0x18;
 const EC_ABSOLUTE_TILT_X: c_int = 0x1a;
 const EC_ABSOLUTE_TILT_Y: c_int = 0x1b;
-const EC_ABS_MT_SLOT: c_int = 0x2f; /* MT slot being modified */
+/*const EC_ABS_MT_SLOT: c_int = 0x2f; /* MT slot being modified */
 const EC_ABS_MT_TOUCH_MAJOR: c_int = 0x30; /* Major axis of touching ellipse */
 const EC_ABS_MT_TOUCH_MINOR: c_int = 0x31; /* Minor axis (omit if circular) */
 const EC_ABS_MT_ORIENTATION: c_int = 0x34; /* Ellipse orientation */
@@ -158,7 +158,7 @@ const EC_ABS_MT_TRACKING_ID: c_int = 0x39; /* Unique ID of initiated contact */
 const EC_ABS_MT_PRESSURE: c_int = 0x3a; /* Pressure on contact area */
 
 // Maximum for Absolute Values
-const ABS_MAX: c_int = 65535;
+const ABS_MAX: c_int = 65535;*/
 
 impl PointerDevice for GraphicTablet {
     fn send_event(&mut self, event: &PointerEvent) {
@@ -290,7 +290,7 @@ impl PointerDevice for GraphicTablet {
                 self.send(
                     ET_ABSOLUTE,
                     EC_ABSOLUTE_PRESSURE,
-                    self.transform_pressure(1.0),
+                    self.transform_pressure(0.5),
                 );
                 match event.event_type {
                     PointerEventType::DOWN => self.send(ET_KEY, EC_KEY_MOUSE_LEFT, 1),

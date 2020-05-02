@@ -5,8 +5,10 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::mpsc;
+use std::sync::mpsc::SendError;
 use std::sync::Arc;
 use tokio::sync::mpsc as mpsc_tokio;
+use tracing::warn;
 
 #[derive(Serialize)]
 struct WebConfig {
@@ -48,7 +50,7 @@ async fn serve<'a>(
                 if let Some(pass) = params.get("password") {
                     if pass == password {
                         authed = true;
-                        sender.send(Web2GuiMessage::Info(format!("User authed.")));
+                        log_gui_send_error(sender.send(Web2GuiMessage::Info(format!("User authed."))));
                     }
                 }
             }
@@ -98,6 +100,12 @@ pub enum Web2GuiMessage {
     Info(String),
     Error(String),
     Shutdown,
+}
+
+fn log_gui_send_error<T>(res: Result<(), SendError<T>>) {
+    if let Err(err) = res {
+        warn!("Webserver: Failed to send message to gui: {}", err);
+    }
 }
 
 struct Context<'a> {
@@ -166,16 +174,16 @@ async fn run_server(
             }
         }
     });
-    sender2.send(Web2GuiMessage::Info(format!(
+    log_gui_send_error(sender2.send(Web2GuiMessage::Info(format!(
         "Webserver listening at {}...",
         addr
-    )));
+    ))));
     match server.await {
-        Ok(_) => sender2.send(Web2GuiMessage::Info("Webserver shutdown!".into())),
-        Err(err) => sender2.send(Web2GuiMessage::Error(format!(
+        Ok(_) => log_gui_send_error(sender2.send(Web2GuiMessage::Info("Webserver shutdown!".into()))),
+        Err(err) => log_gui_send_error(sender2.send(Web2GuiMessage::Error(format!(
             "Webserver exited error: {}",
             err
-        ))),
+        )))),
     };
-    sender2.send(Web2GuiMessage::Shutdown);
+    log_gui_send_error(sender2.send(Web2GuiMessage::Shutdown));
 }

@@ -20,8 +20,13 @@ mod websocket;
 mod x11helper;
 
 fn main() {
-    let subscriber = tracing_subscriber::fmt()
+    #[cfg(debug_assertions)]
+    let _subscriber = tracing_subscriber::fmt()
         .with_max_level(Level::TRACE)
+        .init();
+    #[cfg(not(debug_assertions))]
+    let _subscriber = tracing_subscriber::fmt()
+        .with_max_level(Level::WARN)
         .init();
     gui::run();
 }

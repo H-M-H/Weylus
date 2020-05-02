@@ -1,5 +1,5 @@
 [package]
-name = "Weylus"
+name = "weylus"
 version = "0.1.0"
 authors = ["HMH <henry@freedesk.net>"]
 edition = "2018"
@@ -36,9 +36,7 @@ name = "Weylus"
 identifier = "io.github.h-m-h.weylus"
 
 [package.metadata.deb]
+name = "Weylus"
 depends = "$auto"
 section = "utility"
 priority = "optional"
-assets = [
-    ["target/release/Weylus", "usr/bin/weylus", "755"],
-]

@@ -122,6 +122,7 @@ pub fn run() {
         .below_of(&check_faster_screencapture, padding)
         .with_label("Capturing windows is\nonly supported on Linux!");
 
+    #[allow(unused_mut)]
     let mut choice_window = Choice::default()
         .with_size(width, height)
         .below_of(&label_window_choice, 0);
@@ -210,7 +211,7 @@ pub fn run() {
     #[cfg(target_os = "linux")]
     let mut x11_context = X11Context::new().unwrap();
     #[cfg(target_os = "linux")]
-    let capture_window = Rc::new(RefCell::new(x11_context.root_window().unwrap()));
+    let capture_window = Rc::new(RefCell::new(x11_context.root_window()));
 
     #[cfg(target_os = "linux")]
     {
@@ -222,7 +223,7 @@ pub fn run() {
                 let mut choice_window = choice_window_ref.borrow_mut();
                 choice_window.clear();
                 {
-                    let root_window = x11_context.root_window().unwrap();
+                    let root_window = x11_context.root_window();
                     let capture_window = capture_window.clone();
                     choice_window.add(
                         "",

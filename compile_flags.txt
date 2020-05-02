@@ -1,2 +1,4 @@
 -lX11
 -lXext
+-Wall
+-Wextra
