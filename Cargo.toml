@@ -20,7 +20,7 @@ bitflags = "1.2"
 image = "0.22.4"
 base64 = "0.12"
 mtpng = "0.3.4"
-fltk = { git = "https://github.com/MoAlyousef/fltk-rs" }
+fltk = "^0.3.10"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 pnet = "0.25"
