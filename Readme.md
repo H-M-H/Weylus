@@ -36,6 +36,16 @@ I am afraid but as of now Weylus has not been tested on Windows.
 
 That is it, start drawing!
 
+## Building
+To build Weylus you need to install Rust and Typescript. `cargo build` builds the project.
+On windows make sure to run the Typescript compiler in the project root first.
+On Linux some additional dependencies are required to build Weylus. On Debian or Ubuntu they can be
+installed via:
+```
+apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev
+libxfixes-dev libxtst-dev
+```
+
 ## How does this work?
 ### Stylus/Touch
 Modern browsers expose so called
