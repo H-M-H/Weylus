@@ -1,7 +1,8 @@
 [package]
 name = "weylus"
-version = "0.1.0"
+version = "0.5.3"
 authors = ["HMH <henry@freedesk.net>"]
+license = "AGPL-3.0-or-later"
 edition = "2018"
 description = "Use your iPad or Android tablet as graphic tablet."
 

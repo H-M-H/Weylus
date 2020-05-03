@@ -1,7 +1,8 @@
 [package]
 name = "c_helper"
-version = "0.1.0"
+version = "0.5.3"
 authors = ["HMH <henry@freedesk.net>"]
+license = "AGPL-3.0-or-later"
 edition = "2018"
 
 [lib]
