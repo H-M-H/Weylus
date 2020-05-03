@@ -1,4 +1,6 @@
 # Weylus
+![Rust](https://github.com/H-M-H/Weylus/workflows/Rust/badge.svg)
+
 Weylus turns your tablet or smart phone into a graphic tablet / touch screen for your computer!
 
 ## Features
