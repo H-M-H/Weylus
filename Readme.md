@@ -1,17 +1,17 @@
 # Weylus
 ![Build](https://github.com/H-M-H/Weylus/workflows/Build/badge.svg)
 
-Weylus turns your tablet or smart phone into a graphic tablet / touch screen for your computer!
+Weylus turns your tablet or smart phone into a graphic tablet/touch screen for your computer!
 
 ## Features
-- Control your computers mouse with your tablet
-- Mirror your computers screen to your tablet
+- Control your mouse with your tablet
+- Mirror your screen to your tablet
 
 The above features are available on all Operating Systems but Weylus works best on Linux. Additional
 features on Linux are:
-- Support for a Stylus/Pen (supports pressure and tilt)
-- Multi-Touch: Try it with software that supports multi-touch, like Krita, and see for yourself!
-- Capturing single windows
+- Support for a stylus/pen (supports pressure and tilt)
+- Multi-touch: Try it with software that supports multi-touch, like Krita, and see for yourself!
+- Capturing specific windows and only drawing to them
 - Faster screen mirroring
 
 ## Installation
@@ -58,12 +58,12 @@ supports controlling the mouse or on Linux the uinput backend can be used. It ma
 uinput Linux kernel module which supports creating a wide range of input devices including mouse,
 stylus and touch input devices.
 
-### Screen mirroring & window captures
-Either the generic backend is used which is less efficient or on Linux xlib is used to connect to
-the X-server and do the necessary work of getting window information and capturing the window/screen
-to make things fast the "MIT-SHM - The MIT Shared Memory Extension" is used to create shared memory
-images using `XShmCreateImage`.
-The images captured are then encoded to the PNG format using the library mtpng for greater speed.
-Finally the PNG binary data are encoded to base64 and send back to the connected browser, which then
-loads them to an image tag and draws them to a canvas element. The latencies and loads on my machine
-are reasonable but I am open to improvements here.
+### Screen mirroring & window capturing
+Either the generic backend is used which is less efficient and only captures the whole screen or on
+Linux xlib is used to connect to the X-server and do the necessary work of getting window
+information and capturing the window/screen. To make things fast the "MIT-SHM - The MIT Shared
+Memory Extension" is used to create shared memory images using `XShmCreateImage`. The images
+captured are then encoded to the PNG format using the library mtpng for greater speed. Finally the
+PNG binary data are encoded to base64 and send back to the connected browser, which then loads them
+to an image tag and draws them to a canvas element. The latencies and loads on my machine are
+reasonable but I am open to improvements here.
