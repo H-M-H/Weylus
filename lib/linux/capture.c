@@ -1,15 +1,3 @@
-// gcc raw.c -o raw -lX11 -lXext -Ofast -funroll-loops && ./raw
-// gcc raw.c -o raw -lX11 -lXext -Ofast -funroll-loops -mfpmath=both -march=native -m64 -mavx2 &&
-// ./raw
-
-// The MIT-SHM extension allows for shared-memory XImage objects
-// This requires OS support for SYSV (System-V) shared memory, and X support for the MIT-SHM
-// extension. Shared memory PIXMAPS can only be supported when the X server can use regular virtual
-// memory for pixmap data; if the pixmaps are stored in some magic graphics hardware, you're out of
-// luck. Xdpyinfo(1) gives NO information about this!
-
-// Depth 16: each pixel has 16 bits. Red: 5 bits, green: 6 bits, blue: 5 bits. Total: 65536 colors
-
 #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
