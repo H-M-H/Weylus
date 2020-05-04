@@ -34,16 +34,16 @@ void setup_abs(int fd, int code, int minimum, int maximum, int resolution, Error
 		ERROR(err, 1, "error: UI_ABS_SETUP, code: %#x", code);
 }
 
-void setup(int fd, const char* name, int product, Error* err)
+void setup(int fd, const char* name, Error* err)
 {
 
 	struct uinput_setup setup;
 	memset(&setup, 0, sizeof(setup));
 	strncpy(setup.name, name, UINPUT_MAX_NAME_SIZE - 1);
 	setup.id.bustype = BUS_VIRTUAL;
-	setup.id.vendor = 0x01;
-	setup.id.product = product;
-	setup.id.version = 0x01;
+	setup.id.vendor = 0x1701;
+	setup.id.product = 0x1701;
+	setup.id.version = 0x0001;
 	setup.ff_effects_max = 0;
 	if (ioctl(fd, UI_DEV_SETUP, &setup) < 0)
 		ERROR(err, 1, "error: UI_DEV_SETUP");
@@ -76,7 +76,7 @@ void init_mouse(int fd, Error* err)
 	setup_abs(fd, ABS_Y, 0, ABS_MAXVAL, 0, err);
 	OK_OR_ABORT(err);
 
-	setup(fd, "Weylus Mouse", 1, err);
+	setup(fd, "Weylus Mouse", err);
 	OK_OR_ABORT(err);
 
 	if (ioctl(fd, UI_DEV_CREATE) < 0)
@@ -115,7 +115,7 @@ void init_stylus(int fd, Error* err)
 	setup_abs(fd, ABS_TILT_Y, -90, 90, 12, err);
 	OK_OR_ABORT(err);
 
-	setup(fd, "Weylus", 1, err);
+	setup(fd, "Weylus", err);
 	OK_OR_ABORT(err);
 
 	if (ioctl(fd, UI_DEV_CREATE) < 0)
@@ -179,7 +179,7 @@ void init_touch(int fd, Error* err)
 	setup_abs(fd, ABS_MT_ORIENTATION, 0, 1, 0, err);
 	OK_OR_ABORT(err);
 
-	setup(fd, "Weylus Touch", 2, err);
+	setup(fd, "Weylus Touch", err);
 	OK_OR_ABORT(err);
 
 	if (ioctl(fd, UI_DEV_CREATE) < 0)
