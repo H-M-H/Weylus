@@ -3,6 +3,10 @@
 
 Weylus turns your tablet or smart phone into a graphic tablet/touch screen for your computer!
 
+Weylus in action with [Xournal++](https://github.com/xournalpp/xournalpp):
+
+![Weylus in action](In_action.gif)
+
 ## Features
 - Control your mouse with your tablet
 - Mirror your screen to your tablet
