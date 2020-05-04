@@ -24,13 +24,24 @@ Start Weylus, preferably set a password in the password box and press the Start 
 start a webserver running on your computer. To control your computer with your tablet you need to
 open the url `http://<address of your computer>:<port set in the menu, default is 1701>`, if
 possible Weylus will display to you the url you need to open.
+
 ### Linux
 **To enable stylus and multi-touch support `/dev/uinput` needs to be writable by Weylus!**
+To make `/dev/uinput` permanently writable by your user you can do the following:
+```sh
+sudo useradd -r -U -s /usr/bin/nologin uinput
+sudo usermod -aG uinput $USER
+echo 'KERNEL=="uinput", MODE="0660", GROUP="uinput", OPTIONS+="static_node=uinput"' \
+| sudo tee /etc/udev/rules.d/60-weylus.rules
+```
+Rebooting the system is required for this changes to take affect.
+
 ### macOS
 Weylus needs some permissions to work properly, make sure you enable:
 - Incoming connections
 - Screen capturing
 - Controlling your desktop
+
 ### Windows
 I am afraid but as of now Weylus has not been tested on Windows.
 
