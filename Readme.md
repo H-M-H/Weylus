@@ -33,8 +33,9 @@ sudo useradd -r -U -s /usr/bin/nologin uinput
 sudo usermod -aG uinput $USER
 echo 'KERNEL=="uinput", MODE="0660", GROUP="uinput", OPTIONS+="static_node=uinput"' \
 | sudo tee /etc/udev/rules.d/60-weylus.rules
+sudo udevadm control --reload
+sudo udevadm trigger
 ```
-Rebooting the system is required for this changes to take affect.
 
 ### macOS
 Weylus needs some permissions to work properly, make sure you enable:
@@ -44,6 +45,8 @@ Weylus needs some permissions to work properly, make sure you enable:
 
 ### Windows
 I am afraid but as of now Weylus has not been tested on Windows.
+
+---
 
 That is it, start drawing!
 
