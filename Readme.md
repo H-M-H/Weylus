@@ -69,7 +69,7 @@ libxfixes-dev libxtst-dev
 Modern browsers expose so called
 [PointerEvents](https://developer.mozilla.org/en-US/docs/Web/API/PointerEvent) that can convey not
 only mouse but additionally stylus/pen and touch information. Weylus sets up a webserver with the
-corresponding javascript code to capture these events. The events are send back to the server using
+corresponding javascript code to capture these events. The events are sent back to the server using
 websockets.
 Weylus then processes these events using either the generic OS independent backend, which only
 supports controlling the mouse or on Linux the uinput backend can be used. It makes use of the
@@ -82,6 +82,6 @@ Linux xlib is used to connect to the X-server and do the necessary work of getti
 information and capturing the window/screen. To make things fast the "MIT-SHM - The MIT Shared
 Memory Extension" is used to create shared memory images using `XShmCreateImage`. The images
 captured are then encoded to the PNG format using the library mtpng for greater speed. Finally the
-PNG binary data are encoded to base64 and send back to the connected browser, which then loads them
+PNG binary data are encoded to base64 and sent back to the connected browser, which then loads them
 to an image tag and draws them to a canvas element. The latencies and loads on my machine are
 reasonable but I am open to improvements here.
