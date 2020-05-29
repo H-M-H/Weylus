@@ -39,7 +39,6 @@ impl CImage {
 pub struct ScreenCaptureX11 {
     handle: *mut c_void,
     img: CImage,
-    png_buf: Vec<u8>,
 }
 
 impl ScreenCaptureX11 {
@@ -54,40 +53,8 @@ impl ScreenCaptureX11 {
             return Ok(Self {
                 handle,
                 img: CImage::new(),
-                png_buf: Vec::<u8>::new(),
             });
         }
-    }
-
-    fn convert_to_png(&mut self) -> Result<&[u8], std::io::Error> {
-        let img = &self.img;
-        let mut header = mtpng::Header::new();
-        header.set_size(img.width as u32, img.height as u32)?;
-        header.set_color(mtpng::ColorType::Truecolor, 8)?;
-        let mut options = mtpng::encoder::Options::new();
-        options.set_compression_level(mtpng::CompressionLevel::Fast)?;
-
-        self.png_buf.clear();
-        if self.png_buf.capacity() < img.size() {
-            self.png_buf = Vec::<u8>::with_capacity(img.size());
-        }
-        let mut encoder = mtpng::encoder::Encoder::new(&mut self.png_buf, &options);
-        encoder.write_header(&header)?;
-        let mut row_buf = vec![0 as u8; 3 * img.width as usize];
-        let data = img.data();
-        let mut pos: usize = 0;
-        for i in 0..img.height * img.width {
-            row_buf[pos] = data[4 * i as usize + 2];
-            row_buf[pos + 1] = data[4 * i as usize + 1];
-            row_buf[pos + 2] = data[4 * i as usize];
-            pos += 3;
-            if (i + 1) % img.width == 0 {
-                encoder.write_image_rows(&row_buf)?;
-                pos = 0;
-            }
-        }
-        encoder.finish()?;
-        Ok(&self.png_buf)
     }
 }
 
@@ -110,10 +77,6 @@ impl ScreenCapture for ScreenCaptureX11 {
             capture_sceen(self.handle, &mut self.img, &mut err);
         }
         fltk::app::unlock();
-    }
-
-    fn png(&mut self) -> &[u8] {
-        self.convert_to_png().unwrap()
     }
 
     fn fill_yuv(
