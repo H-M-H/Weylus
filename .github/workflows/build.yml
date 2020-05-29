@@ -19,8 +19,8 @@ jobs:
         include:
         - os: ubuntu-latest
           install-deps: |
-             apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libxtst-dev libavcodec-dev libavformat-dev libavutil-dev
-             npm install -g typescript
+             sudo apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libxtst-dev libavcodec-dev libavformat-dev libavutil-dev
+             sudo npm install -g typescript
              cargo install cargo-deb
           build-cmd: cargo deb
           package-files: |
