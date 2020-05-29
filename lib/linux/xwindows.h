@@ -9,7 +9,7 @@
 #include <malloc.h>
 #include <string.h>
 
-#include "error.h"
+#include "../error.h"
 
 #define MAX_PROPERTY_VALUE_LEN 4096
 

@@ -31,9 +31,9 @@ class PEvent {
     width: number;
     height: number;
 
-    constructor(eventType: string, event: PointerEvent, canvas: HTMLCanvasElement) {
-        let canvasRect = canvas.getBoundingClientRect();
-        let diag_len = Math.sqrt(canvas.width * canvas.width + canvas.height * canvas.height)
+    constructor(eventType: string, event: PointerEvent, video: HTMLVideoElement) {
+        let videoRect = video.getBoundingClientRect();
+        let diag_len = Math.sqrt(videoRect.width * videoRect.width + videoRect.height * videoRect.height)
         this.event_type = eventType.toString();
         this.pointer_id = event.pointerId;
         this.timestamp = Math.round(event.timeStamp * 1000);
@@ -41,8 +41,8 @@ class PEvent {
         this.pointer_type = event.pointerType;
         this.button = event.button < 0 ? 0 : 1 << event.button;
         this.buttons = event.buttons;
-        this.x = (event.clientX - canvasRect.left) / canvasRect.width;
-        this.y = (event.clientY - canvasRect.top) / canvasRect.height;
+        this.x = (event.clientX - videoRect.left) / videoRect.width;
+        this.y = (event.clientY - videoRect.top) / videoRect.height;
         this.movement_x = event.movementX ? event.movementX : 0;
         this.movement_y = event.movementY ? event.movementY : 0;
         this.pressure = event.pressure;
@@ -55,81 +55,106 @@ class PEvent {
 }
 
 class PointerHandler {
-    canvas: HTMLCanvasElement;
+    video: HTMLVideoElement;
     webSocket: WebSocket;
 
-    constructor(canvas: HTMLCanvasElement, webSocket: WebSocket) {
-        this.canvas = canvas;
+    constructor(video: HTMLVideoElement, webSocket: WebSocket) {
+        this.video = video;
         this.webSocket = webSocket;
-        this.canvas.addEventListener("pointerdown", (e) => { this.onDown(e) }, false);
-        this.canvas.addEventListener("pointerup", (e) => { this.onUp(e) }, false);
-        this.canvas.addEventListener("pointercancel", (e) => { this.onCancel(e) }, false);
-        this.canvas.addEventListener("pointermove", (e) => { this.onMove(e) }, false);
+        this.video.addEventListener("pointerdown", (e) => { this.onDown(e) }, false);
+        this.video.addEventListener("pointerup", (e) => { this.onUp(e) }, false);
+        this.video.addEventListener("pointercancel", (e) => { this.onCancel(e) }, false);
+        this.video.addEventListener("pointermove", (e) => { this.onMove(e) }, false);
     }
 
     onDown(event: PointerEvent) {
-        this.webSocket.send(JSON.stringify({ "PointerEvent": new PEvent("pointerdown", event, this.canvas) }));
+        this.webSocket.send(JSON.stringify({ "PointerEvent": new PEvent("pointerdown", event, this.video) }));
     }
 
     onUp(event: PointerEvent) {
-        this.webSocket.send(JSON.stringify({ "PointerEvent": new PEvent("pointerup", event, this.canvas) }));
+        this.webSocket.send(JSON.stringify({ "PointerEvent": new PEvent("pointerup", event, this.video) }));
     }
 
     onCancel(event: PointerEvent) {
-        this.webSocket.send(JSON.stringify({ "PointerEvent": new PEvent("pointercancel", event, this.canvas) }));
+        this.webSocket.send(JSON.stringify({ "PointerEvent": new PEvent("pointercancel", event, this.video) }));
     }
 
     onMove(event: PointerEvent) {
-        this.webSocket.send(JSON.stringify({ "PointerEvent": new PEvent("pointermove", event, this.canvas) }));
+        this.webSocket.send(JSON.stringify({ "PointerEvent": new PEvent("pointermove", event, this.video) }));
+    }
+}
+
+function process_stream(videoWebSocket: WebSocket, video: HTMLVideoElement) {
+    let mediaSource: MediaSource = null;
+    let sourceBuffer: SourceBuffer = null;
+    let queue = [];
+    function upd_buf() {
+        if (sourceBuffer == null)
+            return;
+        if (!sourceBuffer.updating && queue.length > 0 && mediaSource.readyState == "open") {
+            sourceBuffer.appendBuffer(queue.shift());
+        }
+    }
+    videoWebSocket.onmessage = (event: MessageEvent) => {
+        if (typeof event.data == "string") {
+            if (event.data[0] == "@") {
+                let interval_millis: number = parseInt(event.data.slice(1, -1));
+                setTimeout(() => videoWebSocket.send(""), interval_millis);
+            } else if (event.data == "new") {
+                mediaSource = new MediaSource();
+                sourceBuffer = null;
+                video.src = URL.createObjectURL(mediaSource);
+                mediaSource.addEventListener("sourceopen", (_) => {
+                    let mimeType = 'video/mp4; codecs="avc1.4D403D"';
+                    if (!MediaSource.isTypeSupported(mimeType))
+                        mimeType = "video/mp4";
+                    sourceBuffer = mediaSource.addSourceBuffer(mimeType);
+                    sourceBuffer.addEventListener("updateend", upd_buf);
+                })
+
+            }
+            requestAnimationFrame(() => videoWebSocket.send(""));
+            return;
+        }
+        queue.push(event.data);
+        upd_buf();
+        if (video.seekable.length > 0 && video.seekable.end(0) - video.currentTime > 0.01)
+            video.currentTime = video.seekable.end(0)
+        requestAnimationFrame(() => videoWebSocket.send(""));
     }
 }
 
 function init(password: string, websocket_pointer_port: number, websocket_video_port: number) {
-    let webSocket = new WebSocket("ws://" + window.location.hostname + ":" + websocket_pointer_port, "pointer");
-    let canvas = document.getElementById("canvas") as HTMLCanvasElement;
+
+    // pointer
+    let webSocket = new WebSocket("ws://" + window.location.hostname + ":" + websocket_pointer_port);
     webSocket.onopen = function(event) {
         if (password)
             webSocket.send(password);
-        let pointerHandler = new PointerHandler(canvas, webSocket);
-    }
-    webSocket.onmessage = function(event) {
+        let pointerHandler = new PointerHandler(video, webSocket);
     }
 
 
-    let videoWebSocket = new WebSocket("ws://" + window.location.hostname + ":" + websocket_video_port, "video");
-    videoWebSocket.onmessage = (event: MessageEvent) => {
-        if (event.data[0] == "@") {
-            let interval_millis: number = parseInt(event.data.slice(1, -1));
-            setTimeout(() => videoWebSocket.send(""), interval_millis);
-            return;
-        }
+    // videostreaming
+    let video = document.getElementById("video") as HTMLVideoElement;
 
-        let img = new Image();
-        img.src = "data:image/png;base64," + event.data;
-        let ctx = canvas.getContext("2d");
-        img.onload = () => {
-            if (canvas.height != img.height)
-                canvas.height = img.height;
-            if (canvas.width != img.width)
-                canvas.width = img.width;
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        };
-        videoWebSocket.send("");
-    }
+    window.onresize = () => stretch_video(video);
+    video.autoplay = true;
+    video.controls = false;
+    video.onloadeddata = () => stretch_video(video);
+    let videoWebSocket = new WebSocket("ws://" + window.location.hostname + ":" + websocket_video_port);
+    videoWebSocket.binaryType = "arraybuffer";
     videoWebSocket.onopen = () => {
         if (password)
             videoWebSocket.send(password);
         videoWebSocket.send("");
     }
+    process_stream(videoWebSocket, video);
 }
 
-function fullscreen() {
-    let canvas = document.getElementById("canvas") as any;
-    if (canvas.requestFullscreen) {
-        canvas.requestFullscreen();
-    } else if (canvas.webkitRequestFullScreen) {
-        canvas.webkitRequestFullScreen();
-    } else if (canvas.mozRequestFullScreen) {
-        canvas.mozRequestFullScreen();
-    }
+
+// object-fit: fill; <-- this is unfortunately not supported on iOS, so we use the following
+// workaround
+function stretch_video(video: HTMLVideoElement) {
+    video.style.transform = "scaleX(" + document.body.clientWidth / video.clientWidth + ") scaleY(" + document.body.clientHeight / video.clientHeight + ")";
 }

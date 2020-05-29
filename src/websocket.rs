@@ -16,7 +16,7 @@ use websocket::OwnedMessage;
 use crate::input::mouse_device::Mouse;
 #[cfg(target_os = "linux")]
 use crate::input::uinput_device::GraphicTablet;
-use crate::stream_handler::{PointerStreamHandler, ScreenStreamHandler, StreamHandler};
+use crate::stream_handler::{PointerStreamHandler, ScreenMP4StreamHandler, StreamHandler};
 
 use crate::screen_capture::generic::ScreenCaptureGeneric;
 
@@ -228,8 +228,8 @@ fn create_mouse_stream_handler() -> Result<PointerStreamHandler<Mouse>, Box<dyn 
 fn create_xscreen_stream_handler(
     capture_window: WindowInfo,
     update_interval: Duration,
-) -> Result<ScreenStreamHandler<ScreenCaptureX11>, Box<dyn std::error::Error>> {
-    Ok(ScreenStreamHandler::new(
+) -> Result<ScreenMP4StreamHandler<ScreenCaptureX11>, Box<dyn std::error::Error>> {
+    Ok(ScreenMP4StreamHandler::new(
         ScreenCaptureX11::new(capture_window)?,
         update_interval,
     ))
@@ -237,8 +237,8 @@ fn create_xscreen_stream_handler(
 
 fn create_screen_stream_handler(
     update_interval: Duration,
-) -> Result<ScreenStreamHandler<ScreenCaptureGeneric>, Box<dyn std::error::Error>> {
-    Ok(ScreenStreamHandler::new(
+) -> Result<ScreenMP4StreamHandler<ScreenCaptureGeneric>, Box<dyn std::error::Error>> {
+    Ok(ScreenMP4StreamHandler::new(
         ScreenCaptureGeneric::new(),
         update_interval,
     ))

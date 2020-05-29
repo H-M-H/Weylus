@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "error.h"
+#include "../error.h"
 #include "xwindows.h"
 
 struct CaptureContext

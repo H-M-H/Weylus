@@ -1,5 +1,5 @@
 #include "xwindows.h"
-#include "error.h"
+#include "../error.h"
 #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <stdio.h>
@@ -249,7 +249,7 @@ void get_root_window_info(Display* disp, WindowInfo* winfo)
 	char* title_utf8 = malloc(12);
 	snprintf(title_utf8, 12, "Root Window");
 	winfo->disp = disp;
-	strncpy(winfo->title, title_utf8, sizeof(winfo->title));
+	strncpy(winfo->title, title_utf8, sizeof(winfo->title)-1);
 	winfo->win = root;
 	winfo->desktop_id = -1;
 	free(title_utf8);

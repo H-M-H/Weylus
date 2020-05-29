@@ -18,6 +18,7 @@ mod web;
 mod websocket;
 #[cfg(target_os = "linux")]
 mod x11helper;
+mod video;
 
 fn main() {
     #[cfg(debug_assertions)]
@@ -25,8 +26,6 @@ fn main() {
         .with_max_level(Level::TRACE)
         .init();
     #[cfg(not(debug_assertions))]
-    let _subscriber = tracing_subscriber::fmt()
-        .with_max_level(Level::WARN)
-        .init();
+    let _subscriber = tracing_subscriber::fmt().with_max_level(Level::WARN).init();
     gui::run();
 }

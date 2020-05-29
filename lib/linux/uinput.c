@@ -11,7 +11,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "error.h"
+#include "../error.h"
 
 #define ABS_MAXVAL 65535
 

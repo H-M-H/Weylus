@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use websocket::Message;
@@ -8,6 +9,8 @@ use tracing::{trace, warn};
 use crate::input::device::InputDevice;
 use crate::protocol::NetMessage;
 use crate::screen_capture::ScreenCapture;
+
+use crate::video::VideoEncoder;
 
 type WsWriter = Arc<Mutex<websocket::sender::Writer<std::net::TcpStream>>>;
 
@@ -21,7 +24,7 @@ pub struct PointerStreamHandler<T: InputDevice> {
 
 impl<T: InputDevice> PointerStreamHandler<T> {
     pub fn new(device: T) -> Self {
-        PointerStreamHandler { device: device }
+        PointerStreamHandler { device }
     }
 }
 
@@ -43,25 +46,25 @@ impl<Device: InputDevice> StreamHandler for PointerStreamHandler<Device> {
     }
 }
 
-pub struct ScreenStreamHandler<T: ScreenCapture> {
+pub struct ScreenPNGStreamHandler<T: ScreenCapture> {
     screen_capture: T,
     base64_buf: Vec<u8>,
     update_interval: Duration,
     last_update: Instant,
 }
 
-impl<T: ScreenCapture> ScreenStreamHandler<T> {
+impl<T: ScreenCapture> ScreenPNGStreamHandler<T> {
     pub fn new(screen_capture: T, update_interval: Duration) -> Self {
         Self {
-            screen_capture: screen_capture,
+            screen_capture,
             base64_buf: Vec::<u8>::new(),
-            update_interval: update_interval,
+            update_interval,
             last_update: Instant::now(),
         }
     }
 }
 
-impl<T: ScreenCapture> StreamHandler for ScreenStreamHandler<T> {
+impl<T: ScreenCapture> StreamHandler for ScreenPNGStreamHandler<T> {
     fn process(&mut self, sender: WsWriter, message: &OwnedMessage) {
         match message {
             OwnedMessage::Text(_) => {
@@ -78,7 +81,8 @@ impl<T: ScreenCapture> StreamHandler for ScreenStreamHandler<T> {
                     }
                     return;
                 }
-                let img = self.screen_capture.capture();
+                self.screen_capture.capture();
+                let img = self.screen_capture.png();
                 let base64_size = img.len() * 4 / 3 + 4;
                 if self.base64_buf.len() < base64_size {
                     self.base64_buf.resize(base64_size * 2, 0);
@@ -91,6 +95,78 @@ impl<T: ScreenCapture> StreamHandler for ScreenStreamHandler<T> {
                 if let Err(err) = sender.lock().unwrap().send_message(&msg) {
                     warn!("Error sending video: {}", err);
                 }
+                self.last_update = Instant::now();
+            }
+            _ => (),
+        }
+    }
+}
+
+pub struct ScreenMP4StreamHandler<T: ScreenCapture> {
+    screen_capture: T,
+    video_encoder: Option<Box<VideoEncoder>>,
+    update_interval: Duration,
+    last_update: Instant,
+}
+
+impl<T: ScreenCapture> ScreenMP4StreamHandler<T> {
+    pub fn new(screen_capture: T, update_interval: Duration) -> Self {
+        Self {
+            screen_capture,
+            video_encoder: None,
+            update_interval,
+            last_update: Instant::now(),
+        }
+    }
+}
+
+impl<T: ScreenCapture> StreamHandler for ScreenMP4StreamHandler<T> {
+    fn process(&mut self, sender: WsWriter, message: &OwnedMessage) {
+        match message {
+            OwnedMessage::Text(_) => {
+                let now = Instant::now();
+                let interval = now - self.last_update;
+                if interval < self.update_interval {
+                    let msg = Message::text(format!(
+                        "@{}", // prepend some none base64 character,
+                        //  so clients can tell this is something different
+                        (self.update_interval - interval).as_millis().to_string()
+                    ));
+                    if let Err(err) = sender.lock().unwrap().send_message(&msg) {
+                        warn!("Error sending video: {}", err);
+                    }
+                    return;
+                }
+                self.screen_capture.capture();
+                let (width, height) = self.screen_capture.size();
+                // video encoder is not setup or setup for encoding the wrong size: restart it
+                if self.video_encoder.is_none()
+                    || !self
+                        .video_encoder
+                        .as_ref()
+                        .unwrap()
+                        .check_size(width, height)
+                {
+                    if let Err(err) = sender.lock().unwrap().send_message(&Message::text("new")) {
+                        warn!("Error sending video: {}", err);
+                    }
+                    self.video_encoder = Some(
+                        VideoEncoder::new(width, height, move |data| {
+                            let msg = Message::binary(data);
+                            if let Err(err) = sender.lock().unwrap().send_message(&msg) {
+                                warn!("Error sending video: {}", err);
+                            }
+                        })
+                        .unwrap(),
+                    )
+                }
+                let video_encoder = self.video_encoder.as_mut().unwrap();
+                let screen_capture = RefCell::new(&mut self.screen_capture);
+                video_encoder.encode(|y, u, v, y_linesize, u_linesize, v_linesize| {
+                    screen_capture
+                        .borrow_mut()
+                        .fill_yuv(y, u, v, y_linesize, u_linesize, v_linesize)
+                });
                 self.last_update = Instant::now();
             }
             _ => (),
