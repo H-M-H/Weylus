@@ -39,7 +39,7 @@ jobs:
 
         - os: windows-latest
           install-deps: |
-             vcpkg install ffmpeg
+             vcpkg install ffmpeg:x64-windows-static x264:x64-windows-static
              vcpkg integrate install
              npm install -g typescript
           build-cmd: npm run build && cargo build --release --verbose
