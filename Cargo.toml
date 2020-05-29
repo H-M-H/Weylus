@@ -23,14 +23,14 @@ base64 = "0.12"
 mtpng = "0.3.4"
 fltk = "^0.3.10"
 
+[build-dependencies]
+cc = "1.0"
+
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 pnet = "0.25"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 c_helper = { path = "c_helper" }
-
-[target.'cfg(target_os = "linux")'.build-dependencies]
-cc = "1.0"
 
 [package.metadata.bundle]
 name = "Weylus"
