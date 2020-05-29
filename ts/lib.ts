@@ -134,12 +134,10 @@ function init(password: string, websocket_pointer_port: number, websocket_video_
         let pointerHandler = new PointerHandler(video, webSocket);
     }
 
-
     // videostreaming
     let video = document.getElementById("video") as HTMLVideoElement;
 
     window.onresize = () => stretch_video(video);
-    video.autoplay = true;
     video.controls = false;
     video.onloadeddata = () => stretch_video(video);
     let videoWebSocket = new WebSocket("ws://" + window.location.hostname + ":" + websocket_video_port);

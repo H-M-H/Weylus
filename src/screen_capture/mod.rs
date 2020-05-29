@@ -7,9 +7,6 @@ pub trait ScreenCapture {
     /// capture screen
     fn capture(&mut self);
 
-    /// encoded as PNG
-    fn png(&mut self) -> &[u8];
-
     /// capture screen to YUV
     fn fill_yuv(
         &self,

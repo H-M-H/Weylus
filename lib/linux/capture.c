@@ -124,8 +124,7 @@ void capture_sceen(CaptureContext* ctx, struct Image* img, Error* err)
 	{
 		// capture window within its root so menus are visible as strictly speaking menus do not
 		// belong to the window itself ...
-		XTranslateCoordinates(
-			ctx->winfo.disp, ctx->winfo.win, root, junkx, junky, &x, &y, &junkwin);
+		XTranslateCoordinates(ctx->winfo.disp, ctx->winfo.win, root, 0, 0, &x, &y, &junkwin);
 		XShmGetImage(ctx->winfo.disp, root, ctx->ximg, x, y, 0x00ffffff);
 	}
 	else

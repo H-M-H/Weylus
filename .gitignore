@@ -1,4 +1,8 @@
 /target
+/deps/ffmpeg
+/deps/x264
+/deps/dist
 c_helper/target
+c_helper/Cargo.lock
 *.js
 *.js.map

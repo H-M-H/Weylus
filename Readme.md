@@ -55,13 +55,13 @@ I am afraid but as of now Weylus has not been tested on Windows.
 That is it, start drawing!
 
 ## Building
-To build Weylus you need to install Rust and Typescript. `cargo build` builds the project.
-On windows make sure to run the Typescript compiler in the project root first.
+To build Weylus you need to install Rust, Typescript, make, a C compiler and bash. `cargo build`
+builds the project.  On windows make sure to run the Typescript compiler in the project root first.
 On Linux some additional dependencies are required to build Weylus. On Debian or Ubuntu they can be
 installed via:
 ```
 apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev
-libxfixes-dev libxtst-dev
+libxfixes-dev libxtst-dev nasm
 ```
 
 ## How does this work?
@@ -81,7 +81,7 @@ Either the generic backend is used which is less efficient and only captures the
 Linux xlib is used to connect to the X-server and do the necessary work of getting window
 information and capturing the window/screen. To make things fast the "MIT-SHM - The MIT Shared
 Memory Extension" is used to create shared memory images using `XShmCreateImage`. The images
-captured are then encoded to the PNG format using the library mtpng for greater speed. Finally the
-PNG binary data are encoded to base64 and sent back to the connected browser, which then loads them
-to an image tag and draws them to a canvas element. The latencies and loads on my machine are
-reasonable but I am open to improvements here.
+captured are then encoded to a video stream using ffmpeg. Fragmented MP4 is used as container format
+to enable browsers to play the stream via the Media Source Extensions API. The video codec used is
+H.264 as this is widely supported and allows very fast encoding as opposed to formats like AV1. To
+minimize dependencies ffmpeg is statically linked into Weylus.

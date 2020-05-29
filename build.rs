@@ -1,11 +1,39 @@
+use std::path::Path;
 use std::process::Command;
 
+fn build_ffmpeg() {
+    if Path::new("deps/dist").exists() {
+        return;
+    }
+
+    if !Command::new("bash")
+        .arg(Path::new("build.sh"))
+        .current_dir("deps")
+        .status()
+        .expect("Failed to run bash!")
+        .success()
+    {
+        println!("cargo:warning=Failed to build ffmpeg!");
+        std::process::exit(1);
+    }
+}
+
 fn main() {
+    build_ffmpeg();
+
     println!("cargo:rerun-if-changed=ts/lib.ts");
+
     #[cfg(not(target_os = "windows"))]
-    match Command::new("npm").arg("run").arg("build").status() {
+    let mut tsc_command = Command::new("tsc");
+
+    #[cfg(target_os = "windows")]
+    let mut tsc_command = Command::new("bash");
+    #[cfg(target_os = "windows")]
+    tsc_command.arg("tsc");
+
+    match tsc_command.status() {
         Err(err) => {
-            println!("cargo:warning=Failed to call npm: {}", err);
+            println!("cargo:warning=Failed to call tsc: {}", err);
             std::process::exit(1);
         }
         Ok(status) => {
@@ -26,10 +54,18 @@ fn main() {
     println!("cargo:rerun-if-changed=lib/encode_video.c");
     cc::Build::new()
         .file("lib/encode_video.c")
+        .include("deps/dist/include")
         .compile("video");
-    println!("cargo:rustc-link-lib=avformat");
-    println!("cargo:rustc-link-lib=avcodec");
-    println!("cargo:rustc-link-lib=avutil");
+    println!("cargo:rustc-link-lib=static=avcodec");
+    println!("cargo:rustc-link-lib=static=avdevice");
+    println!("cargo:rustc-link-lib=static=avfilter");
+    println!("cargo:rustc-link-lib=static=avformat");
+    println!("cargo:rustc-link-lib=static=avutil");
+    println!("cargo:rustc-link-lib=static=postproc");
+    println!("cargo:rustc-link-lib=static=swresample");
+    println!("cargo:rustc-link-lib=static=swscale");
+    println!("cargo:rustc-link-lib=static=x264");
+    println!("cargo:rustc-link-search=deps/dist/lib");
 
     #[cfg(target_os = "linux")]
     linux();

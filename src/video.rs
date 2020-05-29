@@ -13,7 +13,7 @@ extern "C" {
         u_linesize: *mut c_int,
         v_linesize: *mut c_int,
     ) -> *const *mut u8;
-    fn encode_video_frame(handle: *mut c_void, millis: c_int, err: *mut CError);
+    fn encode_video_frame(handle: *mut c_void, micros: c_int, err: *mut CError);
 }
 
 #[no_mangle]
@@ -90,7 +90,7 @@ impl VideoEncoder {
         let v = unsafe { std::slice::from_raw_parts_mut(data[2], v_linesize * self.height) };
         fill_yuv(y, u, v, y_linesize, u_linesize, v_linesize);
         let mut err = CError::new();
-        unsafe { encode_video_frame(self.handle, (Instant::now() - self.start_time).as_millis() as c_int, &mut err) };
+        unsafe { encode_video_frame(self.handle, (Instant::now() - self.start_time).as_micros() as c_int, &mut err) };
     }
 
     pub fn check_size(&self, width: usize, height: usize) -> bool {
