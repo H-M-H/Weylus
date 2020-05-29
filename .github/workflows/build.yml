@@ -40,6 +40,7 @@ jobs:
         - os: windows-latest
           install-deps: |
              vcpkg install ffmpeg
+             vcpkg integrate install
              npm install -g typescript
           build-cmd: npm run build && cargo build --release --verbose
           package-files: target/release/Windows.zip
