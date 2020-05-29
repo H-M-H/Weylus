@@ -18,26 +18,35 @@ jobs:
         os: [ubuntu-latest, macOS-latest, windows-latest]
         include:
         - os: ubuntu-latest
-          build-cmd: npm install -g typescript && cargo install cargo-deb && cargo deb
+          install-deps: |
+             apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libxtst-dev libavcodec-dev libavformat-dev libavutil-dev
+             npm install -g typescript
+             cargo install cargo-deb
+          build-cmd: cargo deb
           package-files: |
              target/release/linux.zip
              target/debian/Weylus*.deb
           pkg-cmd: cd target/release/ && zip linux.zip weylus
+
         - os: macOS-latest
-          build-cmd: npm install -g typescript && cargo install cargo-bundle && cargo bundle --release
+          install-deps: |
+             npm install -g typescript
+             cargo install cargo-bundle
+             brew install ffmpeg
+          build-cmd: cargo bundle --release
           package-files: target/release/bundle/osx/macOS.zip
           pkg-cmd: cd target/release/bundle/osx/ && zip -r macOS.zip Weylus.app
+
         - os: windows-latest
-          build-cmd: npm install -g typescript && npm run build && cargo build --release --verbose
+          install-deps: |
+             npm install -g typescript
+          build-cmd: npm run build && cargo build --release --verbose
           package-files: target/release/Windows.zip
           pkg-cmd: cd target/release/ && 7z a Windows.zip weylus.exe
 
     steps:
     - name: Download deps
-      run: |
-         if [ "$RUNNER_OS" == "Linux" ]; then
-          sudo apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libxtst-dev
-         fi
+      run: ${{ matrix.install-deps }}
       shell: bash
     - uses: actions/checkout@v2
     - uses: actions/setup-node@v1
