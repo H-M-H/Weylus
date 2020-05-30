@@ -43,11 +43,6 @@ fn build_x264() {
         .arg("--disable-cli")
         .arg("--disable-opencl");
 
-    // no nice things on windows
-    // if anyone can tell me how to get nasm to work on windows I am all ears
-    #[cfg(target_os = "windows")]
-    configure_cmd.arg("--disable-asm");
-
     if !configure_cmd
         .status()
         .expect("Failed to configure libx264!")
@@ -164,13 +159,6 @@ fn build_ffmpeg() {
         .env("C_INCLUDE_PATH", &x264_include_path)
         .env("LIBRARY_PATH", &x264_lib_path);
 
-    #[cfg(target_os = "windows")]
-    {
-        configure_cmd.arg("--disable-x86asm");
-        configure_cmd.arg(format!("--extra-cflags=-I{}", &x264_include_path));
-        configure_cmd.arg(format!("--extra-libs=-L{}", &x264_lib_path));
-    }
-
     if !configure_cmd
         .status()
         .expect("Failed to configure ffmpeg!")
@@ -213,7 +201,6 @@ fn main() {
     build_ffmpeg();
 
     println!("cargo:rerun-if-changed=ts/lib.ts");
-    #[cfg(not(target_os = "windows"))]
     match Command::new("npm").arg("run").arg("build").status() {
         Err(err) => {
             println!("cargo:warning=Failed to call npm: {}", err);
