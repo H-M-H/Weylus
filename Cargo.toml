@@ -23,6 +23,7 @@ fltk = "^0.3.10"
 
 [build-dependencies]
 cc = "1.0"
+num_cpus = "1.0"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 pnet = "0.25"

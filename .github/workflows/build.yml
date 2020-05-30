@@ -19,7 +19,7 @@ jobs:
         include:
         - os: ubuntu-latest
           install-deps: |
-             sudo apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libxtst-dev libavcodec-dev libavformat-dev libavutil-dev
+             sudo apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libxtst-dev
              sudo npm install -g typescript
              cargo install cargo-deb
           build-cmd: cargo deb
@@ -32,15 +32,12 @@ jobs:
           install-deps: |
              npm install -g typescript
              cargo install cargo-bundle
-             brew install ffmpeg
           build-cmd: cargo bundle --release
           package-files: target/release/bundle/osx/macOS.zip
           pkg-cmd: cd target/release/bundle/osx/ && zip -r macOS.zip Weylus.app
 
         - os: windows-latest
           install-deps: |
-             vcpkg install ffmpeg:x64-windows-static x264:x64-windows-static
-             vcpkg integrate install
              npm install -g typescript
           build-cmd: npm run build && cargo build --release --verbose
           package-files: target/release/Windows.zip
@@ -52,6 +49,10 @@ jobs:
       shell: bash
     - uses: actions/checkout@v2
     - uses: actions/setup-node@v1
+    - uses: actions/cache@v2
+      with:
+        path: deps
+        key: ${{ runner.os }}-deps
     - name: Build
       run: ${{ matrix.build-cmd }}
     - name: Package
