@@ -46,10 +46,7 @@ fn build_x264() {
     // no nice things on windows
     // if anyone can tell me how to get nasm to work on windows I am all ears
     #[cfg(target_os = "windows")]
-    {
-        configure_cmd.arg("--disable-asm");
-        configure_cmd.arg("--disable-x86asm");
-    }
+    configure_cmd.arg("--disable-asm");
 
     if !configure_cmd
         .status()
@@ -123,7 +120,8 @@ fn build_ffmpeg() {
         .unwrap()
         .to_string();
 
-    if !Command::new("bash")
+    let mut configure_cmd = Command::new("bash");
+    configure_cmd
         .current_dir(&ffmpeg_path)
         .arg("configure")
         .arg("--prefix=dist")
@@ -166,7 +164,12 @@ fn build_ffmpeg() {
         .env("C_INCLUDE_PATH", &x264_include_path)
         .env("LIBRARY_PATH", &x264_lib_path)
         .env("INCLUDE", &x264_include_path)
-        .env("LIB", &x264_lib_path)
+        .env("LIB", &x264_lib_path);
+
+    #[cfg(target_os = "windows")]
+    configure_cmd.arg("--disable-x86asm");
+
+    if !configure_cmd
         .status()
         .expect("Failed to configure ffmpeg!")
         .success()
