@@ -31,7 +31,8 @@ fn build_x264() {
         fs::create_dir_all(x264_dist_path).expect("Could not create x264 dist directory!");
     }
 
-    if !Command::new("bash")
+    let mut configure_cmd = Command::new("bash");
+    configure_cmd
         .current_dir(&x264_path)
         .arg("configure")
         .arg("--prefix=dist")
@@ -40,7 +41,14 @@ fn build_x264() {
         .arg("--enable-pic")
         .arg("--enable-strip")
         .arg("--disable-cli")
-        .arg("--disable-opencl")
+        .arg("--disable-opencl");
+
+    // no nice things on windows
+    // if anyone can tell me how to get nasm to work on windows I am all ears
+    #[cfg(target_os = "windows")]
+    configure_cmd.arg("--disable-asm");
+
+    if !configure_cmd
         .status()
         .expect("Failed to configure libx264!")
         .success()
