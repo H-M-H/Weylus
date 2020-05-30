@@ -1,4 +1,5 @@
 /target
+/deps
 c_helper/target
 *.js
 *.js.map
