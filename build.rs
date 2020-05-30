@@ -98,11 +98,15 @@ fn build_ffmpeg() {
 
     let x264_include_path = Path::new(X264_DIST_PATH_STR)
         .join("include")
+        .canonicalize()
+        .unwrap()
         .to_str()
         .unwrap()
         .to_string();
     let x264_lib_path = Path::new(X264_DIST_PATH_STR)
         .join("lib")
+        .canonicalize()
+        .unwrap()
         .to_str()
         .unwrap()
         .to_string();
