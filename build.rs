@@ -2,26 +2,28 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-static FFMPEG_PATH: &str = "deps/ffmpeg";
-static FFMPEG_DIST_PATH: &str = "deps/ffmpeg/dist";
+static FFMPEG_PATH_STR: &str = "deps/ffmpeg";
+static FFMPEG_DIST_PATH_STR: &str = "deps/ffmpeg/dist";
 
-static X264_PATH: &str = "deps/x264";
-static X264_DIST_PATH: &str = "deps/x264/dist";
+static X264_PATH_STR: &str = "deps/x264";
+static X264_DIST_PATH_STR: &str = "deps/x264/dist";
 
 fn build_x264()
 {
-    if Path::new(X264_DIST_PATH).exists() {
+    let x264_path = Path::new(X264_PATH_STR);
+    let x264_dist_path = Path::new(X264_DIST_PATH_STR);
+    if x264_dist_path.exists() {
         return;
     }
 
-    if !Path::new(&X264_PATH).exists() {
+    if !x264_path.exists() {
         fs::create_dir_all("deps").expect("Could not create deps directory!");
         if let Err(err) = Command::new("git")
             .arg("clone")
             .arg("-b")
             .arg("stable")
             .arg("https://code.videolan.org/videolan/x264.git")
-            .arg(&X264_PATH)
+            .arg(&x264_path)
             .status()
         {
             println!("cargo:warning=Failed to clone libx264: {}", err);
@@ -30,7 +32,7 @@ fn build_x264()
     }
 
     if !Command::new("./configure")
-        .current_dir(&X264_PATH)
+        .current_dir(&x264_path)
         .arg("--prefix=./dist")
         .arg("--exec-prefix=./dist")
         .arg("--enable-static")
@@ -46,7 +48,7 @@ fn build_x264()
     }
 
     if !Command::new("make")
-        .current_dir(&X264_PATH)
+        .current_dir(&x264_path)
         .arg("-j")
         .arg(num_cpus::get().to_string())
         .status()
@@ -58,7 +60,7 @@ fn build_x264()
     }
 
     if !Command::new("make")
-        .current_dir(&X264_PATH)
+        .current_dir(&x264_path)
         .arg("install")
         .status()
         .expect("Failed to call make!")
@@ -70,18 +72,21 @@ fn build_x264()
 }
 
 fn build_ffmpeg() {
-    if Path::new(FFMPEG_DIST_PATH).exists() {
+    let ffmpeg_path = Path::new(FFMPEG_PATH_STR);
+    let ffmpeg_dist_path = Path::new(FFMPEG_DIST_PATH_STR);
+
+    if ffmpeg_dist_path.exists() {
         return;
     }
 
-    if !Path::new(&FFMPEG_PATH).exists() {
+    if !ffmpeg_path.exists() {
         fs::create_dir_all("deps").expect("Could not create deps directory!");
         if let Err(err) = Command::new("git")
             .arg("clone")
             .arg("-b")
             .arg("n4.2.3")
             .arg("https://git.ffmpeg.org/ffmpeg.git")
-            .arg(&FFMPEG_PATH)
+            .arg(&ffmpeg_path)
             .status()
         {
             println!("cargo:warning=Failed to clone ffmpeg: {}", err);
@@ -89,9 +94,9 @@ fn build_ffmpeg() {
         }
     }
 
-    if !Command::new("./configure")
-        .current_dir(&FFMPEG_PATH)
-        .arg("--prefix=./dist")
+    if !Command::new(Path::new("./configure"))
+        .current_dir(&ffmpeg_path)
+        .arg("--prefix=dist")
         .arg("--disable-debug")
         .arg("--enable-stripping")
         .arg("--enable-static")
@@ -137,7 +142,7 @@ fn build_ffmpeg() {
     }
 
     if !Command::new("make")
-        .current_dir(&FFMPEG_PATH)
+        .current_dir(&ffmpeg_path)
         .arg("-j")
         .arg(num_cpus::get().to_string())
         .status()
@@ -149,7 +154,7 @@ fn build_ffmpeg() {
     }
 
     if !Command::new("make")
-        .current_dir(&FFMPEG_PATH)
+        .current_dir(&ffmpeg_path)
         .arg("install")
         .status()
         .expect("Failed to call make!")
@@ -189,10 +194,10 @@ fn main() {
     println!("cargo:rerun-if-changed=lib/encode_video.c");
     cc::Build::new()
         .file("lib/encode_video.c")
-        .include(format!("{}/include", FFMPEG_DIST_PATH))
+        .include(format!("{}/include", FFMPEG_DIST_PATH_STR))
         .compile("video");
-    println!("cargo:rustc-link-search={}/lib", X264_DIST_PATH);
-    println!("cargo:rustc-link-search={}/lib", FFMPEG_DIST_PATH);
+    println!("cargo:rustc-link-search={}/lib", X264_DIST_PATH_STR);
+    println!("cargo:rustc-link-search={}/lib", FFMPEG_DIST_PATH_STR);
     println!("cargo:rustc-link-lib=static=avcodec");
     println!("cargo:rustc-link-lib=static=avdevice");
     println!("cargo:rustc-link-lib=static=avfilter");
