@@ -40,6 +40,7 @@ fn build_x264() {
         .arg("--enable-pic")
         .arg("--enable-strip")
         .arg("--disable-cli")
+        .arg("--disable-opencl")
         .status()
         .expect("Failed to configure libx264!")
         .success()
