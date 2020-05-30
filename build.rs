@@ -163,8 +163,7 @@ fn build_ffmpeg() {
         .arg("--disable-videotoolbox")
         .env("C_INCLUDE_PATH", &x264_include_path)
         .env("LIBRARY_PATH", &x264_lib_path)
-        .env("INCLUDE", &x264_include_path)
-        .env("LIB", &x264_lib_path);
+        .env("CL", format!("/I{} /link {}", &x264_include_path, &x264_lib_path));
 
     #[cfg(target_os = "windows")]
     configure_cmd.arg("--disable-x86asm");
@@ -184,8 +183,7 @@ fn build_ffmpeg() {
         .arg(num_cpus::get().to_string())
         .env("C_INCLUDE_PATH", &x264_include_path)
         .env("LIBRARY_PATH", &x264_lib_path)
-        .env("INCLUDE", &x264_include_path)
-        .env("LIB", &x264_lib_path)
+        .env("CL", format!("/I{} /link {}", &x264_include_path, &x264_lib_path))
         .status()
         .expect("Failed to call make!")
         .success()
@@ -199,8 +197,7 @@ fn build_ffmpeg() {
         .arg("install")
         .env("C_INCLUDE_PATH", &x264_include_path)
         .env("LIBRARY_PATH", &x264_lib_path)
-        .env("INCLUDE", &x264_include_path)
-        .env("LIB", &x264_lib_path)
+        .env("CL", format!("/I{} /link {}", &x264_include_path, &x264_lib_path))
         .status()
         .expect("Failed to call make!")
         .success()
