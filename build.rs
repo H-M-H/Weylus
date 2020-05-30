@@ -34,8 +34,8 @@ fn build_x264() {
     if !Command::new("bash")
         .current_dir(&x264_path)
         .arg("configure")
-        .arg("dist")
-        .arg("dist")
+        .arg("--prefix=dist")
+        .arg("--exec-prefix=dist")
         .arg("--enable-static")
         .arg("--enable-pic")
         .arg("--enable-strip")
@@ -214,8 +214,6 @@ fn main() {
         .file("lib/encode_video.c")
         .include(format!("{}/include", FFMPEG_DIST_PATH_STR))
         .compile("video");
-    println!("cargo:rustc-link-search={}/lib", X264_DIST_PATH_STR);
-    println!("cargo:rustc-link-search={}/lib", FFMPEG_DIST_PATH_STR);
     println!("cargo:rustc-link-lib=static=avcodec");
     println!("cargo:rustc-link-lib=static=avdevice");
     println!("cargo:rustc-link-lib=static=avfilter");
@@ -225,6 +223,8 @@ fn main() {
     println!("cargo:rustc-link-lib=static=swresample");
     println!("cargo:rustc-link-lib=static=swscale");
     println!("cargo:rustc-link-lib=static=x264");
+    println!("cargo:rustc-link-search={}/lib", FFMPEG_DIST_PATH_STR);
+    println!("cargo:rustc-link-search={}/lib", X264_DIST_PATH_STR);
 
     #[cfg(target_os = "linux")]
     linux();

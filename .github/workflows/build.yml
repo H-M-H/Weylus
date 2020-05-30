@@ -57,6 +57,7 @@ jobs:
         key: ${{ runner.os }}-deps
     - name: Build
       run: ${{ matrix.build-cmd }}
+      shell: bash
     - name: Package
       run: ${{ matrix.pkg-cmd }}
     - name: Publish
