@@ -45,11 +45,7 @@ jobs:
           pkg-cmd: cd target/release/ && 7z a Windows.zip weylus.exe
 
     steps:
-    - name: Download deps
-      run: ${{ matrix.install-deps }}
-      shell: bash
     - uses: actions/checkout@v2
-    - uses: actions/setup-node@v1
     - uses: actions/cache@v2
       with:
         path: deps
@@ -61,6 +57,10 @@ jobs:
           ~/.cargo/git
           target
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - uses: actions/setup-node@v1
+    - name: Download deps
+      run: ${{ matrix.install-deps }}
+      shell: bash
     - name: Build
       run: ${{ matrix.build-cmd }}
       shell: bash
