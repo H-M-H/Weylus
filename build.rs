@@ -32,8 +32,9 @@ fn build_x264()
         fs::create_dir_all(x264_dist_path).expect("Could not create x264 dist directory!");
     }
 
-    if !Command::new(Path::new("./configure"))
+    if !Command::new("bash")
         .current_dir(&x264_path)
+        .arg("configure")
         .arg("--prefix=dist")
         .arg("--exec-prefix=dist")
         .arg("--enable-static")
@@ -96,8 +97,9 @@ fn build_ffmpeg() {
         fs::create_dir_all(ffmpeg_dist_path).expect("Could not create ffmpeg dist directory!");
     }
 
-    if !Command::new(Path::new("./configure"))
+    if !Command::new("bash")
         .current_dir(&ffmpeg_path)
+        .arg("configure")
         .arg("--prefix=dist")
         .arg("--disable-debug")
         .arg("--enable-stripping")
