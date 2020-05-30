@@ -156,7 +156,7 @@ fn build_ffmpeg() {
         .arg("--disable-vaapi")
         .arg("--disable-vdpau")
         .arg("--disable-videotoolbox")
-        .env("C_INCLUDE_PATH", &x264_include_path)
+        .env("CPATH", &x264_include_path)
         .env("LIBRARY_PATH", &x264_lib_path);
 
     if !configure_cmd
@@ -201,7 +201,7 @@ fn main() {
     build_ffmpeg();
 
     println!("cargo:rerun-if-changed=ts/lib.ts");
-    match Command::new("npm").arg("run").arg("build").status() {
+    match Command::new("tsc").status() {
         Err(err) => {
             println!("cargo:warning=Failed to call npm: {}", err);
             std::process::exit(1);
