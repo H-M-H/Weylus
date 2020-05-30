@@ -31,10 +31,10 @@ fn build_x264()
         }
     }
 
-    if !Command::new("./configure")
+    if !Command::new(Path::new("./configure"))
         .current_dir(&x264_path)
-        .arg("--prefix=./dist")
-        .arg("--exec-prefix=./dist")
+        .arg("--prefix=dist")
+        .arg("--exec-prefix=dist")
         .arg("--enable-static")
         .arg("--enable-pic")
         .arg("--enable-strip")
