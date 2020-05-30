@@ -46,7 +46,10 @@ fn build_x264() {
     // no nice things on windows
     // if anyone can tell me how to get nasm to work on windows I am all ears
     #[cfg(target_os = "windows")]
-    configure_cmd.arg("--disable-asm");
+    {
+        configure_cmd.arg("--disable-asm");
+        configure_cmd.arg("--disable-x86asm");
+    }
 
     if !configure_cmd
         .status()
