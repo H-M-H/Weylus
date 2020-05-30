@@ -31,17 +31,11 @@ fn build_x264() {
         fs::create_dir_all(x264_dist_path).expect("Could not create x264 dist directory!");
     }
 
-    let dist_path = Path::new(x264_dist_path)
-        .canonicalize()
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_string();
     if !Command::new("bash")
         .current_dir(&x264_path)
         .arg("configure")
-        .arg(format!("--prefix={}", dist_path))
-        .arg(format!("--exec-prefix={}", dist_path))
+        .arg("dist")
+        .arg("dist")
         .arg("--enable-static")
         .arg("--enable-pic")
         .arg("--enable-strip")
@@ -102,6 +96,17 @@ fn build_ffmpeg() {
         fs::create_dir_all(ffmpeg_dist_path).expect("Could not create ffmpeg dist directory!");
     }
 
+    let x264_include_path = Path::new(X264_DIST_PATH_STR)
+        .join("include")
+        .to_str()
+        .unwrap()
+        .to_string();
+    let x264_lib_path = Path::new(X264_DIST_PATH_STR)
+        .join("lib")
+        .to_str()
+        .unwrap()
+        .to_string();
+
     if !Command::new("bash")
         .current_dir(&ffmpeg_path)
         .arg("configure")
@@ -142,10 +147,10 @@ fn build_ffmpeg() {
         .arg("--disable-vaapi")
         .arg("--disable-vdpau")
         .arg("--disable-videotoolbox")
-        .env(
-            "PKG_CONFIG_PATH",
-            Path::new(X264_DIST_PATH_STR).join("lib").join("pkgconfig"),
-        )
+        .env("C_INCLUDE_PATH", &x264_include_path)
+        .env("LIBRARY_PATH", &x264_lib_path)
+        .env("INCLUDE", &x264_include_path)
+        .env("LIB", &x264_lib_path)
         .status()
         .expect("Failed to configure ffmpeg!")
         .success()
