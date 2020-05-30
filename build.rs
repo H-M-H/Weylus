@@ -8,8 +8,7 @@ static FFMPEG_DIST_PATH_STR: &str = "deps/ffmpeg/dist";
 static X264_PATH_STR: &str = "deps/x264";
 static X264_DIST_PATH_STR: &str = "deps/x264/dist";
 
-fn build_x264()
-{
+fn build_x264() {
     let x264_path = Path::new(X264_PATH_STR);
     let x264_dist_path = Path::new(X264_DIST_PATH_STR);
     if x264_dist_path.exists() {
@@ -32,11 +31,17 @@ fn build_x264()
         fs::create_dir_all(x264_dist_path).expect("Could not create x264 dist directory!");
     }
 
+    let dist_path = Path::new(x264_dist_path)
+        .canonicalize()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
     if !Command::new("bash")
         .current_dir(&x264_path)
         .arg("configure")
-        .arg("--prefix=dist")
-        .arg("--exec-prefix=dist")
+        .arg(format!("--prefix={}", dist_path))
+        .arg(format!("--exec-prefix={}", dist_path))
         .arg("--enable-static")
         .arg("--enable-pic")
         .arg("--enable-strip")
@@ -68,7 +73,7 @@ fn build_x264()
         .expect("Failed to call make!")
         .success()
     {
-        println!("cargo:warning=Failed to make install ffmpeg!");
+        println!("cargo:warning=Failed to make install libx264!");
         std::process::exit(1);
     }
 }
@@ -137,6 +142,10 @@ fn build_ffmpeg() {
         .arg("--disable-vaapi")
         .arg("--disable-vdpau")
         .arg("--disable-videotoolbox")
+        .env(
+            "PKG_CONFIG_PATH",
+            Path::new(X264_DIST_PATH_STR).join("lib").join("pkgconfig"),
+        )
         .status()
         .expect("Failed to configure ffmpeg!")
         .success()
