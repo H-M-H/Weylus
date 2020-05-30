@@ -29,6 +29,7 @@ fn build_x264()
             println!("cargo:warning=Failed to clone libx264: {}", err);
             std::process::exit(1);
         }
+        fs::create_dir_all(x264_dist_path).expect("Could not create x264 dist directory!");
     }
 
     if !Command::new(Path::new("./configure"))
@@ -92,6 +93,7 @@ fn build_ffmpeg() {
             println!("cargo:warning=Failed to clone ffmpeg: {}", err);
             std::process::exit(1);
         }
+        fs::create_dir_all(ffmpeg_dist_path).expect("Could not create ffmpeg dist directory!");
     }
 
     if !Command::new(Path::new("./configure"))
