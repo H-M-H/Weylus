@@ -100,21 +100,6 @@ fn build_ffmpeg() {
         fs::create_dir_all(ffmpeg_dist_path).expect("Could not create ffmpeg dist directory!");
     }
 
-    let x264_include_path = Path::new(X264_DIST_PATH_STR)
-        .join("include")
-        .canonicalize()
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_string();
-    let x264_lib_path = Path::new(X264_DIST_PATH_STR)
-        .join("lib")
-        .canonicalize()
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_string();
-
     let mut configure_cmd = Command::new("bash");
     configure_cmd
         .current_dir(&ffmpeg_path)
@@ -156,8 +141,8 @@ fn build_ffmpeg() {
         .arg("--disable-vaapi")
         .arg("--disable-vdpau")
         .arg("--disable-videotoolbox")
-        .env("CPATH", &x264_include_path)
-        .env("LIBRARY_PATH", &x264_lib_path);
+        .arg("--extra-cflags=-I../x264/dist/include")
+        .arg("--extra-ldflags=-L../x264/dist/lib");
 
     if !configure_cmd
         .status()
@@ -172,8 +157,6 @@ fn build_ffmpeg() {
         .current_dir(&ffmpeg_path)
         .arg("-j")
         .arg(num_cpus::get().to_string())
-        .env("C_INCLUDE_PATH", &x264_include_path)
-        .env("LIBRARY_PATH", &x264_lib_path)
         .status()
         .expect("Failed to call make!")
         .success()
@@ -185,8 +168,6 @@ fn build_ffmpeg() {
     if !Command::new("make")
         .current_dir(&ffmpeg_path)
         .arg("install")
-        .env("C_INCLUDE_PATH", &x264_include_path)
-        .env("LIBRARY_PATH", &x264_lib_path)
         .status()
         .expect("Failed to call make!")
         .success()
@@ -203,7 +184,7 @@ fn main() {
     println!("cargo:rerun-if-changed=ts/lib.ts");
     match Command::new("tsc").status() {
         Err(err) => {
-            println!("cargo:warning=Failed to call npm: {}", err);
+            println!("cargo:warning=Failed to call tsc: {}", err);
             std::process::exit(1);
         }
         Ok(status) => {
