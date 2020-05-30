@@ -61,16 +61,9 @@ void open_video(VideoContext* ctx, Error* err)
 	/* resolution must be a multiple of two */
 	ctx->c->width = ctx->width;
 	ctx->c->height = ctx->height;
-	/* frames per second */
-	ctx->c->time_base = (AVRational){1, 1000};
+	ctx->c->time_base = (AVRational){1, 1000000};
 	ctx->c->framerate = (AVRational){0, 1};
 
-	/* emit one intra frame every ten frames
-	 * check frame pict_type before passing frame
-	 * to encoder, if frame->pict_type is AV_PICTURE_TYPE_I
-	 * then gop_size is ignored and the output of encoder
-	 * will always be I frame irrespective to gop_size
-	 */
 	ctx->c->gop_size = 12;
 	ctx->c->max_b_frames = 1;
 	ctx->c->pix_fmt = AV_PIX_FMT_YUV420P;
@@ -137,11 +130,11 @@ void destroy_video_encoder(VideoContext* ctx)
 	av_free(ctx->buf);
 }
 
-void encode_video_frame(VideoContext* ctx, int millis, Error* err)
+void encode_video_frame(VideoContext* ctx, int micros, Error* err)
 {
 	int ret;
 
-	ctx->frame->pts = millis;
+	ctx->frame->pts = micros;
 
 	ret = avcodec_send_frame(ctx->c, ctx->frame);
 	if (ret < 0)
