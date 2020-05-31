@@ -157,11 +157,14 @@ fn build_ffmpeg() {
         .current_dir(&ffmpeg_path)
         .arg("-j")
         .arg(num_cpus::get().to_string())
+        .arg("VERBOSE=1")
         .status()
         .expect("Failed to call make!")
         .success()
     {
         println!("cargo:warning=Failed to make ffmpeg!");
+        let s = fs::read_to_string("deps/ffmpeg/ffbuild/config.log").unwrap();
+        println!("cargo:warning={}", s);
         std::process::exit(1);
     }
 
