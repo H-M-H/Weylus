@@ -155,8 +155,8 @@ fn build_ffmpeg() {
 
     if !Command::new("make")
         .current_dir(&ffmpeg_path)
-        .arg("-j")
-        .arg(num_cpus::get().to_string())
+        //.arg("-j")
+        //.arg(num_cpus::get().to_string())
         .arg("VERBOSE=1")
         .status()
         .expect("Failed to call make!")
