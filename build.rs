@@ -106,7 +106,6 @@ fn build_ffmpeg() {
         .arg("configure")
         .arg("--prefix=dist")
         .arg("--disable-debug")
-        .arg("--enable-stripping")
         .arg("--enable-static")
         .arg("--disable-shared")
         .arg("--enable-pic")
@@ -143,6 +142,12 @@ fn build_ffmpeg() {
         .arg("--disable-videotoolbox")
         .arg("--extra-cflags=-I../x264/dist/include")
         .arg("--extra-ldflags=-L../x264/dist/lib");
+
+        #[cfg(not(target_os = "windows"))]
+        configure_cmd.arg("--enable-stripping");
+
+        #[cfg(target_os = "windows")]
+        configure_cmd.arg("--disable-stripping");
 
     if !configure_cmd
         .status()
