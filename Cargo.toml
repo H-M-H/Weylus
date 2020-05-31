@@ -19,7 +19,7 @@ tracing = "0.1"
 tracing-subscriber = "0.2.4"
 bitflags = "1.2"
 image = "0.22.4"
-fltk = "^0.3.10"
+fltk = "^0.4"
 
 [build-dependencies]
 cc = "1.0"
