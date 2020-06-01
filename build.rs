@@ -1,185 +1,24 @@
-use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-static FFMPEG_PATH_STR: &str = "deps/ffmpeg";
-static FFMPEG_DIST_PATH_STR: &str = "deps/ffmpeg/dist";
-
-static X264_PATH_STR: &str = "deps/x264";
-static X264_DIST_PATH_STR: &str = "deps/x264/dist";
-
-fn build_x264() {
-    let x264_path = Path::new(X264_PATH_STR);
-    let x264_dist_path = Path::new(X264_DIST_PATH_STR);
-    if x264_dist_path.exists() {
-        return;
-    }
-
-    if !x264_path.exists() {
-        fs::create_dir_all("deps").expect("Could not create deps directory!");
-        if let Err(err) = Command::new("git")
-            .arg("clone")
-            .arg("-b")
-            .arg("stable")
-            .arg("https://code.videolan.org/videolan/x264.git")
-            .arg(&x264_path)
-            .status()
-        {
-            println!("cargo:warning=Failed to clone libx264: {}", err);
-            std::process::exit(1);
-        }
-        fs::create_dir_all(x264_dist_path).expect("Could not create x264 dist directory!");
-    }
-
-    let mut configure_cmd = Command::new("bash");
-    configure_cmd
-        .current_dir(&x264_path)
-        .arg("configure")
-        .arg("--prefix=dist")
-        .arg("--exec-prefix=dist")
-        .arg("--enable-static")
-        .arg("--enable-pic")
-        .arg("--enable-strip")
-        .arg("--disable-cli")
-        .arg("--disable-opencl");
-
-    if !configure_cmd
-        .status()
-        .expect("Failed to configure libx264!")
-        .success()
-    {
-        println!("cargo:warning=Failed to configure libx264!");
-        std::process::exit(1);
-    }
-
-    if !Command::new("make")
-        .current_dir(&x264_path)
-        .arg("-j")
-        .arg(num_cpus::get().to_string())
-        .status()
-        .expect("Failed to call make!")
-        .success()
-    {
-        println!("cargo:warning=Failed to make libx264!");
-        std::process::exit(1);
-    }
-
-    if !Command::new("make")
-        .current_dir(&x264_path)
-        .arg("install")
-        .status()
-        .expect("Failed to call make!")
-        .success()
-    {
-        println!("cargo:warning=Failed to make install libx264!");
-        std::process::exit(1);
-    }
-}
-
 fn build_ffmpeg() {
-    let ffmpeg_path = Path::new(FFMPEG_PATH_STR);
-    let ffmpeg_dist_path = Path::new(FFMPEG_DIST_PATH_STR);
-
-    if ffmpeg_dist_path.exists() {
+    if Path::new("deps/dist").exists() {
         return;
     }
 
-    if !ffmpeg_path.exists() {
-        fs::create_dir_all("deps").expect("Could not create deps directory!");
-        if let Err(err) = Command::new("git")
-            .arg("clone")
-            .arg("-b")
-            .arg("n4.2.3")
-            .arg("https://git.ffmpeg.org/ffmpeg.git")
-            .arg(&ffmpeg_path)
-            .status()
-        {
-            println!("cargo:warning=Failed to clone ffmpeg: {}", err);
-            std::process::exit(1);
-        }
-        fs::create_dir_all(ffmpeg_dist_path).expect("Could not create ffmpeg dist directory!");
-    }
-
-    let mut configure_cmd = Command::new("bash");
-    configure_cmd
-        .current_dir(&ffmpeg_path)
-        .arg("configure")
-        .arg("--prefix=dist")
-        .arg("--disable-debug")
-        .arg("--enable-static")
-        .arg("--disable-shared")
-        .arg("--enable-pic")
-        .arg("--enable-stripping")
-        .arg("--disable-programs")
-        .arg("--enable-gpl")
-        .arg("--enable-libx264")
-        .arg("--disable-bzlib")
-        .arg("--disable-alsa")
-        .arg("--disable-appkit")
-        .arg("--disable-avfoundation")
-        .arg("--disable-coreimage")
-        .arg("--disable-iconv")
-        .arg("--disable-libxcb")
-        .arg("--disable-libxcb-shm")
-        .arg("--disable-libxcb-xfixes")
-        .arg("--disable-libxcb-shape")
-        .arg("--disable-lzma")
-        .arg("--disable-schannel")
-        .arg("--disable-sdl2")
-        .arg("--disable-securetransport")
-        .arg("--disable-xlib")
-        .arg("--disable-zlib")
-        .arg("--disable-amf")
-        .arg("--disable-audiotoolbox")
-        .arg("--disable-cuda-llvm")
-        .arg("--disable-cuvid")
-        .arg("--disable-d3d11va")
-        .arg("--disable-dxva2")
-        .arg("--disable-ffnvcodec")
-        .arg("--disable-nvdec")
-        .arg("--disable-nvenc")
-        .arg("--disable-vaapi")
-        .arg("--disable-vdpau")
-        .arg("--disable-videotoolbox")
-        .arg("--extra-cflags=-I../x264/dist/include")
-        .arg("--extra-ldflags=-L../x264/dist/lib");
-
-    if !configure_cmd
+    if !Command::new("bash")
+        .arg(Path::new("build.sh"))
+        .current_dir("deps")
         .status()
-        .expect("Failed to configure ffmpeg!")
+        .expect("Failed to run bash!")
         .success()
     {
-        println!("cargo:warning=Failed to configure ffmpeg!");
-        std::process::exit(1);
-    }
-
-    let make_cmd = Command::new("make")
-        .current_dir(&ffmpeg_path)
-        .arg("-j")
-        .arg(num_cpus::get().to_string())
-        .arg("V=1")
-        .output()
-        .expect("Failed to call make for ffmpeg!");
-
-    if !make_cmd.status.success() {
-        println!("cargo:warning=Failed to make ffmpeg!");
-        std::process::exit(1);
-    }
-
-    if !Command::new("make")
-        .current_dir(&ffmpeg_path)
-        .arg("install")
-        .status()
-        .expect("Failed to call make!")
-        .success()
-    {
-        println!("cargo:warning=Failed to make install ffmpeg!");
+        println!("cargo:warning=Failed to build ffmpeg!");
         std::process::exit(1);
     }
 }
 
 fn main() {
-    build_x264();
     build_ffmpeg();
 
     println!("cargo:rerun-if-changed=ts/lib.ts");
@@ -215,7 +54,7 @@ fn main() {
     println!("cargo:rerun-if-changed=lib/encode_video.c");
     cc::Build::new()
         .file("lib/encode_video.c")
-        .include(format!("{}/include", FFMPEG_DIST_PATH_STR))
+        .include("deps/dist/include")
         .compile("video");
     println!("cargo:rustc-link-lib=static=avcodec");
     println!("cargo:rustc-link-lib=static=avdevice");
@@ -226,8 +65,7 @@ fn main() {
     println!("cargo:rustc-link-lib=static=swresample");
     println!("cargo:rustc-link-lib=static=swscale");
     println!("cargo:rustc-link-lib=static=x264");
-    println!("cargo:rustc-link-search={}/lib", FFMPEG_DIST_PATH_STR);
-    println!("cargo:rustc-link-search={}/lib", X264_DIST_PATH_STR);
+    println!("cargo:rustc-link-search=deps/dist/lib");
 
     #[cfg(target_os = "linux")]
     linux();

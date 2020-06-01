@@ -1,0 +1,15 @@
+diff --git a/ffbuild/library.mak b/ffbuild/library.mak
+index 612bacb980..1842dac699 100644
+--- a/ffbuild/library.mak
++++ b/ffbuild/library.mak
+@@ -19,7 +19,9 @@ $(LIBOBJS) $(LIBOBJS:.o=.s) $(LIBOBJS:.o=.i):   CPPFLAGS += -DHAVE_AV_CONFIG_H
+ 
+ $(SUBDIR)$(LIBNAME): $(OBJS)
+ 	$(RM) $@
+-	$(AR) $(ARFLAGS) $(AR_O) $^
++	$(file >$@.ar.txt, $^)
++	$(AR) $(ARFLAGS) $(AR_O) @$@.ar.txt
++	$(RM) $@.ar.txt
+ 	$(RANLIB) $@
+ 
+ install-headers: install-lib$(NAME)-headers install-lib$(NAME)-pkgconfig

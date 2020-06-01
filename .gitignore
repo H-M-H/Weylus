@@ -1,5 +1,6 @@
 /target
-/deps
+/deps/ffmpeg
+/deps/x264
 c_helper/target
 c_helper/Cargo.lock
 *.js
