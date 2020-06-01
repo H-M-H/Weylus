@@ -140,12 +140,21 @@ fn build_ffmpeg() {
         .arg("--disable-nvenc")
         .arg("--disable-vaapi")
         .arg("--disable-vdpau")
-        .arg("--disable-videotoolbox")
-        .arg("--extra-cflags=-I../x264/dist/include")
-        .arg("--extra-ldflags=-L../x264/dist/lib");
+        .arg("--disable-videotoolbox");
+    #[cfg(not(target_os = "windows"))]
+    {
+        configure_cmd
+            .arg("--extra-cflags=-I../x264/dist/include")
+            .arg("--extra-ldflags=-L../x264/dist/lib");
+    }
 
     #[cfg(target_os = "windows")]
-    configure_cmd.arg("--toolchain=msvc");
+    {
+        configure_cmd
+            .arg("--toolchain=msvc")
+            .arg("--extra-cflags=/I ..\\x264\\dist\\include")
+            .arg("--extra-ldflags=/link /LIBPATH:..\\x264\\dist\\lib");
+    }
 
     if !configure_cmd
         .status()
