@@ -158,12 +158,14 @@ fn build_ffmpeg() {
         .arg("-j")
         .arg(num_cpus::get().to_string())
         .arg("V=1")
-        .output().expect("Failed to call make for ffmpeg!");
-     if !make_cmd.status.success()
-    {
+        .output()
+        .expect("Failed to call make for ffmpeg!");
+
+    fs::write("build.log", make_cmd.stdout).unwrap();
+    fs::write("build.err", make_cmd.stderr).unwrap();
+
+    if !make_cmd.status.success() {
         println!("cargo:warning=Failed to make ffmpeg!");
-        fs::write("build.log", make_cmd.stdout).unwrap();
-        fs::write("build.err", make_cmd.stderr).unwrap();
         std::process::exit(1);
     }
 
