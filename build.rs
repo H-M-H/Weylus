@@ -153,16 +153,13 @@ fn build_ffmpeg() {
         std::process::exit(1);
     }
 
-    let make_cmd = Command::new("make")
-        .current_dir(&ffmpeg_path)
-        .arg("-j")
-        .arg(num_cpus::get().to_string())
-        .arg("V=1")
-        .output()
-        .expect("Failed to call make for ffmpeg!");
+    let mut make_cmd = Command::new("make");
+    make_cmd.current_dir(&ffmpeg_path);
 
-    fs::write("build.log", make_cmd.stdout).unwrap();
-    fs::write("build.err", make_cmd.stderr).unwrap();
+    #[cfg(not(target_os = "windows"))]
+    make_cmd.arg("-j").arg(num_cpus::get().to_string());
+
+    let make_cmd = make_cmd.output().expect("Failed to call make for ffmpeg!");
 
     if !make_cmd.status.success() {
         println!("cargo:warning=Failed to make ffmpeg!");
@@ -191,7 +188,9 @@ fn main() {
     let mut tsc_command = Command::new("tsc");
 
     #[cfg(target_os = "windows")]
-    let mut tsc_command = Command::new("bash").arg("tsc");
+    let mut tsc_command = Command::new("bash");
+    #[cfg(target_os = "windows")]
+    tsc_command.arg("tsc");
 
     match tsc_command.status() {
         Err(err) => {
