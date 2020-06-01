@@ -140,29 +140,9 @@ fn build_ffmpeg() {
         .arg("--disable-nvenc")
         .arg("--disable-vaapi")
         .arg("--disable-vdpau")
-        .arg("--disable-videotoolbox");
-    #[cfg(not(target_os = "windows"))]
-    {
-        configure_cmd
-            .arg("--extra-cflags=-I../x264/dist/include")
-            .arg("--extra-ldflags=-L../x264/dist/lib");
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        let mut ld_arg = std::ffi::OsString::from("--ld=");
-        ld_arg.push(
-            cc::windows_registry::find_tool("msvc", "link.exe")
-                .expect("link.exe for msvc not found!")
-                .path()
-                .as_os_str(),
-        );
-        configure_cmd
-            .arg("--toolchain=msvc")
-            .arg("--extra-cflags=/I ..\\x264\\dist\\include")
-            .arg("--extra-ldflags=/link /LIBPATH:..\\x264\\dist\\lib")
-            .arg(ld_arg);
-    }
+        .arg("--disable-videotoolbox")
+        .arg("--extra-cflags=-I../x264/dist/include")
+        .arg("--extra-ldflags=-L../x264/dist/lib");
 
     if !configure_cmd
         .status()
