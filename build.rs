@@ -150,10 +150,18 @@ fn build_ffmpeg() {
 
     #[cfg(target_os = "windows")]
     {
+        let mut ld_arg = std::ffi::OsString::from("--ld=");
+        ld_arg.push(
+            cc::windows_registry::find_tool("msvc", "link.exe")
+                .expect("link.exe for msvc not found!")
+                .path()
+                .as_os_str(),
+        );
         configure_cmd
             .arg("--toolchain=msvc")
             .arg("--extra-cflags=/I ..\\x264\\dist\\include")
-            .arg("--extra-ldflags=/link /LIBPATH:..\\x264\\dist\\lib");
+            .arg("--extra-ldflags=/link /LIBPATH:..\\x264\\dist\\lib")
+            .arg(ld_arg);
     }
 
     if !configure_cmd
