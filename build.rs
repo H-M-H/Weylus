@@ -144,6 +144,9 @@ fn build_ffmpeg() {
         .arg("--extra-cflags=-I../x264/dist/include")
         .arg("--extra-ldflags=-L../x264/dist/lib");
 
+    #[cfg(target_os = "windows")]
+    configure_cmd.arg("--toolchain=msvc");
+
     if !configure_cmd
         .status()
         .expect("Failed to configure ffmpeg!")
@@ -155,8 +158,8 @@ fn build_ffmpeg() {
 
     if !Command::new("make")
         .current_dir(&ffmpeg_path)
-        //.arg("-j")
-        //.arg(num_cpus::get().to_string())
+        .arg("-j")
+        .arg(num_cpus::get().to_string())
         .arg("VERBOSE=1")
         .status()
         .expect("Failed to call make!")
