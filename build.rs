@@ -153,18 +153,17 @@ fn build_ffmpeg() {
         std::process::exit(1);
     }
 
-    if !Command::new("make")
+    let make_cmd = Command::new("make")
         .current_dir(&ffmpeg_path)
         .arg("-j")
         .arg(num_cpus::get().to_string())
-        .arg("VERBOSE=1")
-        .status()
-        .expect("Failed to call make!")
-        .success()
+        .arg("V=1")
+        .output().expect("Failed to call make for ffmpeg!");
+     if !make_cmd.status.success()
     {
         println!("cargo:warning=Failed to make ffmpeg!");
-        let s = fs::read_to_string("deps/ffmpeg/ffbuild/config.log").unwrap();
-        println!("cargo:warning={}", s);
+        fs::write("build.log", make_cmd.stdout).unwrap();
+        fs::write("build.err", make_cmd.stderr).unwrap();
         std::process::exit(1);
     }
 
