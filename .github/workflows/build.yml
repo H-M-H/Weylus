@@ -21,7 +21,6 @@ jobs:
           install-deps: |
              sudo apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libgl1-mesa-dev libglu1-mesa-dev libxtst-dev nasm
              cargo install cargo-deb
-          build-shell: bash
           build-cmd: cargo deb
           package-files: |
              target/release/linux.zip
@@ -33,7 +32,6 @@ jobs:
              npm install -g typescript
              brew install nasm
              cargo install cargo-bundle
-          build-shell: bash
           build-cmd: cargo bundle --release
           package-files: target/release/bundle/osx/macOS.zip
           pkg-cmd: cd target/release/bundle/osx/ && zip -r macOS.zip Weylus.app
@@ -44,7 +42,6 @@ jobs:
              7z x nasm-2.14.02-win64.zip
              cp nasm-2.14.02/nasm.exe /usr/bin/nasm.exe
              choco install yasm
-          build-shell: cmd
           build-cmd: |
              call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x86_amd64
              cargo build --release --verbose
@@ -68,8 +65,19 @@ jobs:
       run: ${{ matrix.install-deps }}
       shell: bash
     - name: Build
+      if: matrix.os != 'windows-latest'
       run: ${{ matrix.build-cmd }}
-      shell: ${{ matrix.build-shell }}
+      shell: bash
+    - name: Build Windows
+      if: matrix.os == 'windows-latest'
+      run: ${{ matrix.build-cmd }}
+      shell: cmd
+    - name: Debug
+      if: failure()
+      uses: actions/upload-artifact@v2
+      with:
+        name: debug
+        path: .
     - name: Package
       run: ${{ matrix.pkg-cmd }}
     - name: Publish
