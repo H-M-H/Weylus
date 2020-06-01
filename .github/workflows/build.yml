@@ -51,14 +51,14 @@ jobs:
     - uses: actions/cache@v2
       with:
         path: deps
-        key: ${{ runner.os }}-deps
+        key: ${{ runner.os }}-deps-${{ hashFiles('deps/*.sh') }}-${{ hashFiles('deps/*.patch') }}
     - uses: actions/cache@v2
       with:
         path: |
           ~/.cargo/registry
           ~/.cargo/git
           target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
     - name: Download deps
       run: ${{ matrix.install-deps }}
       shell: bash
