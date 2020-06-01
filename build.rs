@@ -186,7 +186,14 @@ fn main() {
     build_ffmpeg();
 
     println!("cargo:rerun-if-changed=ts/lib.ts");
-    match Command::new("tsc").status() {
+
+    #[cfg(not(target_os = "windows"))]
+    let mut tsc_command = Command::new("tsc");
+
+    #[cfg(target_os = "windows")]
+    let mut tsc_command = Command::new("bash").arg("tsc");
+
+    match tsc_command.status() {
         Err(err) => {
             println!("cargo:warning=Failed to call tsc: {}", err);
             std::process::exit(1);
