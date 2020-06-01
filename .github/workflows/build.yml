@@ -38,6 +38,10 @@ jobs:
 
         - os: windows-latest
           install-deps: |
+             which npm || true
+             which tsc || true
+             npm install -g typescript
+             which tsc
              curl -LO https://www.nasm.us/pub/nasm/releasebuilds/2.14.02/win64/nasm-2.14.02-win64.zip
              7z x nasm-2.14.02-win64.zip
              cp nasm-2.14.02/nasm.exe /usr/bin/nasm.exe
