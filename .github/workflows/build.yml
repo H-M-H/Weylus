@@ -50,8 +50,8 @@ jobs:
     - uses: actions/checkout@v2
     - uses: actions/cache@v2
       with:
-        path: deps
-        key: ${{ runner.os }}-deps-${{ hashFiles('deps/*.sh') }}-${{ hashFiles('deps/*.patch') }}
+        path: deps/dist
+        key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}
     - uses: actions/cache@v2
       with:
         path: |
