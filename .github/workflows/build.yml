@@ -41,7 +41,7 @@ jobs:
              curl -LO https://www.nasm.us/pub/nasm/releasebuilds/2.14.02/win64/nasm-2.14.02-win64.zip
              7z x nasm-2.14.02-win64.zip
              cp nasm-2.14.02/nasm.exe /usr/bin/nasm.exe
-             cp $(which tsc) /usr/bin/tsc
+             npm config set script-shell bash
           build-cmd: |
              cargo build --release --verbose
           package-files: target/release/Windows.zip
