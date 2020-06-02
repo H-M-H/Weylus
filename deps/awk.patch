@@ -1,0 +1,20 @@
+diff --git a/configure b/configure
+index 6a7a85cbb9..aa39a76a17 100755
+--- a/configure
++++ b/configure
+@@ -4607,7 +4607,7 @@ probe_cc(){
+     elif $_cc -nologo- 2>&1 | grep -q Microsoft || { $_cc -v 2>&1 | grep -q clang && $_cc -? > /dev/null 2>&1; }; then
+         _type=msvc
+         _ident=$($_cc 2>&1 | head -n1 | tr -d '\r')
+-        _DEPCMD='$(DEP$(1)) $(DEP$(1)FLAGS) $($(1)DEP_FLAGS) $< 2>&1 | awk '\''/including/ { sub(/^.*file: */, ""); gsub(/\\/, "/"); if (!match($$0, / /)) print "$@:", $$0 }'\'' > $(@:.o=.d)'
++        _DEPCMD='$(DEP$(1)) $(DEP$(1)FLAGS) $($(1)DEP_FLAGS) $< 2>&1 | awk -f ./msvc_dep.awk > $(@:.o=.d)'
+         _DEPFLAGS='$(CPPFLAGS) $(CFLAGS) -showIncludes -Zs'
+         _cflags_speed="-O2"
+         _cflags_size="-O1"
+diff --git a/msvc_dep.awk b/msvc_dep.awk
+new file mode 100644
+index 0000000000..a791efe000
+--- /dev/null
++++ b/msvc_dep.awk
+@@ -0,0 +1 @@
++/including/ { sub(/^.*file: */, ""); gsub(/\\/, "/"); if (!match($$0, / /)) print "$@:", $$0 }

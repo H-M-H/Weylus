@@ -41,8 +41,9 @@ cd ffmpeg
 	--disable-vaapi \
 	--disable-vdpau \
 	--disable-videotoolbox \
-	--extra-cflags=-I../dist/include \
-	--extra-ldflags=-L../dist/lib
+	--extra-cflags="$FFMPEG_CFLAGS" \
+	--extra-ldflags="$FFMPEG_LIBRARY_PATH" \
+	$FFMPEG_EXTRA_ARGS
 
 make -j$(nproc)
 make install
