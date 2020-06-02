@@ -7,7 +7,7 @@ set -ex
 ./ffmpeg.sh
 
 if [ "$RUNNER_OS" == "Windows" ]; then
-    cd deps/dist/lib
+    cd dist/lib
     for l in *.a; do
         cp "$l" "${${l#lib}%.a}.lib"
     done
