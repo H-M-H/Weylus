@@ -9,6 +9,7 @@ set -ex
 if [ "$RUNNER_OS" == "Windows" ]; then
     cd dist/lib
     for l in *.a; do
-        cp "$l" "${${l#lib}%.a}.lib"
+        d=${l#lib}
+        cp "$l" "${d%.a}.lib"
     done
 fi
