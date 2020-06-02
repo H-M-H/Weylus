@@ -2,3 +2,4 @@
 -lXext
 -Wall
 -Wextra
+-Ideps/dist/include
