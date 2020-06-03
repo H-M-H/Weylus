@@ -55,14 +55,15 @@ I am afraid but as of now Weylus has not been tested on Windows.
 That is it, start drawing!
 
 ## Building
-To build Weylus you need to install Rust, Typescript, make, a C compiler and bash. `cargo build`
-builds the project.  On windows make sure to run the Typescript compiler in the project root first.
-On Linux some additional dependencies are required to build Weylus. On Debian or Ubuntu they can be
-installed via:
+To build Weylus you need to install Rust, Typescript, make, git, a C compiler, nasm and bash. `cargo
+build` builds the project. On Linux some additional dependencies are required to build Weylus. On
+Debian or Ubuntu they can be installed via:
 ```
 apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev
-libxfixes-dev libxtst-dev nasm
+libxfixes-dev libxtst-dev
 ```
+Note that building for the first time may take a while as ffmpeg needs to be build. On windows only
+msvc is supported as C compiler.
 
 ## How does this work?
 ### Stylus/Touch
