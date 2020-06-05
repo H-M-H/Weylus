@@ -51,23 +51,22 @@ void open_video(VideoContext* ctx, Error* err)
 		ERROR(err, 1, "Could not allocate video codec context");
 	}
 
-	/* put sample parameters */
-	ctx->c->bit_rate = 100000000;
 	/* resolution must be a multiple of two */
 	ctx->c->width = ctx->width;
 	ctx->c->height = ctx->height;
 	ctx->c->time_base = (AVRational){1, 1000000};
 	ctx->c->framerate = (AVRational){0, 1};
 
-	ctx->c->gop_size = 12;
-	ctx->c->max_b_frames = 1;
+	ctx->c->gop_size = 0;
+	// no B-frames to reduce latency
+	ctx->c->max_b_frames = 0;
 	ctx->c->pix_fmt = AV_PIX_FMT_YUV420P;
 	if (ctx->oc->oformat->flags & AVFMT_GLOBALHEADER)
 		ctx->c->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
 	av_opt_set(ctx->c->priv_data, "preset", "ultrafast", 0);
 	av_opt_set(ctx->c->priv_data, "tune", "zerolatency", 0);
-	av_opt_set(ctx->c->priv_data, "crf", "21", 0);
+	av_opt_set(ctx->c->priv_data, "crf", "23", 0);
 
 	ctx->st = avformat_new_stream(ctx->oc, NULL);
 
