@@ -57,7 +57,7 @@ void open_video(VideoContext* ctx, Error* err)
 	ctx->c->time_base = (AVRational){1, 1000000};
 	ctx->c->framerate = (AVRational){0, 1};
 
-	ctx->c->gop_size = 0;
+	ctx->c->gop_size = 12;
 	// no B-frames to reduce latency
 	ctx->c->max_b_frames = 0;
 	ctx->c->pix_fmt = AV_PIX_FMT_YUV420P;
