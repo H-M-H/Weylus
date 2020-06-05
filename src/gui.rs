@@ -40,7 +40,7 @@ pub fn run() {
     let mut wind = Window::default()
         .with_size(660, 600)
         .center_screen()
-        .with_label("Weylus");
+        .with_label(&format!("Weylus - {}", env!("CARGO_PKG_VERSION")));
 
     let input_password = Input::default()
         .with_pos(200, 30)
