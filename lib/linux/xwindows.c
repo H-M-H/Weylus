@@ -210,7 +210,7 @@ void get_window_geometry(
 	{
 		ERROR(err, 1, "Failed to get window geometry!");
 	}
-	XTranslateCoordinates(winfo->disp, winfo->win, junkroot, junkx, junky, x, y, &junkroot);
+	XTranslateCoordinates(winfo->disp, winfo->win, junkroot, 0, 0, x, y, &junkroot);
 }
 
 void get_window_geometry_relative(
@@ -228,8 +228,8 @@ void get_window_geometry_relative(
 			winfo->disp,
 			winfo->win,
 			window_attributes.root,
-			window_attributes.x,
-			window_attributes.y,
+			0,
+			0,
 			&x_tmp,
 			&y_tmp,
 			&junkroot))
