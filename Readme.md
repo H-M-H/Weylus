@@ -65,6 +65,12 @@ libxfixes-dev libxtst-dev
 Note that building for the first time may take a while as ffmpeg needs to be build. On windows only
 msvc is supported as C compiler.
 
+In case you do not want to build ffmpeg and libx264 via the supplied build script you have to create
+the directory `deps/dist` yourself and copy static ffmpeg libraries built with support for libx264
+and a static version of libx264 into `deps/dist/lib`. Additional `deps/dist/include` needs to be
+filled with ffmpeg's include header files. The build script will only try to build ffmpeg if the
+directory `deps/dist` does not exist.
+
 ## How does this work?
 ### Stylus/Touch
 Modern browsers expose so called
