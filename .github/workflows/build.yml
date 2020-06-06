@@ -28,8 +28,6 @@ jobs:
              sudo update-alternatives --set cc /usr/bin/gcc
              sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++ 100
              sudo update-alternatives --set c++ /usr/bin/g++
-             g++ --version
-             gcc --version
              cargo install cargo-deb
           build-cmd: cargo deb
           package-files: |
@@ -78,6 +76,12 @@ jobs:
       shell: bash
     - name: Package
       run: ${{ matrix.pkg-cmd }}
+    - name: Artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ runner.os }}
+        path: |
+          ${{ matrix.package-files }}
     - name: Publish
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
