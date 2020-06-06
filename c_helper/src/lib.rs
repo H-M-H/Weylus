@@ -15,7 +15,13 @@ pub fn xwindow_info_struct(attr: TokenStream, input: TokenStream) -> TokenStream
     let size = unsafe { get_sizeof_window() } as usize;
     let gen_new = quote! {
         pub fn new() -> Self {
-            Self {disp: std::ptr::null(), win: [0u8; #size], desktop_id: -2, title: [0; 4096usize]}
+            Self {
+                disp: std::ptr::null(),
+                win: [0u8; #size],
+                desktop_id: -2,
+                title: [0; 4096usize],
+                should_activate: 0
+            }
         }
     };
     input.items.push(syn::ImplItem::Verbatim(gen_new));
@@ -27,6 +33,7 @@ pub fn xwindow_info_struct(attr: TokenStream, input: TokenStream) -> TokenStream
             win: [u8; #size],
             desktop_id: ::std::os::raw::c_long,
             title: [::std::os::raw::c_char; 4096usize],
+            should_activate: ::std::os::raw::c_int,
         }
         unsafe impl Send for #ident {}
         #input

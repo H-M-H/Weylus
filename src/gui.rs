@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::net::{IpAddr, SocketAddr};
 use std::rc::Rc;
 use std::time::Duration;
+use std::iter::Iterator;
 
 use std::sync::{mpsc, Arc, Mutex};
 use tokio::sync::mpsc as mpsc_tokio;
@@ -226,7 +227,7 @@ pub fn run() {
                     let root_window = x11_context.root_window();
                     let capture_window = capture_window.clone();
                     choice_window.add(
-                        "",
+                        &root_window.name(),
                         Shortcut::None,
                         MenuFlag::Normal,
                         Box::new(move || {
@@ -237,13 +238,23 @@ pub fn run() {
                 }
                 for window in x11_context.windows().unwrap() {
                     let capture_window = capture_window.clone();
+                    let chars = window
+                        .name()
+                        .replace("\\", "\\\\")
+                        .replace("/", "\\/")
+                        .replace("_", "\\_")
+                        .replace("&", "\\&");
+                    let chars = chars.chars();
+                    let mut name = String::new();
+                    for (i, c) in chars.enumerate() {
+                        if i >= 20 {
+                            name.push_str("...");
+                            break;
+                        }
+                        name.push(c);
+                    }
                     choice_window.add(
-                        &window
-                            .name()
-                            .replace("\\", "\\\\")
-                            .replace("/", "\\/")
-                            .replace("_", "\\_")
-                            .replace("&", "\\&"),
+                        &name,
                         Shortcut::None,
                         MenuFlag::Normal,
                         Box::new(move || {

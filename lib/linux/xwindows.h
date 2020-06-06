@@ -19,6 +19,7 @@ struct WindowInfo
 	Window win;
 	signed long desktop_id;
 	char title[MAX_PROPERTY_VALUE_LEN];
+	int should_activate;
 };
 
 typedef struct WindowInfo WindowInfo;

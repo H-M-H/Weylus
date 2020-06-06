@@ -165,10 +165,21 @@ size_t get_window_info(Display* disp, WindowInfo* windows, size_t size, Error* e
 		return 0;
 	}
 
+	size_t num_screens = XScreenCount(disp);
+	size_t i = 0;
+	for (; i < num_screens && i < size; i++)
+	{
+		Screen* s = XScreenOfDisplay(disp, i);
+		windows[i].disp = disp;
+		windows[i].win = XRootWindowOfScreen(s);
+		windows[i].desktop_id = -1;
+		snprintf(windows[i].title, sizeof(windows[i].title), "Screen - %lu", i);
+		windows[i].should_activate = 0;
+	}
+
 	size_t num_windows = client_list_size / sizeof(Window);
 
-	/* print the list */
-	for (size_t i = 0; i < num_windows && i < size; i++)
+	for (; i < num_windows && i < size; i++)
 	{
 		char* title_utf8 = get_window_title(disp, client_list[i], NULL);
 		if (title_utf8 == NULL)
@@ -192,6 +203,7 @@ size_t get_window_info(Display* disp, WindowInfo* windows, size_t size, Error* e
 		// use -2 to indicate that no desktop has been found
 		windows[i].desktop_id = desktop ? (signed long)*desktop : -2;
 		strncpy(windows[i].title, title_utf8, sizeof(windows->title));
+		windows[i].should_activate = 1;
 		free(title_utf8);
 		free(desktop);
 	}
@@ -225,14 +237,7 @@ void get_window_geometry_relative(
 		ERROR(err, 1, "Failed to get window attributes for window: 0x%.8lx", winfo->win);
 	}
 	if (!XTranslateCoordinates(
-			winfo->disp,
-			winfo->win,
-			window_attributes.root,
-			0,
-			0,
-			&x_tmp,
-			&y_tmp,
-			&junkroot))
+			winfo->disp, winfo->win, window_attributes.root, 0, 0, &x_tmp, &y_tmp, &junkroot))
 	{
 		// we are on a different screen or some error occured
 		ERROR(err, 1, "Failed to get window coordinates relative to its root!");
@@ -246,12 +251,13 @@ void get_window_geometry_relative(
 void get_root_window_info(Display* disp, WindowInfo* winfo)
 {
 	Window root = DefaultRootWindow(disp);
-	char* title_utf8 = malloc(12);
-	snprintf(title_utf8, 12, "Root Window");
+	char* title_utf8 = malloc(8);
+	snprintf(title_utf8, 8, "Desktop");
 	winfo->disp = disp;
-	strncpy(winfo->title, title_utf8, sizeof(winfo->title)-1);
+	strncpy(winfo->title, title_utf8, sizeof(winfo->title) - 1);
 	winfo->win = root;
 	winfo->desktop_id = -1;
+	winfo->should_activate = 0;
 	free(title_utf8);
 }
 
@@ -289,13 +295,12 @@ void client_msg(
 
 void activate_window(WindowInfo* winfo, Error* err)
 {
+	// do not activate windows like the root window or root windows of a screen
+	if (!winfo->should_activate)
+		return;
 
 	Window* active_window = 0;
 	unsigned long size;
-
-	// do not need to activate the root window
-	if (winfo->win == DefaultRootWindow(winfo->disp))
-		return;
 
 	active_window = (Window*)get_property(
 		winfo->disp, DefaultRootWindow(winfo->disp), XA_WINDOW, "_NET_ACTIVE_WINDOW", &size, err);
@@ -317,7 +322,16 @@ void activate_window(WindowInfo* winfo, Error* err)
 			ERROR(err, 1, "Cannot find desktop ID of the window.");
 		}
 	}
-	client_msg(winfo->disp, DefaultRootWindow(winfo->disp), "_NET_CURRENT_DESKTOP", *desktop, 0, 0, 0, 0, err);
+	client_msg(
+		winfo->disp,
+		DefaultRootWindow(winfo->disp),
+		"_NET_CURRENT_DESKTOP",
+		*desktop,
+		0,
+		0,
+		0,
+		0,
+		err);
 	free(desktop);
 	OK_OR_ABORT(err);
 
