@@ -19,7 +19,17 @@ jobs:
         include:
         - os: ubuntu-latest
           install-deps: |
-             sudo apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libgl1-mesa-dev libglu1-mesa-dev libxtst-dev nasm
+             sudo apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libgl1-mesa-dev libglu1-mesa-dev libxtst-dev nasm libstdc++-6-dev gcc-6 g++-6
+             sudo update-alternatives --install /usr/bin/gcc gcc $(which gcc-6) 100
+             sudo update-alternatives --set gcc $(which gcc-6)
+             sudo update-alternatives --install /usr/bin/g++ g++ $(which g++-6) 100
+             sudo update-alternatives --set g++ $(which g++-6)
+             sudo update-alternatives --install /usr/bin/cc cc /usr/bin/gcc 100
+             sudo update-alternatives --set cc /usr/bin/gcc
+             sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++ 100
+             sudo update-alternatives --set c++ /usr/bin/g++
+             g++ --version
+             gcc --version
              cargo install cargo-deb
           build-cmd: cargo deb
           package-files: |
@@ -51,14 +61,14 @@ jobs:
     - uses: actions/cache@v2
       with:
         path: deps/dist
-        key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}
+        key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}-1
     - uses: actions/cache@v2
       with:
         path: |
           ~/.cargo/registry
           ~/.cargo/git
           target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}-1
     - name: Download deps
       run: ${{ matrix.install-deps }}
       shell: bash
