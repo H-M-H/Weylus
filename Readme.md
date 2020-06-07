@@ -92,3 +92,9 @@ captured are then encoded to a video stream using ffmpeg. Fragmented MP4 is used
 to enable browsers to play the stream via the Media Source Extensions API. The video codec used is
 H.264 as this is widely supported and allows very fast encoding as opposed to formats like AV1. To
 minimize dependencies ffmpeg is statically linked into Weylus.
+
+---
+
+[![Packaging status](
+https://repology.org/badge/vertical-allrepos/weylus.svg
+)](https://repology.org/project/weylus/versions)
