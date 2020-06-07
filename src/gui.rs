@@ -1,12 +1,12 @@
 use std::cell::RefCell;
+use std::iter::Iterator;
 use std::net::{IpAddr, SocketAddr};
 use std::rc::Rc;
 use std::time::Duration;
-use std::iter::Iterator;
 
 use std::sync::{mpsc, Arc, Mutex};
 use tokio::sync::mpsc as mpsc_tokio;
-use tracing::{error, info, warn};
+use tracing::info;
 
 use fltk::{
     app::App,
@@ -25,12 +25,12 @@ use fltk::{
 use pnet::datalink;
 
 use crate::web::{Gui2WebMessage, Web2GuiMessage};
-use crate::websocket::{Gui2WsMessage, Ws2GuiMessage};
+use crate::websocket::Gui2WsMessage;
 
 #[cfg(target_os = "linux")]
 use crate::x11helper::X11Context;
 
-pub fn run() {
+pub fn run(log_receiver: mpsc::Receiver<String>) {
     fltk::app::lock().unwrap();
     fltk::app::unlock();
     let width = 200;
@@ -158,47 +158,24 @@ pub fn run() {
     let output_server_addr = Arc::new(Mutex::new(output_server_addr));
     let output = Arc::new(Mutex::new(output));
 
-    let (sender_ws2gui, receiver_ws2gui) = mpsc::channel();
+    let (sender_ws2gui, _receiver_ws2gui) = mpsc::channel();
     let (sender_web2gui, receiver_web2gui) = mpsc::channel();
 
     {
         let output = output.clone();
         std::thread::spawn(move || {
-            while let Ok(message) = receiver_ws2gui.recv() {
+            while let Ok(log_message) = log_receiver.recv() {
                 let output = output.lock().unwrap();
-                match message {
-                    Ws2GuiMessage::Info(s) => {
-                        info!("Websocket: {}", s);
-                        output.insert(&format!("Info from Websocket: {}\n", s))
-                    }
-                    Ws2GuiMessage::Warning(s) => {
-                        warn!("Websocket: {}", s);
-                        output.insert(&format!("Warning from Websocket: {}\n", s))
-                    }
-                    Ws2GuiMessage::Error(s) => {
-                        error!("Websocket: {}", s);
-                        output.insert(&format!("Error from Websocket: {}\n", s))
-                    }
-                }
+                output.insert(&log_message);
             }
         });
     }
 
     {
-        let output = output.clone();
         let output_server_addr = output_server_addr.clone();
         std::thread::spawn(move || {
             while let Ok(message) = receiver_web2gui.recv() {
-                let output = output.lock().unwrap();
                 match message {
-                    Web2GuiMessage::Info(s) => {
-                        info!("Webserver: {}", s);
-                        output.insert(&format!("Info from Webserver: {}\n", s))
-                    }
-                    Web2GuiMessage::Error(s) => {
-                        error!("Webserver: {}", s);
-                        output.insert(&format!("Error from Webserver: {}\n", s))
-                    }
                     Web2GuiMessage::Shutdown => {
                         info!("Webserver: shutdown!");
                         let mut output_server_addr = output_server_addr.lock().unwrap();

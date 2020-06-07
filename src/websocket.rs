@@ -4,10 +4,9 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     mpsc, Arc, Mutex,
 };
-use std::sync::mpsc::SendError;
 use std::thread::spawn;
 use std::time::Duration;
-use tracing::warn;
+use tracing::{error, info, warn};
 
 use websocket::sender::Writer;
 use websocket::sync::Server;
@@ -25,19 +24,10 @@ use crate::screen_capture::linux::ScreenCaptureX11;
 #[cfg(target_os = "linux")]
 use crate::x11helper::WindowInfo;
 
-pub enum Ws2GuiMessage {
-    Error(String),
-    Warning(String),
-    Info(String),
-}
+pub enum Ws2GuiMessage {}
+
 pub enum Gui2WsMessage {
     Shutdown,
-}
-
-fn log_gui_send_error<T>(res: Result<(), SendError<T>>) {
-    if let Err(err) = res {
-        warn!("Websocket: Failed to send message to gui: {}", err);
-    }
 }
 
 #[cfg(target_os = "linux")]
@@ -71,10 +61,7 @@ pub fn run(
                 for client in clients.values() {
                     let client = client.lock().unwrap();
                     if let Err(err) = client.shutdown_all() {
-                        log_gui_send_error(sender.send(Ws2GuiMessage::Error(format!(
-                            "Could not shutdown websocket: {}",
-                            err
-                        ))));
+                        error!("Could not shutdown websocket: {}", err);
                     }
                 }
                 shutdown.store(true, Ordering::Relaxed);
@@ -166,10 +153,7 @@ pub fn run(
                 for client in clients.values() {
                     let client = client.lock().unwrap();
                     if let Err(err) = client.shutdown_all() {
-                        sender.send(Ws2GuiMessage::Error(format!(
-                            "Could not shutdown websocket: {}",
-                            err
-                        )));
+                        error!("Could not shutdown websocket: {}", err);
                     }
                 }
                 shutdown.store(true, Ordering::Relaxed);
@@ -249,7 +233,7 @@ fn listen_websocket<T, F>(
     password: Option<String>,
     clients: Arc<Mutex<HashMap<SocketAddr, Arc<Mutex<Writer<TcpStream>>>>>>,
     shutdown: Arc<AtomicBool>,
-    sender: mpsc::Sender<Ws2GuiMessage>,
+    _sender: mpsc::Sender<Ws2GuiMessage>,
     create_stream_handler: F,
 ) where
     T: StreamHandler,
@@ -257,28 +241,21 @@ fn listen_websocket<T, F>(
 {
     let server = Server::bind(addr);
     if let Err(err) = server {
-        log_gui_send_error(sender.send(Ws2GuiMessage::Error(format!(
-            "Failed binding to socket: {}",
-            err
-        ))));
+        error!("Failed binding to socket: {}", err);
         return;
     }
     let mut server = server.unwrap();
     if let Err(err) = server.set_nonblocking(true) {
-        log_gui_send_error(sender.send(Ws2GuiMessage::Warning(format!(
+        warn!(
             "Could not set websocket to non-blocking, graceful shutdown may be impossible now: {}",
             err
-        ))));
+        );
     }
 
     loop {
         std::thread::sleep(std::time::Duration::from_millis(10));
-        let sender = sender.clone();
         if shutdown.load(Ordering::Relaxed) {
-            log_gui_send_error(sender.send(Ws2GuiMessage::Info(format!(
-                "Shutting down websocket: {}",
-                addr
-            ))));
+            info!("Shutting down websocket: {}", addr);
             return;
         }
         let clients = clients.clone();
@@ -289,10 +266,7 @@ fn listen_websocket<T, F>(
                 spawn(move || {
                     let client = request.accept();
                     if let Err((_, err)) = client {
-                        log_gui_send_error(sender.send(Ws2GuiMessage::Warning(format!(
-                            "Failed to accept client: {}",
-                            err
-                        ))));
+                        warn!("Failed to accept client: {}", err);
                         return;
                     }
                     let client = client.unwrap();
@@ -301,19 +275,13 @@ fn listen_websocket<T, F>(
                     }
                     let peer_addr = client.peer_addr();
                     if let Err(err) = peer_addr {
-                        log_gui_send_error(sender.send(Ws2GuiMessage::Warning(format!(
-                            "Failed to retrieve client address: {}",
-                            err
-                        ))));
+                        warn!("Failed to retrieve client address: {}", err);
                         return;
                     }
                     let peer_addr = peer_addr.unwrap();
                     let client = client.split();
                     if let Err(err) = client {
-                        log_gui_send_error(sender.send(Ws2GuiMessage::Warning(format!(
-                            "Failed to setup connection: {}",
-                            err
-                        ))));
+                        warn!("Failed to setup connection: {}", err);
                         return;
                     }
                     let (mut ws_receiver, ws_sender) = client.unwrap();
@@ -327,10 +295,7 @@ fn listen_websocket<T, F>(
 
                     let stream_handler = create_stream_handler();
                     if let Err(err) = stream_handler {
-                        log_gui_send_error(sender.send(Ws2GuiMessage::Error(format!(
-                            "Failed to create stream handler: {}",
-                            err
-                        ))));
+                        error!("Failed to create stream handler: {}", err);
                         return;
                     }
 
