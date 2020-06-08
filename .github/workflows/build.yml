@@ -9,34 +9,63 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  build-docker:
+    runs-on: ${{ matrix.os }}
+    container: docker://hhmhh/weylus_build:latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        include:
+        - os: ubuntu-latest
+          build-cmd: cargo deb
+          package-files: |
+            target/release/linux.zip
+            target/debian/Weylus*.deb
+          exec-file: target/debian/Weylus*.deb
+          pkg-cmd: cd target/release/ && zip linux.zip weylus
 
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/cache@v2
+      with:
+        path: deps/dist
+        key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}-3
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}-3
+    - name: Build
+      run: ${{ matrix.build-cmd }}
+      shell: bash
+    - name: Package
+      run: ${{ matrix.pkg-cmd }}
+    - name: Artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ runner.os }}
+        path: |
+          ${{ matrix.exec-file }}
+    - name: Publish
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+          files: |
+            ${{ matrix.package-files }}
+          prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macOS-latest, windows-latest]
+        os: [macOS-latest, windows-latest]
         include:
-        - os: ubuntu-latest
-          install-deps: |
-             sudo apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libgl1-mesa-dev libglu1-mesa-dev libxtst-dev nasm libstdc++-6-dev gcc-6 g++-6
-             sudo apt-get remove gcc-7 g++-7 gcc-9 g++-9
-             sudo update-alternatives --install /usr/bin/gcc gcc $(which gcc-6) 100
-             sudo update-alternatives --set gcc $(which gcc-6)
-             sudo update-alternatives --install /usr/bin/g++ g++ $(which g++-6) 100
-             sudo update-alternatives --set g++ $(which g++-6)
-             sudo update-alternatives --install /usr/bin/cc cc /usr/bin/gcc 100
-             sudo update-alternatives --set cc /usr/bin/gcc
-             sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++ 100
-             sudo update-alternatives --set c++ /usr/bin/g++
-             cargo install cargo-deb
-          build-cmd: cargo deb
-          package-files: |
-             target/release/linux.zip
-             target/debian/Weylus*.deb
-          exec-file: target/release/linux.zip
-          pkg-cmd: cd target/release/ && zip linux.zip weylus
-
         - os: macOS-latest
           install-deps: |
              npm install -g typescript

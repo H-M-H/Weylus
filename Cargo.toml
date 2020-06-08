@@ -40,3 +40,7 @@ name = "Weylus"
 depends = "$auto"
 section = "utility"
 priority = "optional"
+
+[profile.release]
+lto = true
+opt-level = 3
