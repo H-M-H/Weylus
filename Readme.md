@@ -30,16 +30,28 @@ open the url `http://<address of your computer>:<port set in the menu, default i
 possible Weylus will display to you the url you need to open.
 
 ### Linux
-**To enable stylus and multi-touch support `/dev/uinput` needs to be writable by Weylus!**
-To make `/dev/uinput` permanently writable by your user you can do the following:
+Weylus uses the `uinput` interface to simulate input events on Linux. **To enable stylus and multi-touch support `/dev/uinput` needs to be writable by Weylus.** To make `/dev/uinput` permanently writable by your user, run:
 ```sh
-sudo useradd -r -U -s /usr/bin/nologin uinput
+sudo groupadd -r uinput
 sudo usermod -aG uinput $USER
 echo 'KERNEL=="uinput", MODE="0660", GROUP="uinput", OPTIONS+="static_node=uinput"' \
 | sudo tee /etc/udev/rules.d/60-weylus.rules
+```
+
+Then, either reboot, or run
+
+```
 sudo udevadm control --reload
 sudo udevadm trigger
 ```
+
+then log out and log in again. To undo this, run:
+
+```
+sudo rm /etc/udev/rules.d/60-weylus.rules
+```
+
+This allows your user to synthesize input events system-wide, even when another user is logged in. Therefore, untrusted users should not be added to the uinput group.
 
 ### macOS
 Weylus needs some permissions to work properly, make sure you enable:
