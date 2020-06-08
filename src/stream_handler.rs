@@ -1,8 +1,7 @@
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use websocket::Message;
-use websocket::OwnedMessage;
+use websocket::{Message, OwnedMessage, WebSocketError};
 
 use tracing::{trace, warn};
 
@@ -97,7 +96,18 @@ impl<T: ScreenCapture> StreamHandler for ScreenStreamHandler<T> {
                         VideoEncoder::new(width, height, move |data| {
                             let msg = Message::binary(data);
                             if let Err(err) = sender.lock().unwrap().send_message(&msg) {
-                                warn!("Error sending video: {}", err);
+                                match err {
+                                    WebSocketError::IoError(err) => {
+                                        // ignore broken pipe errors as those are caused by
+                                        // intentionally shutting down the websocket
+                                        if err.kind() == std::io::ErrorKind::BrokenPipe {
+                                            trace!("Error sending video: {}", err);
+                                        } else {
+                                            warn!("Error sending video: {}", err);
+                                        }
+                                    }
+                                    _ => warn!("Error sending video: {}", err),
+                                }
                             }
                         })
                         .unwrap(),

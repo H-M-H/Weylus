@@ -148,6 +148,7 @@ function init(password: string, websocket_pointer_port: number, websocket_video_
         videoWebSocket.send("");
     }
     process_stream(videoWebSocket, video);
+    window.onunload = () => { webSocket.close(); videoWebSocket.close(); }
 }
 
 

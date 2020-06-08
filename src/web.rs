@@ -1,6 +1,6 @@
 use handlebars::Handlebars;
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Method, Request, Response, Server, StatusCode};
+use hyper::{Body, Method, Request, Response, Server, StatusCode, server::conn::AddrStream};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -34,6 +34,7 @@ fn response_not_found() -> Response<Body> {
 }
 
 async fn serve<'a>(
+    addr: SocketAddr,
     req: Request<Body>,
     context: Arc<Context<'a>>,
     _sender: mpsc::Sender<Web2GuiMessage>,
@@ -50,7 +51,7 @@ async fn serve<'a>(
                 if let Some(pass) = params.get("password") {
                     if pass == password {
                         authed = true;
-                        info!("User authed.");
+                        info!("Client authenticated: {}.", &addr);
                     }
                 }
             }
@@ -69,6 +70,7 @@ async fn serve<'a>(
                     "text/html; charset=utf-8",
                 ));
             }
+            info!("Client connected: {}", &addr);
             let config = WebConfig {
                 password: context.password.clone(),
                 websocket_pointer_port: context.ws_pointer_port,
@@ -153,13 +155,14 @@ async fn run_server(
 
     let sender = sender.clone();
     let sender2 = sender.clone();
-    let service = make_service_fn(move |_| {
+    let service = make_service_fn(move |s: &AddrStream| {
+        let addr = s.remote_addr();
         let context = context.clone();
         let sender = sender.clone();
         async move {
             Ok::<_, hyper::Error>(service_fn(move |req| {
                 let context = context.clone();
-                serve(req, context, sender.clone())
+                serve(addr, req, context, sender.clone())
             }))
         }
     });

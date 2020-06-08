@@ -288,15 +288,15 @@ fn listen_websocket<T, F>(
 
                     let ws_sender = Arc::new(Mutex::new(ws_sender));
 
-                    {
-                        let mut clients = clients.lock().unwrap();
-                        clients.insert(peer_addr, ws_sender.clone());
-                    }
-
                     let stream_handler = create_stream_handler();
                     if let Err(err) = stream_handler {
                         error!("Failed to create stream handler: {}", err);
                         return;
+                    }
+
+                    {
+                        let mut clients = clients.lock().unwrap();
+                        clients.insert(peer_addr, ws_sender.clone());
                     }
 
                     let mut authed = password.is_none();
@@ -310,6 +310,12 @@ fn listen_websocket<T, F>(
                                         if pw == &password {
                                             authed = true;
                                         } else {
+                                            warn!(
+                                                "Authentication failed: {} sent wrong password: '{}'",
+                                                peer_addr, pw
+                                            );
+                                            let mut clients = clients.lock().unwrap();
+                                            clients.remove(&peer_addr);
                                             return;
                                         }
                                     }
@@ -317,11 +323,23 @@ fn listen_websocket<T, F>(
                                     stream_handler.process(ws_sender.clone(), &msg);
                                 }
                                 if msg.is_close() {
+                                    let mut clients = clients.lock().unwrap();
+                                    clients.remove(&peer_addr);
                                     return;
                                 }
                             }
                             Err(err) => {
-                                warn!("Error reading message from websocket, closing ({})", err);
+                                match err {
+                                    // this happens on calling shutdown, no need to log this
+                                    websocket::WebSocketError::NoDataAvailable => (),
+                                    _ => warn!(
+                                        "Error reading message from websocket, closing ({})",
+                                        err
+                                    ),
+                                }
+
+                                let mut clients = clients.lock().unwrap();
+                                clients.remove(&peer_addr);
                                 return;
                             }
                         }
