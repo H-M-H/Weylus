@@ -22,7 +22,8 @@ jobs:
           package-files: |
             target/release/linux.zip
             target/debian/Weylus*.deb
-          exec-file: target/debian/Weylus*.deb
+          exec-file: target/release/weylus
+          deb-file: target/debian/Weylus*.deb
           pkg-cmd: cd target/release/ && zip linux.zip weylus
 
     steps:
@@ -43,12 +44,16 @@ jobs:
       shell: bash
     - name: Package
       run: ${{ matrix.pkg-cmd }}
-    - name: Artifacts
+    - name: Artifacts1
       uses: actions/upload-artifact@v2
       with:
-        name: ${{ runner.os }}
-        path: |
-          ${{ matrix.exec-file }}
+        name: ${{ runner.os }}-exec
+        path: ${{ matrix.exec-file }}
+    - name: Artifacts2
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ runner.os }}-deb
+        path: ${{ matrix.deb-file }}
     - name: Publish
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
