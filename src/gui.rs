@@ -224,7 +224,7 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                     let chars = chars.chars();
                     let mut name = String::new();
                     for (i, c) in chars.enumerate() {
-                        if i >= 20 {
+                        if i >= 32 {
                             name.push_str("...");
                             break;
                         }
