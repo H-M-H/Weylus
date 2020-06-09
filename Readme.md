@@ -30,7 +30,9 @@ open the url `http://<address of your computer>:<port set in the menu, default i
 possible Weylus will display to you the url you need to open.
 
 ### Linux
-Weylus uses the `uinput` interface to simulate input events on Linux. **To enable stylus and multi-touch support `/dev/uinput` needs to be writable by Weylus.** To make `/dev/uinput` permanently writable by your user, run:
+Weylus uses the `uinput` interface to simulate input events on Linux. **To enable stylus and
+multi-touch support `/dev/uinput` needs to be writable by Weylus.** To make `/dev/uinput`
+permanently writable by your user, run:
 ```sh
 sudo groupadd -r uinput
 sudo usermod -aG uinput $USER
@@ -40,18 +42,19 @@ echo 'KERNEL=="uinput", MODE="0660", GROUP="uinput", OPTIONS+="static_node=uinpu
 
 Then, either reboot, or run
 
-```
+```sh
 sudo udevadm control --reload
 sudo udevadm trigger
 ```
 
 then log out and log in again. To undo this, run:
 
-```
+```sh
 sudo rm /etc/udev/rules.d/60-weylus.rules
 ```
 
-This allows your user to synthesize input events system-wide, even when another user is logged in. Therefore, untrusted users should not be added to the uinput group.
+This allows your user to synthesize input events system-wide, even when another user is logged in.
+Therefore, untrusted users should not be added to the uinput group.
 
 ### macOS
 Weylus needs some permissions to work properly, make sure you enable:
@@ -70,7 +73,7 @@ That is it, start drawing!
 To build Weylus you need to install Rust, Typescript, make, git, a C compiler, nasm and bash. `cargo
 build` builds the project. On Linux some additional dependencies are required to build Weylus. On
 Debian or Ubuntu they can be installed via:
-```
+```sh
 apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev
 libxfixes-dev libxtst-dev
 ```
@@ -82,6 +85,34 @@ the directory `deps/dist` yourself and copy static ffmpeg libraries built with s
 and a static version of libx264 into `deps/dist/lib`. Additional `deps/dist/include` needs to be
 filled with ffmpeg's include header files. The build script will only try to build ffmpeg if the
 directory `deps/dist` does not exist.
+
+### Docker
+It is also possible to build the Linux version inside a docker container. The Dockerfile used is
+located at [docker/Dockerfile](docker/Dockerfile). This is also how the official release is built.
+Building works like
+this:
+```console
+docker run -it hhmhh/weylus_build bash
+root@f02164dbfa18:/# git clone https://github.com/H-M-H/Weylus
+Cloning into 'Weylus'...
+remote: Enumerating objects: 10, done.
+remote: Counting objects: 100% (10/10), done.
+remote: Compressing objects: 100% (7/7), done.
+remote: Total 827 (delta 1), reused 6 (delta 0), pack-reused 817
+Receiving objects: 100% (827/827), 5.38 MiB | 7.12 MiB/s, done.
+Resolving deltas: 100% (431/431), done.
+root@f02164dbfa18:/# cd Weylus/
+root@f02164dbfa18:/Weylus# cargo deb
+   Compiling
+   ...
+```
+Once the build is finished you can for example copy the binary from the container to your file
+system like this:
+```sh
+docker cp f02164dbfa18:/Weylus/target/release/weylus ~/some/path/weylus
+```
+The .deb is located at `/Weylus/target/debian/`.  Please note that the container ID will most likely
+not be `f02164dbfa18` if you run this yourself, replace it accordingly.
 
 ## How does this work?
 ### Stylus/Touch
