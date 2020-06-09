@@ -1,3 +1,7 @@
+#![cfg_attr(feature = "bench", feature(test))]
+#[cfg(feature = "bench")]
+extern crate test;
+
 #[macro_use]
 extern crate bitflags;
 
@@ -80,4 +84,40 @@ fn main() {
         );
     tracing::subscriber::set_global_default(logger).expect("Failed to setup logger!");
     gui::run(receiver);
+}
+
+#[cfg(feature = "bench")]
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use screen_capture::ScreenCapture;
+    use test::Bencher;
+
+    #[cfg(target_os = "linux")]
+    #[bench]
+    fn bench_capture_x11(b: &mut Bencher) {
+        let mut x11ctx = x11helper::X11Context::new().unwrap();
+        let root = x11ctx.root_window();
+        let mut sc = screen_capture::linux::ScreenCaptureX11::new(root).unwrap();
+        b.iter(|| sc.capture());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[bench]
+    fn bench_video_x11(b: &mut Bencher) {
+        let mut x11ctx = x11helper::X11Context::new().unwrap();
+        let root = x11ctx.root_window();
+        use screen_capture::ScreenCapture;
+        let mut sc = screen_capture::linux::ScreenCaptureX11::new(root).unwrap();
+        sc.capture();
+        let (width, height) = sc.size();
+
+        let mut encoder = video::VideoEncoder::new(width, height, |_| {}).unwrap();
+        b.iter(|| {
+            sc.capture();
+            encoder.encode(|y, u, v, y_linesize, u_linesize, v_linesize| {
+                sc.fill_yuv(y, u, v, y_linesize, u_linesize, v_linesize)
+            })
+        });
+    }
 }

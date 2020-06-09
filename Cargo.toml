@@ -31,6 +31,9 @@ pnet = "0.25"
 [target.'cfg(target_os = "linux")'.dependencies]
 c_helper = { path = "c_helper" }
 
+[features]
+bench = []
+
 [package.metadata.bundle]
 name = "Weylus"
 identifier = "io.github.h-m-h.weylus"
