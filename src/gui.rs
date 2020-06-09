@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use std::sync::{mpsc, Arc, Mutex};
 use tokio::sync::mpsc as mpsc_tokio;
-use tracing::info;
+use tracing::{info, error};
 
 use fltk::{
     app::App,
@@ -177,7 +177,6 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
             while let Ok(message) = receiver_web2gui.recv() {
                 match message {
                     Web2GuiMessage::Shutdown => {
-                        info!("Webserver: shutdown!");
                         let mut output_server_addr = output_server_addr.lock().unwrap();
                         output_server_addr.hide();
                     }
@@ -326,36 +325,34 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
 
                     #[cfg(not(target_os = "windows"))]
                     {
-                    if web_sock.ip().is_unspecified() {
-                        // try to guess an ip
-                        let mut ips = Vec::<IpAddr>::new();
-                        for iface in datalink::interfaces()
-                            .iter()
-                            .filter(|iface| iface.is_up() && !iface.is_loopback())
-                        {
-                            for ipnetw in &iface.ips {
-                                if (ipnetw.is_ipv4() && web_sock.ip().is_ipv4())
-                                    || (ipnetw.is_ipv6() && web_sock.ip().is_ipv6())
-                                {
-                                    // filtering ipv6 unicast requires nightly or more fiddling,
-                                    // lets wait for nightlies to stabilize...
-                                    ips.push(ipnetw.ip())
+                        if web_sock.ip().is_unspecified() {
+                            // try to guess an ip
+                            let mut ips = Vec::<IpAddr>::new();
+                            for iface in datalink::interfaces()
+                                .iter()
+                                .filter(|iface| iface.is_up() && !iface.is_loopback())
+                            {
+                                for ipnetw in &iface.ips {
+                                    if (ipnetw.is_ipv4() && web_sock.ip().is_ipv4())
+                                        || (ipnetw.is_ipv6() && web_sock.ip().is_ipv6())
+                                    {
+                                        // filtering ipv6 unicast requires nightly or more fiddling,
+                                        // lets wait for nightlies to stabilize...
+                                        ips.push(ipnetw.ip())
+                                    }
+                                }
+                            }
+                            if ips.len() > 0 {
+                                web_sock.set_ip(ips[0]);
+                            }
+                            if ips.len() > 1 {
+                                info!("Found more than one IP address for browsers to connect to,");
+                                info!("other urls are:");
+                                for ip in &ips[1..] {
+                                    info!("http://{}", SocketAddr::new(*ip, web_port));
                                 }
                             }
                         }
-                        if ips.len() > 0 {
-                            web_sock.set_ip(ips[0]);
-                        }
-                        if ips.len() > 1 {
-                            let output = output.lock()?;
-                            output.insert(
-                                "Info: Found more than one IP address for browsers to connect to,\nInfo: other urls are:\n"
-                            );
-                            for ip in &ips[1..] {
-                                output.insert(&format!("Info: http://{}\n", SocketAddr::new(*ip, web_port)));
-                            }
-                        }
-                    }
                     }
                     let mut output_server_addr = output_server_addr.lock()?;
 
@@ -366,7 +363,8 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                         if web_sock.ip().is_unspecified() {
                             output_server_addr.set_value("http://<your ip address>");
                         } else {
-                            output_server_addr.set_value(&format!("http://{}", web_sock.to_string()));
+                            output_server_addr
+                                .set_value(&format!("http://{}", web_sock.to_string()));
                         }
                     }
                     output_server_addr.show();
@@ -384,8 +382,7 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                 is_server_running = !is_server_running;
                 Ok(())
             }() {
-                let output = output.lock().unwrap();
-                output.insert(&format!("Error: {}\n", err));
+                error!("{}", err);
             };
         }));
 

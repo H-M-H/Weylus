@@ -73,7 +73,6 @@ fn main() {
     let logger = tracing_subscriber::fmt()
         .with_max_level(level)
         .finish()
-        .with(tracing_subscriber::fmt::Layer::default())
         .with(
             tracing_subscriber::fmt::Layer::default()
                 .with_ansi(false)
