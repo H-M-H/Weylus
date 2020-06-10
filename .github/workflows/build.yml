@@ -76,7 +76,7 @@ jobs:
              npm install -g typescript
              brew install nasm
              cargo install cargo-bundle
-          build-cmd: cargo bundle --release
+          build-cmd: MACOSX_DEPLOYMENT_TARGET=10.13 cargo bundle --release
           package-files: target/release/bundle/osx/macOS.zip
           exec-file: target/release/bundle/osx/macOS.zip
           pkg-cmd: cd target/release/bundle/osx/ && zip -r macOS.zip Weylus.app
@@ -97,14 +97,14 @@ jobs:
     - uses: actions/cache@v2
       with:
         path: deps/dist
-        key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}-2
+        key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}-3
     - uses: actions/cache@v2
       with:
         path: |
           ~/.cargo/registry
           ~/.cargo/git
           target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}-2
+        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}-3
     - name: Download deps
       run: ${{ matrix.install-deps }}
       shell: bash
