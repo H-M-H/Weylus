@@ -241,6 +241,7 @@ int create_capturables(Display* disp, Capturable** capturables, int size, Error*
 		Capturable* c = malloc(sizeof(Capturable));
 		capturables[i] = c;
 		c->disp = disp;
+		c->screen = ScreenOfDisplay(disp, screen);
 		c->type = WINDOW;
 		strncpy(c->name, title_utf8, sizeof(c->name) - 1);
 		c->c.winfo.win = client_list[j];
