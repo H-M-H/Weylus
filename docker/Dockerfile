@@ -3,7 +3,7 @@ ENV RUSTUP_HOME="/usr/local/rustup" CARGO_HOME="/usr/local/cargo" PATH="/usr/loc
 RUN apt-get update && \
         apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev \
         libxrender-dev libxfixes-dev libgl1-mesa-dev libglu1-mesa-dev libxtst-dev cmake git curl \
-        software-properties-common zip nasm libssl-dev
+        software-properties-common zip nasm libssl-dev libxrandr-dev
 RUN curl -sL https://deb.nodesource.com/setup_14.x | bash - && \
     apt-get install -y nodejs && \
     npm install -g typescript
