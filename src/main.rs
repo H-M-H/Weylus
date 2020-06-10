@@ -5,10 +5,6 @@ extern crate test;
 #[macro_use]
 extern crate bitflags;
 
-#[cfg(target_os = "linux")]
-#[macro_use]
-extern crate c_helper;
-
 use std::io::Write;
 use std::sync::mpsc;
 use tracing_subscriber;

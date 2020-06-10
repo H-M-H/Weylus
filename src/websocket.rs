@@ -22,7 +22,7 @@ use crate::screen_capture::generic::ScreenCaptureGeneric;
 #[cfg(target_os = "linux")]
 use crate::screen_capture::linux::ScreenCaptureX11;
 #[cfg(target_os = "linux")]
-use crate::x11helper::WindowInfo;
+use crate::x11helper::Capture;
 
 pub enum Ws2GuiMessage {}
 
@@ -40,7 +40,7 @@ pub fn run(
     screen_update_interval: Duration,
     stylus_support: bool,
     faster_capture: bool,
-    capture_window: WindowInfo,
+    capture: Capture,
 ) {
     let clients = Arc::new(Mutex::new(HashMap::<
         SocketAddr,
@@ -71,7 +71,7 @@ pub fn run(
     });
     let pass: Option<String> = password.map_or(None, |s| Some(s.to_string()));
     {
-        let capture_window = capture_window.clone();
+        let capture = capture.clone();
         if stylus_support {
             spawn(move || {
                 listen_websocket(
@@ -80,7 +80,7 @@ pub fn run(
                     clients2,
                     shutdown2,
                     sender2,
-                    move || create_graphic_tablet_stream_handler(capture_window),
+                    move || create_graphic_tablet_stream_handler(capture.clone()),
                 )
             });
         } else {
@@ -91,7 +91,7 @@ pub fn run(
                     clients2,
                     shutdown2,
                     sender2,
-                    move || create_mouse_stream_handler(capture_window),
+                    move || create_mouse_stream_handler(capture.clone()),
                 )
             });
         }
@@ -107,7 +107,7 @@ pub fn run(
                     clients3,
                     shutdown3,
                     sender3,
-                    move || create_xscreen_stream_handler(capture_window, screen_update_interval),
+                    move || create_xscreen_stream_handler(capture.clone(), screen_update_interval),
                 )
             });
         } else {
@@ -190,16 +190,16 @@ pub fn run(
 
 #[cfg(target_os = "linux")]
 fn create_graphic_tablet_stream_handler(
-    winfo: WindowInfo,
+    capture: Capture,
 ) -> Result<PointerStreamHandler<GraphicTablet>, Box<dyn std::error::Error>> {
-    Ok(PointerStreamHandler::new(GraphicTablet::new(winfo)?))
+    Ok(PointerStreamHandler::new(GraphicTablet::new(capture)?))
 }
 
 #[cfg(target_os = "linux")]
 fn create_mouse_stream_handler(
-    winfo: WindowInfo,
+    capture: Capture,
 ) -> Result<PointerStreamHandler<Mouse>, Box<dyn std::error::Error>> {
-    Ok(PointerStreamHandler::new(Mouse::new(winfo)))
+    Ok(PointerStreamHandler::new(Mouse::new(capture)))
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -210,11 +210,11 @@ fn create_mouse_stream_handler() -> Result<PointerStreamHandler<Mouse>, Box<dyn 
 
 #[cfg(target_os = "linux")]
 fn create_xscreen_stream_handler(
-    capture_window: WindowInfo,
+    capture: Capture,
     update_interval: Duration,
 ) -> Result<ScreenStreamHandler<ScreenCaptureX11>, Box<dyn std::error::Error>> {
     Ok(ScreenStreamHandler::new(
-        ScreenCaptureX11::new(capture_window)?,
+        ScreenCaptureX11::new(capture)?,
         update_interval,
     ))
 }

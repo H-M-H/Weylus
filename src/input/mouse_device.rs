@@ -9,11 +9,11 @@ use crate::protocol::PointerEvent;
 use crate::protocol::PointerEventType;
 
 #[cfg(target_os = "linux")]
-use crate::x11helper::WindowInfo;
+use crate::x11helper::Capture;
 
 #[cfg(target_os = "linux")]
 pub struct Mouse {
-    winfo: WindowInfo,
+    capture: Capture,
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -21,8 +21,8 @@ pub struct Mouse {}
 
 #[cfg(target_os = "linux")]
 impl Mouse {
-    pub fn new(winfo: WindowInfo) -> Self {
-        Self { winfo: winfo }
+    pub fn new(capture: Capture) -> Self {
+        Self { capture }
     }
 }
 
@@ -40,11 +40,11 @@ impl InputDevice for Mouse {
         }
         #[cfg(target_os = "linux")]
         {
-            if let Err(err) = self.winfo.activate() {
+            if let Err(err) = self.capture.before_input() {
                 warn!("Failed to activate window, sending no input ({})", err);
                 return;
             }
-            let geometry = self.winfo.geometry();
+            let geometry = self.capture.geometry();
             if let Err(err) = geometry {
                 warn!("Failed to get window geometry, sending no input ({})", err);
                 return;

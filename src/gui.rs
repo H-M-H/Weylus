@@ -188,33 +188,20 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
     #[cfg(target_os = "linux")]
     let mut x11_context = X11Context::new().unwrap();
     #[cfg(target_os = "linux")]
-    let capture_window = Rc::new(RefCell::new(x11_context.root_window()));
+    let capture = Rc::new(RefCell::new(x11_context.captures().unwrap()[0].clone()));
 
     #[cfg(target_os = "linux")]
     {
-        let capture_window = capture_window.clone();
+        let capture = capture.clone();
 
         {
             let choice_window_ref = choice_window_ref.clone();
             but_update_windows.set_callback(Box::new(move || {
                 let mut choice_window = choice_window_ref.borrow_mut();
                 choice_window.clear();
-                {
-                    let root_window = x11_context.root_window();
-                    let capture_window = capture_window.clone();
-                    choice_window.add(
-                        &root_window.name(),
-                        Shortcut::None,
-                        MenuFlag::Normal,
-                        Box::new(move || {
-                            let capture_window = capture_window.clone();
-                            capture_window.replace(root_window);
-                        }),
-                    );
-                }
-                for window in x11_context.windows().unwrap() {
-                    let capture_window = capture_window.clone();
-                    let chars = window
+                for c in x11_context.captures().unwrap() {
+                    let capture = capture.clone();
+                    let chars = c
                         .name()
                         .replace("\\", "\\\\")
                         .replace("/", "\\/")
@@ -234,7 +221,7 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                         Shortcut::None,
                         MenuFlag::Normal,
                         Box::new(move || {
-                            capture_window.replace(window);
+                            capture.replace(c.clone());
                         }),
                     );
                 }
@@ -299,7 +286,7 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                         screen_update_interval,
                         check_stylus.is_checked(),
                         check_faster_screencapture_ref.borrow().is_checked(),
-                        capture_window.clone().borrow().clone(),
+                        capture.clone().borrow().clone(),
                     );
                     #[cfg(not(target_os = "linux"))]
                     crate::websocket::run(

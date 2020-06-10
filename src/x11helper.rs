@@ -5,32 +5,57 @@ use std::os::raw::{c_char, c_float, c_int, c_void};
 use crate::cerror::CError;
 
 extern "C" {
-    fn get_window_info(disp: *mut c_void, windows: *mut WindowInfo, err: *mut CError) -> isize;
+    fn XOpenDisplay(name: *const c_char) -> *mut c_void;
+    fn XCloseDisplay(disp: *mut c_void) -> c_int;
 
-    fn get_root_window_info(disp: *mut c_void, root: *mut WindowInfo);
+    fn create_capture_infos(
+        disp: *mut c_void,
+        handles: *mut *mut c_void,
+        size: c_int,
+        err: *mut CError,
+    ) -> c_int;
 
-    fn get_window_geometry_relative(
-        winfo: *const WindowInfo,
+    fn clone_capture_info(handle: *const c_void) -> *mut c_void;
+    fn destroy_capture_info(handle: *mut c_void);
+    fn get_capture_name(handle: *const c_void) -> *const c_char;
+    fn capture_before_input(handle: *mut c_void, err: *mut CError);
+    fn get_geometry_relative(
+        handle: *const c_void,
         x: *mut c_float,
         y: *mut c_float,
         width: *mut c_float,
         height: *mut c_float,
         err: *mut CError,
     );
-
-    fn activate_window(window: *const WindowInfo, err: *mut CError);
-
-    fn XOpenDisplay(name: *const c_char) -> *mut c_void;
-    fn XCloseDisplay(disp: *mut c_void) -> c_int;
 }
 
-#[xwindow_info_struct(WindowInfo)]
-impl WindowInfo {
-    pub fn name(&self) -> String {
-        unsafe { CStr::from_ptr(self.title.as_ptr()).to_string_lossy().into() }
+pub struct Capture {
+    handle: *mut c_void,
+}
+
+impl Clone for Capture {
+    fn clone(&self) -> Self {
+        let handle = unsafe { clone_capture_info(self.handle) };
+        Self { handle }
+    }
+}
+
+unsafe impl Send for Capture {}
+
+impl Capture {
+    pub unsafe fn handle(&mut self) -> *mut c_void {
+        self.handle
     }
 
-    pub fn geometry(&self) -> Result<WindowGeometry, CError> {
+    pub fn name(&self) -> String {
+        unsafe {
+            CStr::from_ptr(get_capture_name(self.handle))
+                .to_string_lossy()
+                .into()
+        }
+    }
+
+    pub fn geometry(&self) -> Result<CaptureGeometry, CError> {
         let mut x: c_float = 0.0;
         let mut y: c_float = 0.0;
         let mut width: c_float = 0.0;
@@ -38,13 +63,20 @@ impl WindowInfo {
         let mut err = CError::new();
         fltk::app::lock().unwrap();
         unsafe {
-            get_window_geometry_relative(self, &mut x, &mut y, &mut width, &mut height, &mut err);
+            get_geometry_relative(
+                self.handle,
+                &mut x,
+                &mut y,
+                &mut width,
+                &mut height,
+                &mut err,
+            );
         }
         fltk::app::unlock();
         if err.is_err() {
             return Err(err);
         }
-        Ok(WindowGeometry {
+        Ok(CaptureGeometry {
             x: x.into(),
             y: y.into(),
             width: width.into(),
@@ -52,10 +84,10 @@ impl WindowInfo {
         })
     }
 
-    pub fn activate(&self) -> Result<(), CError> {
+    pub fn before_input(&mut self) -> Result<(), CError> {
         let mut err = CError::new();
         fltk::app::lock().unwrap();
-        unsafe { activate_window(self, &mut err) }
+        unsafe { capture_before_input(self.handle, &mut err) };
         fltk::app::unlock();
         if err.is_err() {
             Err(err)
@@ -65,13 +97,21 @@ impl WindowInfo {
     }
 }
 
-impl fmt::Display for WindowInfo {
+impl fmt::Display for Capture {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.name())
     }
 }
 
-pub struct WindowGeometry {
+impl Drop for Capture {
+    fn drop(&mut self) {
+        unsafe {
+            destroy_capture_info(self.handle);
+        }
+    }
+}
+
+pub struct CaptureGeometry {
     pub x: f64,
     pub y: f64,
     pub width: f64,
@@ -88,32 +128,29 @@ impl X11Context {
         if disp.is_null() {
             return None;
         }
-        Some(Self { disp: disp })
+        Some(Self { disp })
     }
 
-    pub fn windows(&mut self) -> Result<Vec<WindowInfo>, CError> {
+    pub fn captures(&mut self) -> Result<Vec<Capture>, CError> {
         let mut err = CError::new();
-        let mut window_infos = [WindowInfo::new(); 256];
+        let mut handles = [std::ptr::null_mut::<c_void>(); 128];
         fltk::app::lock().unwrap();
-        let window_count =
-            unsafe { get_window_info(self.disp, window_infos.as_mut_ptr(), &mut err) as usize };
+        let size = unsafe {
+            create_capture_infos(
+                self.disp,
+                handles.as_mut_ptr(),
+                handles.len() as c_int,
+                &mut err,
+            )
+        };
         fltk::app::unlock();
         if err.is_err() {
             return Err(err);
         }
-        Ok(Vec::from(
-            &window_infos[0..usize::min(window_infos.len(), window_count)],
-        ))
-    }
-
-    pub fn root_window(&mut self) -> WindowInfo {
-        let mut root_window_info = WindowInfo::new();
-        fltk::app::lock().unwrap();
-        unsafe {
-            get_root_window_info(self.disp, &mut root_window_info);
-        }
-        fltk::app::unlock();
-        root_window_info
+        Ok(handles[0..size as usize]
+            .iter()
+            .map(|handle| Capture { handle: *handle })
+            .collect::<Vec<Capture>>())
     }
 }
 

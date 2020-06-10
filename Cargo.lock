@@ -147,15 +147,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "130aac562c0dd69c56b3b1cc8ffd2e17be31d0b6c25b61c96b76231aa23e39e1"
 
 [[package]]
-name = "c_helper"
-version = "1.0.0"
-dependencies = [
- "cc",
- "quote 1.0.6",
- "syn 1.0.30",
-]
-
-[[package]]
 name = "cc"
 version = "1.0.54"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2213,7 +2204,6 @@ version = "0.6.2"
 dependencies = [
  "autopilot",
  "bitflags 1.2.1",
- "c_helper",
  "cc",
  "fltk",
  "handlebars",

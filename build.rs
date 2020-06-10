@@ -74,14 +74,15 @@ fn main() {
 #[cfg(target_os = "linux")]
 fn linux() {
     println!("cargo:rerun-if-changed=lib/linux/uniput.c");
-    println!("cargo:rerun-if-changed=lib/linux/capture.c");
-    println!("cargo:rerun-if-changed=lib/linux/xwindows.c");
-    println!("cargo:rerun-if-changed=lib/linux/xwindows.h");
+    println!("cargo:rerun-if-changed=lib/linux/xcapture.c");
+    println!("cargo:rerun-if-changed=lib/linux/xhelper.c");
+    println!("cargo:rerun-if-changed=lib/linux/xhelper.h");
     cc::Build::new()
         .file("lib/linux/uinput.c")
-        .file("lib/linux/capture.c")
-        .file("lib/linux/xwindows.c")
+        .file("lib/linux/xcapture.c")
+        .file("lib/linux/xhelper.c")
         .compile("linux");
     println!("cargo:rustc-link-lib=X11");
     println!("cargo:rustc-link-lib=Xext");
+    println!("cargo:rustc-link-lib=Xrandr");
 }

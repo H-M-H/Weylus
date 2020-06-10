@@ -5,7 +5,7 @@ use crate::protocol::Button;
 use crate::protocol::PointerEvent;
 use crate::protocol::PointerEventType;
 use crate::protocol::PointerType;
-use crate::x11helper::WindowInfo;
+use crate::x11helper::Capture;
 
 use crate::cerror::CError;
 
@@ -28,7 +28,7 @@ pub struct GraphicTablet {
     mouse_fd: c_int,
     touch_fd: c_int,
     touches: [Option<MultiTouch>; 5],
-    winfo: WindowInfo,
+    capture: Capture,
     x: f64,
     y: f64,
     width: f64,
@@ -36,7 +36,7 @@ pub struct GraphicTablet {
 }
 
 impl GraphicTablet {
-    pub fn new(winfo: WindowInfo) -> Result<Self, CError> {
+    pub fn new(capture: Capture) -> Result<Self, CError> {
         let mut err = CError::new();
         let stylus_fd = unsafe { init_uinput_stylus(&mut err) };
         if err.is_err() {
@@ -54,11 +54,11 @@ impl GraphicTablet {
             return Err(err);
         }
         let tblt = Self {
-            stylus_fd: stylus_fd,
-            mouse_fd: mouse_fd,
-            touch_fd: touch_fd,
+            stylus_fd,
+            mouse_fd,
+            touch_fd,
             touches: Default::default(),
-            winfo: winfo,
+            capture,
             x: 0.0,
             y: 0.0,
             width: 1.0,
@@ -168,11 +168,11 @@ const ABS_MAX: f64 = 65535.0;
 
 impl InputDevice for GraphicTablet {
     fn send_event(&mut self, event: &PointerEvent) {
-        if let Err(err) = self.winfo.activate() {
+        if let Err(err) = self.capture.before_input() {
             warn!("Failed to activate window, sending no input ({})", err);
             return;
         }
-        let geometry = self.winfo.geometry();
+        let geometry = self.capture.geometry();
         if let Err(err) = geometry {
             warn!("Failed to get window geometry, sending no input ({})", err);
             return;

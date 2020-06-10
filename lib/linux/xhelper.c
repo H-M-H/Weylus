@@ -1,10 +1,14 @@
-#include "xwindows.h"
-#include "../error.h"
 #include <X11/X.h>
 #include <X11/Xlib.h>
+#include <X11/extensions/Xrandr.h>
+#include <X11/extensions/randr.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+
+#include "xhelper.h"
+#include "../error.h"
 
 int locale_to_utf8(char* src, char* dest, size_t size)
 {
@@ -155,110 +159,157 @@ Window* get_client_list(Display* disp, unsigned long* size, Error* err)
 	return client_list;
 }
 
-size_t get_window_info(Display* disp, WindowInfo* windows, size_t size, Error* err)
+int create_capture_infos(Display* disp, Capture** captures, int size, Error* err)
 {
+	if (size <= 0)
+		return 0;
+
+	int screen = DefaultScreen(disp);
+	Window root = RootWindow(disp, screen);
+
+	int event_base, error_base, major, minor;
+	int num_monitors = 0;
+	XRRMonitorInfo* monitors = NULL;
+	if (XRRQueryExtension(disp, &event_base, &error_base) && XRRQueryVersion(disp, &major, &minor))
+	{
+		monitors = XRRGetMonitors(disp, root, True, &num_monitors);
+		if (num_monitors < 0)
+		{
+			num_monitors = 0;
+			fill_error(err, 1, "Failed to query monitor info via xrandr.");
+		}
+	}
+	else
+	{
+		fill_error(err, 1, "Xrandr is unsupported on this X server.");
+	}
+
 	Window* client_list;
 	unsigned long client_list_size;
 
-	if ((client_list = get_client_list(disp, &client_list_size, err)) == NULL)
-	{
-		return 0;
-	}
+	size_t num_windows = ((client_list = get_client_list(disp, &client_list_size, err)) == NULL)
+							 ? 0
+							 : client_list_size / sizeof(Window);
 
-	size_t num_screens = XScreenCount(disp);
 	size_t i = 0;
-	for (; i < num_screens && i < size; i++)
+	Capture* cs = malloc(sizeof(Capture));
+	captures[i] = cs;
+	cs->disp = disp;
+	cs->screen = ScreenOfDisplay(disp, screen);
+	strncpy(cs->name, "Desktop", sizeof(cs->name) - 1);
+	cs->type = WINDOW;
+	cs->c.winfo.win = root;
+	cs->c.winfo.should_activate = 0;
+	++i;
+
+	for (; i < (size_t)num_monitors + 1 && i < (size_t)size; ++i)
 	{
-		Screen* s = XScreenOfDisplay(disp, i);
-		windows[i].disp = disp;
-		windows[i].win = XRootWindowOfScreen(s);
-		windows[i].desktop_id = -1;
-		snprintf(windows[i].title, sizeof(windows[i].title), "Screen - %lu", i);
-		windows[i].should_activate = 0;
+		Capture* cs = malloc(sizeof(Capture));
+		captures[i] = cs;
+		XRRMonitorInfo* m = &monitors[i - 1];
+		cs->disp = disp;
+		cs->screen = ScreenOfDisplay(disp, screen);
+		char* name = XGetAtomName(disp, m->name);
+		strncpy(cs->name, name, sizeof(cs->name) - 1);
+		XFree(name);
+		cs->type = RECT;
+		cs->c.rinfo.x = m->x;
+		cs->c.rinfo.y = m->y;
+		cs->c.rinfo.width = m->width;
+		cs->c.rinfo.height = m->height;
 	}
 
-	size_t num_windows = client_list_size / sizeof(Window);
-
-	for (; i < num_windows && i < size; i++)
+	for (; i < num_windows + num_monitors + 1 && i < (size_t)size; ++i)
 	{
-		char* title_utf8 = get_window_title(disp, client_list[i], NULL);
+		size_t j = i - num_monitors - 1;
+		char* title_utf8 = get_window_title(disp, client_list[j], NULL);
 		if (title_utf8 == NULL)
 		{
 			title_utf8 = malloc(32);
-			snprintf(title_utf8, 32, "UNKNOWN %lu", i);
+			snprintf(title_utf8, 32, "UNKNOWN %lu", j);
 		}
 		unsigned long* desktop;
 
 		/* desktop ID */
 		if ((desktop = (unsigned long*)get_property(
-				 disp, client_list[i], XA_CARDINAL, "_NET_WM_DESKTOP", NULL, NULL)) == NULL)
+				 disp, client_list[j], XA_CARDINAL, "_NET_WM_DESKTOP", NULL, NULL)) == NULL)
 		{
 			desktop = (unsigned long*)get_property(
-				disp, client_list[i], XA_CARDINAL, "_WIN_WORKSPACE", NULL, NULL);
+				disp, client_list[j], XA_CARDINAL, "_WIN_WORKSPACE", NULL, NULL);
 		}
 
-		windows[i].disp = disp;
-		windows[i].win = client_list[i];
-		// special desktop ID -1 means "all desktops"
-		// use -2 to indicate that no desktop has been found
-		windows[i].desktop_id = desktop ? (signed long)*desktop : -2;
-		strncpy(windows[i].title, title_utf8, sizeof(windows->title));
-		windows[i].should_activate = 1;
+		Capture* cs = malloc(sizeof(Capture));
+		captures[i] = cs;
+		cs->disp = disp;
+		cs->type = WINDOW;
+		strncpy(cs->name, title_utf8, sizeof(cs->name) - 1);
+		cs->c.winfo.win = client_list[j];
+		cs->c.winfo.should_activate = 1;
 		free(title_utf8);
 		free(desktop);
 	}
 	free(client_list);
-	return num_windows;
+	XRRFreeMonitors(monitors);
+	return i;
 }
 
+void* clone_capture_info(Capture* c)
+{
+	Capture* c2 = malloc(sizeof(Capture));
+	*c2 = *c;
+	memcpy(c2->name, c->name, sizeof(c2->name));
+	return c2;
+}
+
+void destroy_capture_info(Capture* c) { free(c); }
+
 void get_window_geometry(
-	WindowInfo* winfo, int* x, int* y, unsigned int* width, unsigned int* height, Error* err)
+	Display* disp,
+	Window win,
+	int* x,
+	int* y,
+	unsigned int* width,
+	unsigned int* height,
+	Error* err)
 {
 	Window junkroot;
 	int junkx, junky;
 	unsigned int bw, depth;
-	if (!XGetGeometry(
-			winfo->disp, winfo->win, &junkroot, &junkx, &junky, width, height, &bw, &depth))
+	if (!XGetGeometry(disp, win, &junkroot, &junkx, &junky, width, height, &bw, &depth))
 	{
 		ERROR(err, 1, "Failed to get window geometry!");
 	}
-	XTranslateCoordinates(winfo->disp, winfo->win, junkroot, 0, 0, x, y, &junkroot);
+	XTranslateCoordinates(disp, win, junkroot, 0, 0, x, y, &junkroot);
 }
 
-void get_window_geometry_relative(
-	WindowInfo* winfo, float* x, float* y, float* width, float* height, Error* err)
+void get_geometry(
+	Capture* capture, int* x, int* y, unsigned int* width, unsigned int* height, Error* err)
 {
-	Window junkroot;
+	switch (capture->type)
+	{
+	case WINDOW:
+		get_window_geometry(capture->disp, capture->c.winfo.win, x, y, width, height, err);
+		return;
+	case RECT:
+		*x = capture->c.rinfo.x;
+		*y = capture->c.rinfo.y;
+		*width = capture->c.rinfo.width;
+		*height = capture->c.rinfo.height;
+		return;
+	}
+}
+
+void get_geometry_relative(
+	Capture* capture, float* x, float* y, float* width, float* height, Error* err)
+{
 	int x_tmp, y_tmp;
-
-	XWindowAttributes window_attributes;
-	if (!XGetWindowAttributes(winfo->disp, winfo->win, &window_attributes))
-	{
-		ERROR(err, 1, "Failed to get window attributes for window: 0x%.8lx", winfo->win);
-	}
-	if (!XTranslateCoordinates(
-			winfo->disp, winfo->win, window_attributes.root, 0, 0, &x_tmp, &y_tmp, &junkroot))
-	{
-		// we are on a different screen or some error occured
-		ERROR(err, 1, "Failed to get window coordinates relative to its root!");
-	}
-	*x = x_tmp / (float)window_attributes.screen->width;
-	*y = y_tmp / (float)window_attributes.screen->height;
-	*width = window_attributes.width / (float)window_attributes.screen->width;
-	*height = window_attributes.height / (float)window_attributes.screen->height;
-}
-
-void get_root_window_info(Display* disp, WindowInfo* winfo)
-{
-	Window root = DefaultRootWindow(disp);
-	char* title_utf8 = malloc(8);
-	snprintf(title_utf8, 8, "Desktop");
-	winfo->disp = disp;
-	strncpy(winfo->title, title_utf8, sizeof(winfo->title) - 1);
-	winfo->win = root;
-	winfo->desktop_id = -1;
-	winfo->should_activate = 0;
-	free(title_utf8);
+	unsigned int width_tmp, height_tmp;
+	get_geometry(capture, &x_tmp, &y_tmp, &width_tmp, &height_tmp, err);
+	OK_OR_ABORT(err);
+	*x = x_tmp / (float)capture->screen->width;
+	*y = y_tmp / (float)capture->screen->height;
+	*width = width_tmp / (float)capture->screen->width;
+	*height = height_tmp / (float)capture->screen->height;
 }
 
 void client_msg(
@@ -293,7 +344,7 @@ void client_msg(
 	}
 }
 
-void activate_window(WindowInfo* winfo, Error* err)
+void activate_window(Display* disp, WindowInfo* winfo, Error* err)
 {
 	// do not activate windows like the root window or root windows of a screen
 	if (!winfo->should_activate)
@@ -303,7 +354,7 @@ void activate_window(WindowInfo* winfo, Error* err)
 	unsigned long size;
 
 	active_window = (Window*)get_property(
-		winfo->disp, DefaultRootWindow(winfo->disp), XA_WINDOW, "_NET_ACTIVE_WINDOW", &size, err);
+		disp, DefaultRootWindow(disp), XA_WINDOW, "_NET_ACTIVE_WINDOW", &size, err);
 	if (*active_window == winfo->win)
 	{
 		// nothing to do window is active already
@@ -314,28 +365,33 @@ void activate_window(WindowInfo* winfo, Error* err)
 	unsigned long* desktop;
 	/* desktop ID */
 	if ((desktop = (unsigned long*)get_property(
-			 winfo->disp, winfo->win, XA_CARDINAL, "_NET_WM_DESKTOP", NULL, err)) == NULL)
+			 disp, winfo->win, XA_CARDINAL, "_NET_WM_DESKTOP", NULL, err)) == NULL)
 	{
 		if ((desktop = (unsigned long*)get_property(
-				 winfo->disp, winfo->win, XA_CARDINAL, "_WIN_WORKSPACE", NULL, err)) == NULL)
+				 disp, winfo->win, XA_CARDINAL, "_WIN_WORKSPACE", NULL, err)) == NULL)
 		{
 			ERROR(err, 1, "Cannot find desktop ID of the window.");
 		}
 	}
-	client_msg(
-		winfo->disp,
-		DefaultRootWindow(winfo->disp),
-		"_NET_CURRENT_DESKTOP",
-		*desktop,
-		0,
-		0,
-		0,
-		0,
-		err);
+	client_msg(disp, DefaultRootWindow(disp), "_NET_CURRENT_DESKTOP", *desktop, 0, 0, 0, 0, err);
 	free(desktop);
 	OK_OR_ABORT(err);
 
-	client_msg(winfo->disp, winfo->win, "_NET_ACTIVE_WINDOW", 0, 0, 0, 0, 0, err);
+	client_msg(disp, winfo->win, "_NET_ACTIVE_WINDOW", 0, 0, 0, 0, 0, err);
 	OK_OR_ABORT(err);
-	XMapRaised(winfo->disp, winfo->win);
+	XMapRaised(disp, winfo->win);
 }
+
+void capture_before_input(Capture* capture, Error* err)
+{
+	switch (capture->type)
+	{
+	case WINDOW:
+		activate_window(capture->disp, &capture->c.winfo, err);
+		break;
+	case RECT:
+		break;
+	}
+}
+
+const char* get_capture_name(Capture* c) { return c->name; }

@@ -28,9 +28,6 @@ num_cpus = "1.0"
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 pnet = "0.25"
 
-[target.'cfg(target_os = "linux")'.dependencies]
-c_helper = { path = "c_helper" }
-
 [features]
 bench = []
 
