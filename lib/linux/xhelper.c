@@ -210,7 +210,7 @@ int create_capturables(Display* disp, Capturable** capturables, int size, Error*
 		c->disp = disp;
 		c->screen = ScreenOfDisplay(disp, screen);
 		char* name = XGetAtomName(disp, m->name);
-		strncpy(c->name, name, sizeof(c->name) - 1);
+		snprintf(c->name, sizeof(c->name) - 1, "Monitor: %s", name);
 		XFree(name);
 		c->type = RECT;
 		c->c.rinfo.x = m->x;
