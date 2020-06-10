@@ -56,6 +56,9 @@ void init_mouse(int fd, Error* err)
 	if (ioctl(fd, UI_SET_EVBIT, EV_SYN) < 0)
 		ERROR(err, 1, "error: ioctl UI_SET_EVBIT EV_SYN");
 
+	if (ioctl(fd, UI_SET_PROPBIT, INPUT_PROP_DIRECT) < 0)
+		ERROR(err, 1, "error: ioctl UI_SET_PROPBIT INPUT_PROP_DIRECT");
+
 	// enable buttons
 	if (ioctl(fd, UI_SET_EVBIT, EV_KEY) < 0)
 		ERROR(err, 1, "error: ioctl UI_SET_EVBIT EV_KEY");
@@ -88,6 +91,9 @@ void init_stylus(int fd, Error* err)
 	// enable synchronization
 	if (ioctl(fd, UI_SET_EVBIT, EV_SYN) < 0)
 		ERROR(err, 1, "error: ioctl UI_SET_EVBIT EV_SYN");
+
+	if (ioctl(fd, UI_SET_PROPBIT, INPUT_PROP_DIRECT) < 0)
+		ERROR(err, 1, "error: ioctl UI_SET_PROPBIT INPUT_PROP_DIRECT");
 
 	// enable buttons
 	if (ioctl(fd, UI_SET_EVBIT, EV_KEY) < 0)
