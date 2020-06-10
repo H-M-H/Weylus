@@ -111,9 +111,8 @@ function process_stream(videoWebSocket: WebSocket, video: HTMLVideoElement) {
                     sourceBuffer = mediaSource.addSourceBuffer(mimeType);
                     sourceBuffer.addEventListener("updateend", upd_buf);
                 })
-
+                requestAnimationFrame(() => videoWebSocket.send(""));
             }
-            requestAnimationFrame(() => videoWebSocket.send(""));
             return;
         }
         queue.push(event.data);
