@@ -5,7 +5,7 @@ use crate::protocol::Button;
 use crate::protocol::PointerEvent;
 use crate::protocol::PointerEventType;
 use crate::protocol::PointerType;
-use crate::x11helper::Capture;
+use crate::x11helper::Capturable;
 
 use crate::cerror::CError;
 
@@ -28,7 +28,7 @@ pub struct GraphicTablet {
     mouse_fd: c_int,
     touch_fd: c_int,
     touches: [Option<MultiTouch>; 5],
-    capture: Capture,
+    capture: Capturable,
     x: f64,
     y: f64,
     width: f64,
@@ -36,7 +36,7 @@ pub struct GraphicTablet {
 }
 
 impl GraphicTablet {
-    pub fn new(capture: Capture) -> Result<Self, CError> {
+    pub fn new(capture: Capturable) -> Result<Self, CError> {
         let mut err = CError::new();
         let stylus_fd = unsafe { init_uinput_stylus(&mut err) };
         if err.is_err() {

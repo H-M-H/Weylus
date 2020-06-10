@@ -33,7 +33,7 @@ typedef enum CaptureType
 	RECT
 } CaptureType;
 
-typedef struct Capture
+typedef struct Capturable
 {
 	CaptureType type;
 	char name[128];
@@ -44,15 +44,14 @@ typedef struct Capture
 		WindowInfo winfo;
 		RectInfo rinfo;
 	} c;
-} Capture;
+} Capturable;
 
 char* get_property(
 	Display* disp, Window win, Atom xa_prop_type, char* prop_name, unsigned long* size, Error* err);
 
 void get_geometry(
-	Capture* capture, int* x, int* y, unsigned int* width, unsigned int* height, Error* err);
+	Capturable* cap, int* x, int* y, unsigned int* width, unsigned int* height, Error* err);
 
 void get_geometry_relative(
-	Capture* capture, float* x, float* y, float* width, float* height, Error* err);
+	Capturable* cap, float* x, float* y, float* width, float* height, Error* err);
 
-void capture_before_input(Capture* capture, Error* err);

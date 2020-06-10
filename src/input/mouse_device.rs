@@ -9,11 +9,11 @@ use crate::protocol::PointerEvent;
 use crate::protocol::PointerEventType;
 
 #[cfg(target_os = "linux")]
-use crate::x11helper::Capture;
+use crate::x11helper::Capturable;
 
 #[cfg(target_os = "linux")]
 pub struct Mouse {
-    capture: Capture,
+    capture: Capturable,
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -21,7 +21,7 @@ pub struct Mouse {}
 
 #[cfg(target_os = "linux")]
 impl Mouse {
-    pub fn new(capture: Capture) -> Self {
+    pub fn new(capture: Capturable) -> Self {
         Self { capture }
     }
 }

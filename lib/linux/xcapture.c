@@ -16,7 +16,7 @@
 
 struct CaptureContext
 {
-	Capture capture;
+	Capturable cap;
 	XImage* ximg;
 	XShmSegmentInfo shminfo;
 };
@@ -30,20 +30,20 @@ struct Image
 	unsigned int height;
 };
 
-void* start_capture(Capture* capture, CaptureContext* ctx, Error* err)
+void* start_capture(Capturable* cap, CaptureContext* ctx, Error* err)
 {
 	if (!ctx)
 		ctx = malloc(sizeof(CaptureContext));
-	ctx->capture = *capture;
-	strncpy(ctx->capture.name, capture->name, sizeof(ctx->capture.name));
+	ctx->cap = *cap;
+	strncpy(ctx->cap.name, cap->name, sizeof(ctx->cap.name));
 
 	int x, y;
 	unsigned int width, height;
-	get_geometry(capture, &x, &y, &width, &height, err);
+	get_geometry(cap, &x, &y, &width, &height, err);
 	ctx->ximg = XShmCreateImage(
-		capture->disp,
-		DefaultVisualOfScreen(capture->screen),
-		DefaultDepthOfScreen(capture->screen),
+		cap->disp,
+		DefaultVisualOfScreen(cap->screen),
+		DefaultDepthOfScreen(cap->screen),
 		ZPixmap,
 		NULL,
 		&ctx->shminfo,
@@ -59,7 +59,7 @@ void* start_capture(Capture* capture, CaptureContext* ctx, Error* err)
 		fill_error(err, 1, "Fatal shminfo error!");
 		return NULL;
 	}
-	if (!XShmAttach(capture->disp, &ctx->shminfo))
+	if (!XShmAttach(cap->disp, &ctx->shminfo))
 	{
 		fill_error(err, 1, "XShmAttach() failed");
 		return NULL;
@@ -70,7 +70,7 @@ void* start_capture(Capture* capture, CaptureContext* ctx, Error* err)
 
 void stop_capture(CaptureContext* ctx, Error* err)
 {
-	XShmDetach(ctx->capture.disp, &ctx->shminfo);
+	XShmDetach(ctx->cap.disp, &ctx->shminfo);
 	XDestroyImage(ctx->ximg);
 	if (shmdt(ctx->shminfo.shmaddr) != 0)
 	{
@@ -81,25 +81,25 @@ void stop_capture(CaptureContext* ctx, Error* err)
 
 void capture_sceen(CaptureContext* ctx, struct Image* img, Error* err)
 {
-	Window root = DefaultRootWindow(ctx->capture.disp);
+	Window root = DefaultRootWindow(ctx->cap.disp);
 	int x, y;
 	unsigned int width, height;
-	get_geometry(&ctx->capture, &x, &y, &width, &height, err);
+	get_geometry(&ctx->cap, &x, &y, &width, &height, err);
 	OK_OR_ABORT(err);
-	// if window resized, create new capture...
+	// if window resized, create new cap...
 	if (width != (unsigned int)ctx->ximg->width || height != (unsigned int)ctx->ximg->height)
 	{
-		XShmDetach(ctx->capture.disp, &ctx->shminfo);
+		XShmDetach(ctx->cap.disp, &ctx->shminfo);
 		XDestroyImage(ctx->ximg);
 		shmdt(ctx->shminfo.shmaddr);
-		CaptureContext* new_ctx = start_capture(&ctx->capture, ctx, err);
+		CaptureContext* new_ctx = start_capture(&ctx->cap, ctx, err);
 		if (!new_ctx)
 		{
 			return;
 		}
 	}
 
-	switch (ctx->capture.type)
+	switch (ctx->cap.type)
 	{
 	case WINDOW:
 	{
@@ -107,25 +107,25 @@ void capture_sceen(CaptureContext* ctx, struct Image* img, Error* err)
 		unsigned long size;
 
 		active_window = (Window*)get_property(
-			ctx->capture.disp, root, XA_WINDOW, "_NET_ACTIVE_WINDOW", &size, err);
-		if (*active_window == ctx->capture.c.winfo.win)
+			ctx->cap.disp, root, XA_WINDOW, "_NET_ACTIVE_WINDOW", &size, err);
+		if (*active_window == ctx->cap.c.winfo.win)
 		{
-			// capture window within its root so menus are visible as strictly speaking menus do not
+			// cap window within its root so menus are visible as strictly speaking menus do not
 			// belong to the window itself ...
-			XShmGetImage(ctx->capture.disp, root, ctx->ximg, x, y, 0x00ffffff);
+			XShmGetImage(ctx->cap.disp, root, ctx->ximg, x, y, 0x00ffffff);
 		}
 		else
 		{
 			// ... but only if it is the active window as we might be recording the wrong thing
 			// otherwise. If it is not active just record the window itself.
 			XShmGetImage(
-				ctx->capture.disp, ctx->capture.c.winfo.win, ctx->ximg, 0, 0, 0x00ffffff);
+				ctx->cap.disp, ctx->cap.c.winfo.win, ctx->ximg, 0, 0, 0x00ffffff);
 		}
 		free(active_window);
 		break;
 	}
 	case RECT:
-		XShmGetImage(ctx->capture.disp, root, ctx->ximg, x, y, 0x00ffffff);
+		XShmGetImage(ctx->cap.disp, root, ctx->ximg, x, y, 0x00ffffff);
 		break;
 	}
 	img->width = ctx->ximg->width;

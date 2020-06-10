@@ -3,7 +3,7 @@ use std::slice::from_raw_parts;
 
 use crate::cerror::CError;
 use crate::screen_capture::ScreenCapture;
-use crate::x11helper::Capture;
+use crate::x11helper::Capturable;
 
 extern "C" {
     fn start_capture(handle: *const c_void, ctx: *mut c_void, err: *mut CError) -> *mut c_void;
@@ -42,7 +42,7 @@ pub struct ScreenCaptureX11 {
 }
 
 impl ScreenCaptureX11 {
-    pub fn new(mut capture: Capture) -> Result<Self, CError> {
+    pub fn new(mut capture: Capturable) -> Result<Self, CError> {
         let mut err = CError::new();
         fltk::app::lock().unwrap();
         let handle = unsafe { start_capture(capture.handle(), std::ptr::null_mut(), &mut err) };

@@ -22,7 +22,7 @@ use crate::screen_capture::generic::ScreenCaptureGeneric;
 #[cfg(target_os = "linux")]
 use crate::screen_capture::linux::ScreenCaptureX11;
 #[cfg(target_os = "linux")]
-use crate::x11helper::Capture;
+use crate::x11helper::Capturable;
 
 pub enum Ws2GuiMessage {}
 
@@ -40,7 +40,7 @@ pub fn run(
     screen_update_interval: Duration,
     stylus_support: bool,
     faster_capture: bool,
-    capture: Capture,
+    capture: Capturable,
 ) {
     let clients = Arc::new(Mutex::new(HashMap::<
         SocketAddr,
@@ -190,14 +190,14 @@ pub fn run(
 
 #[cfg(target_os = "linux")]
 fn create_graphic_tablet_stream_handler(
-    capture: Capture,
+    capture: Capturable,
 ) -> Result<PointerStreamHandler<GraphicTablet>, Box<dyn std::error::Error>> {
     Ok(PointerStreamHandler::new(GraphicTablet::new(capture)?))
 }
 
 #[cfg(target_os = "linux")]
 fn create_mouse_stream_handler(
-    capture: Capture,
+    capture: Capturable,
 ) -> Result<PointerStreamHandler<Mouse>, Box<dyn std::error::Error>> {
     Ok(PointerStreamHandler::new(Mouse::new(capture)))
 }
@@ -210,7 +210,7 @@ fn create_mouse_stream_handler() -> Result<PointerStreamHandler<Mouse>, Box<dyn 
 
 #[cfg(target_os = "linux")]
 fn create_xscreen_stream_handler(
-    capture: Capture,
+    capture: Capturable,
     update_interval: Duration,
 ) -> Result<ScreenStreamHandler<ScreenCaptureX11>, Box<dyn std::error::Error>> {
     Ok(ScreenStreamHandler::new(

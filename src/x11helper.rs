@@ -8,17 +8,17 @@ extern "C" {
     fn XOpenDisplay(name: *const c_char) -> *mut c_void;
     fn XCloseDisplay(disp: *mut c_void) -> c_int;
 
-    fn create_capture_infos(
+    fn create_capturables(
         disp: *mut c_void,
         handles: *mut *mut c_void,
         size: c_int,
         err: *mut CError,
     ) -> c_int;
 
-    fn clone_capture_info(handle: *const c_void) -> *mut c_void;
-    fn destroy_capture_info(handle: *mut c_void);
-    fn get_capture_name(handle: *const c_void) -> *const c_char;
-    fn capture_before_input(handle: *mut c_void, err: *mut CError);
+    fn clone_capturable(handle: *const c_void) -> *mut c_void;
+    fn destroy_capturable(handle: *mut c_void);
+    fn get_capturable_name(handle: *const c_void) -> *const c_char;
+    fn capturable_before_input(handle: *mut c_void, err: *mut CError);
     fn get_geometry_relative(
         handle: *const c_void,
         x: *mut c_float,
@@ -29,27 +29,27 @@ extern "C" {
     );
 }
 
-pub struct Capture {
+pub struct Capturable {
     handle: *mut c_void,
 }
 
-impl Clone for Capture {
+impl Clone for Capturable {
     fn clone(&self) -> Self {
-        let handle = unsafe { clone_capture_info(self.handle) };
+        let handle = unsafe { clone_capturable(self.handle) };
         Self { handle }
     }
 }
 
-unsafe impl Send for Capture {}
+unsafe impl Send for Capturable {}
 
-impl Capture {
+impl Capturable {
     pub unsafe fn handle(&mut self) -> *mut c_void {
         self.handle
     }
 
     pub fn name(&self) -> String {
         unsafe {
-            CStr::from_ptr(get_capture_name(self.handle))
+            CStr::from_ptr(get_capturable_name(self.handle))
                 .to_string_lossy()
                 .into()
         }
@@ -87,7 +87,7 @@ impl Capture {
     pub fn before_input(&mut self) -> Result<(), CError> {
         let mut err = CError::new();
         fltk::app::lock().unwrap();
-        unsafe { capture_before_input(self.handle, &mut err) };
+        unsafe { capturable_before_input(self.handle, &mut err) };
         fltk::app::unlock();
         if err.is_err() {
             Err(err)
@@ -97,16 +97,16 @@ impl Capture {
     }
 }
 
-impl fmt::Display for Capture {
+impl fmt::Display for Capturable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.name())
     }
 }
 
-impl Drop for Capture {
+impl Drop for Capturable {
     fn drop(&mut self) {
         unsafe {
-            destroy_capture_info(self.handle);
+            destroy_capturable(self.handle);
         }
     }
 }
@@ -131,12 +131,12 @@ impl X11Context {
         Some(Self { disp })
     }
 
-    pub fn captures(&mut self) -> Result<Vec<Capture>, CError> {
+    pub fn capturables(&mut self) -> Result<Vec<Capturable>, CError> {
         let mut err = CError::new();
         let mut handles = [std::ptr::null_mut::<c_void>(); 128];
         fltk::app::lock().unwrap();
         let size = unsafe {
-            create_capture_infos(
+            create_capturables(
                 self.disp,
                 handles.as_mut_ptr(),
                 handles.len() as c_int,
@@ -149,8 +149,8 @@ impl X11Context {
         }
         Ok(handles[0..size as usize]
             .iter()
-            .map(|handle| Capture { handle: *handle })
-            .collect::<Vec<Capture>>())
+            .map(|handle| Capturable { handle: *handle })
+            .collect::<Vec<Capturable>>())
     }
 }
 

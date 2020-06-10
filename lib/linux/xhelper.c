@@ -159,7 +159,7 @@ Window* get_client_list(Display* disp, unsigned long* size, Error* err)
 	return client_list;
 }
 
-int create_capture_infos(Display* disp, Capture** captures, int size, Error* err)
+int create_capturables(Display* disp, Capturable** capturables, int size, Error* err)
 {
 	if (size <= 0)
 		return 0;
@@ -192,31 +192,31 @@ int create_capture_infos(Display* disp, Capture** captures, int size, Error* err
 							 : client_list_size / sizeof(Window);
 
 	size_t i = 0;
-	Capture* cs = malloc(sizeof(Capture));
-	captures[i] = cs;
-	cs->disp = disp;
-	cs->screen = ScreenOfDisplay(disp, screen);
-	strncpy(cs->name, "Desktop", sizeof(cs->name) - 1);
-	cs->type = WINDOW;
-	cs->c.winfo.win = root;
-	cs->c.winfo.should_activate = 0;
+	Capturable* c = malloc(sizeof(Capturable));
+	capturables[i] = c;
+	c->disp = disp;
+	c->screen = ScreenOfDisplay(disp, screen);
+	strncpy(c->name, "Desktop", sizeof(c->name) - 1);
+	c->type = WINDOW;
+	c->c.winfo.win = root;
+	c->c.winfo.should_activate = 0;
 	++i;
 
 	for (; i < (size_t)num_monitors + 1 && i < (size_t)size; ++i)
 	{
-		Capture* cs = malloc(sizeof(Capture));
-		captures[i] = cs;
+		Capturable* c = malloc(sizeof(Capturable));
+		capturables[i] = c;
 		XRRMonitorInfo* m = &monitors[i - 1];
-		cs->disp = disp;
-		cs->screen = ScreenOfDisplay(disp, screen);
+		c->disp = disp;
+		c->screen = ScreenOfDisplay(disp, screen);
 		char* name = XGetAtomName(disp, m->name);
-		strncpy(cs->name, name, sizeof(cs->name) - 1);
+		strncpy(c->name, name, sizeof(c->name) - 1);
 		XFree(name);
-		cs->type = RECT;
-		cs->c.rinfo.x = m->x;
-		cs->c.rinfo.y = m->y;
-		cs->c.rinfo.width = m->width;
-		cs->c.rinfo.height = m->height;
+		c->type = RECT;
+		c->c.rinfo.x = m->x;
+		c->c.rinfo.y = m->y;
+		c->c.rinfo.width = m->width;
+		c->c.rinfo.height = m->height;
 	}
 
 	for (; i < num_windows + num_monitors + 1 && i < (size_t)size; ++i)
@@ -238,13 +238,13 @@ int create_capture_infos(Display* disp, Capture** captures, int size, Error* err
 				disp, client_list[j], XA_CARDINAL, "_WIN_WORKSPACE", NULL, NULL);
 		}
 
-		Capture* cs = malloc(sizeof(Capture));
-		captures[i] = cs;
-		cs->disp = disp;
-		cs->type = WINDOW;
-		strncpy(cs->name, title_utf8, sizeof(cs->name) - 1);
-		cs->c.winfo.win = client_list[j];
-		cs->c.winfo.should_activate = 1;
+		Capturable* c = malloc(sizeof(Capturable));
+		capturables[i] = c;
+		c->disp = disp;
+		c->type = WINDOW;
+		strncpy(c->name, title_utf8, sizeof(c->name) - 1);
+		c->c.winfo.win = client_list[j];
+		c->c.winfo.should_activate = 1;
 		free(title_utf8);
 		free(desktop);
 	}
@@ -253,15 +253,15 @@ int create_capture_infos(Display* disp, Capture** captures, int size, Error* err
 	return i;
 }
 
-void* clone_capture_info(Capture* c)
+void* clone_capturable(Capturable* c)
 {
-	Capture* c2 = malloc(sizeof(Capture));
+	Capturable* c2 = malloc(sizeof(Capturable));
 	*c2 = *c;
 	memcpy(c2->name, c->name, sizeof(c2->name));
 	return c2;
 }
 
-void destroy_capture_info(Capture* c) { free(c); }
+void destroy_capturable(Capturable* c) { free(c); }
 
 void get_window_geometry(
 	Display* disp,
@@ -283,33 +283,33 @@ void get_window_geometry(
 }
 
 void get_geometry(
-	Capture* capture, int* x, int* y, unsigned int* width, unsigned int* height, Error* err)
+	Capturable* cap, int* x, int* y, unsigned int* width, unsigned int* height, Error* err)
 {
-	switch (capture->type)
+	switch (cap->type)
 	{
 	case WINDOW:
-		get_window_geometry(capture->disp, capture->c.winfo.win, x, y, width, height, err);
+		get_window_geometry(cap->disp, cap->c.winfo.win, x, y, width, height, err);
 		return;
 	case RECT:
-		*x = capture->c.rinfo.x;
-		*y = capture->c.rinfo.y;
-		*width = capture->c.rinfo.width;
-		*height = capture->c.rinfo.height;
+		*x = cap->c.rinfo.x;
+		*y = cap->c.rinfo.y;
+		*width = cap->c.rinfo.width;
+		*height = cap->c.rinfo.height;
 		return;
 	}
 }
 
 void get_geometry_relative(
-	Capture* capture, float* x, float* y, float* width, float* height, Error* err)
+	Capturable* cap, float* x, float* y, float* width, float* height, Error* err)
 {
 	int x_tmp, y_tmp;
 	unsigned int width_tmp, height_tmp;
-	get_geometry(capture, &x_tmp, &y_tmp, &width_tmp, &height_tmp, err);
+	get_geometry(cap, &x_tmp, &y_tmp, &width_tmp, &height_tmp, err);
 	OK_OR_ABORT(err);
-	*x = x_tmp / (float)capture->screen->width;
-	*y = y_tmp / (float)capture->screen->height;
-	*width = width_tmp / (float)capture->screen->width;
-	*height = height_tmp / (float)capture->screen->height;
+	*x = x_tmp / (float)cap->screen->width;
+	*y = y_tmp / (float)cap->screen->height;
+	*width = width_tmp / (float)cap->screen->width;
+	*height = height_tmp / (float)cap->screen->height;
 }
 
 void client_msg(
@@ -382,16 +382,16 @@ void activate_window(Display* disp, WindowInfo* winfo, Error* err)
 	XMapRaised(disp, winfo->win);
 }
 
-void capture_before_input(Capture* capture, Error* err)
+void capturable_before_input(Capturable* cap, Error* err)
 {
-	switch (capture->type)
+	switch (cap->type)
 	{
 	case WINDOW:
-		activate_window(capture->disp, &capture->c.winfo, err);
+		activate_window(cap->disp, &cap->c.winfo, err);
 		break;
 	case RECT:
 		break;
 	}
 }
 
-const char* get_capture_name(Capture* c) { return c->name; }
+const char* get_capturable_name(Capturable* c) { return c->name; }
