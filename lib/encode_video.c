@@ -116,12 +116,14 @@ void open_video(VideoContext* ctx, Error* err)
 void destroy_video_encoder(VideoContext* ctx)
 {
 	av_write_trailer(ctx->oc);
+	avio_context_free(&ctx->oc->pb);
 	avformat_free_context(ctx->oc);
 	avcodec_close(ctx->c);
 	avcodec_free_context(&ctx->c);
 	av_frame_free(&ctx->frame);
 	av_packet_free(&ctx->pkt);
 	av_free(ctx->buf);
+	free(ctx);
 }
 
 void encode_video_frame(VideoContext* ctx, int micros, Error* err)
