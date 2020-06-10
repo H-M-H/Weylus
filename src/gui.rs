@@ -137,8 +137,8 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
     #[cfg(not(target_os = "linux"))]
     but_update_capturables.deactivate();
 
-    let mut output_buf = TextBuffer::default();
-    let output = TextDisplay::default(&mut output_buf)
+    let output_buf = TextBuffer::default();
+    let output = TextDisplay::default(output_buf)
         .with_size(600, 6 * height)
         .with_pos(30, 600 - 30 - 6 * height);
 
@@ -294,7 +294,12 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                         screen_update_interval,
                         check_stylus.is_checked(),
                         check_faster_screencapture_ref.borrow().is_checked(),
-                        current_capturable.clone().borrow().as_ref().unwrap().clone(),
+                        current_capturable
+                            .clone()
+                            .borrow()
+                            .as_ref()
+                            .unwrap()
+                            .clone(),
                     );
                     #[cfg(not(target_os = "linux"))]
                     crate::websocket::run(
