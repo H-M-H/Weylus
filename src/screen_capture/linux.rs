@@ -117,9 +117,9 @@ impl ScreenCapture for ScreenCaptureX11 {
                     + data[8 * (yy * width + xx) + 1 + 4 + 4 * width] as i32;
                 r += data[8 * (yy * width + xx) + 2 + 4 * width] as i32
                     + data[8 * (yy * width + xx) + 2 + 4 + 4 * width] as i32;
-                r /= 4;
-                g /= 4;
-                b /= 4;
+                r >>= 2;
+                g >>= 2;
+                b >>= 2;
                 u[yy * u_line_size + xx] = (((128 + 112 * b - 38 * r - 74 * g) >> 8) + 128) as u8;
                 v[yy * v_line_size + xx] = (((128 + 112 * r - 94 * g - 18 * b) >> 8) + 128) as u8;
             }
