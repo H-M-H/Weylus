@@ -139,7 +139,8 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
     #[cfg(not(target_os = "linux"))]
     choice_capturable.deactivate();
 
-    let but_update_capturables = Button::default()
+    #[allow(unused_mut)]
+    let mut but_update_capturables = Button::default()
         .with_size(width, height)
         .below_of(&choice_capturable, padding)
         .with_label("Refresh");
