@@ -28,6 +28,7 @@ struct CaptureContext
 	Capturable cap;
 	XImage* ximg;
 	XShmSegmentInfo shminfo;
+	int has_xfixes;
 };
 
 typedef struct CaptureContext CaptureContext;
@@ -41,10 +42,28 @@ struct Image
 
 void* start_capture(Capturable* cap, CaptureContext* ctx, Error* err)
 {
+	if (XShmQueryExtension(cap->disp) != True)
+	{
+		fill_error(err, 1, "XShmExtension is not available but required!");
+		return NULL;
+	}
+
+	int major, minor;
+	Bool pixmaps = False;
+	XShmQueryVersion(cap->disp, &major, &minor, &pixmaps);
+	if (pixmaps != True)
+	{
+		fill_error(err, 1, "This version of XShmExtension does not support shared memory pixmaps!");
+		return NULL;
+	}
+
 	if (!ctx)
 		ctx = malloc(sizeof(CaptureContext));
 	ctx->cap = *cap;
 	strncpy(ctx->cap.name, cap->name, sizeof(ctx->cap.name));
+
+	int event_base, error_base;
+	ctx->has_xfixes = XFixesQueryExtension(cap->disp, &event_base, &error_base) == True ? 1 : 0;
 
 	int x, y;
 	unsigned int width, height;
@@ -66,11 +85,13 @@ void* start_capture(Capturable* cap, CaptureContext* ctx, Error* err)
 	if (ctx->shminfo.shmid < 0)
 	{
 		fill_error(err, 1, "Fatal shminfo error!");
+		free(ctx);
 		return NULL;
 	}
 	if (!XShmAttach(cap->disp, &ctx->shminfo))
 	{
 		fill_error(err, 1, "XShmAttach() failed");
+		free(ctx);
 		return NULL;
 	}
 
@@ -137,7 +158,8 @@ void capture_sceen(CaptureContext* ctx, struct Image* img, int capture_cursor, E
 		break;
 	}
 
-	if (capture_cursor)
+	// capture cursor if requested and if XFixes is available
+	if (capture_cursor && ctx->has_xfixes)
 	{
 		XFixesCursorImage* cursor_img = XFixesGetCursorImage(ctx->cap.disp);
 		uint32_t* data = (uint32_t*)ctx->ximg->data;
