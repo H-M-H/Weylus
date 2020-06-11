@@ -92,8 +92,8 @@ mod tests {
     #[bench]
     fn bench_capture_x11(b: &mut Bencher) {
         let mut x11ctx = x11helper::X11Context::new().unwrap();
-        let root = x11ctx.root_window();
-        let mut sc = screen_capture::linux::ScreenCaptureX11::new(root).unwrap();
+        let root = x11ctx.capturables().unwrap()[0].clone();
+        let mut sc = screen_capture::linux::ScreenCaptureX11::new(root, false).unwrap();
         b.iter(|| sc.capture());
     }
 
@@ -101,9 +101,9 @@ mod tests {
     #[bench]
     fn bench_video_x11(b: &mut Bencher) {
         let mut x11ctx = x11helper::X11Context::new().unwrap();
-        let root = x11ctx.root_window();
+        let root = x11ctx.capturables().unwrap()[0].clone();
         use screen_capture::ScreenCapture;
-        let mut sc = screen_capture::linux::ScreenCaptureX11::new(root).unwrap();
+        let mut sc = screen_capture::linux::ScreenCaptureX11::new(root, false).unwrap();
         sc.capture();
         let (width, height) = sc.size();
 
@@ -114,5 +114,20 @@ mod tests {
                 sc.fill_yuv(y, u, v, y_linesize, u_linesize, v_linesize)
             })
         });
+    }
+
+    #[cfg(target_os = "linux")]
+    #[bench]
+    fn bench_fill_yuv_x11(b: &mut Bencher) {
+        let mut x11ctx = x11helper::X11Context::new().unwrap();
+        let root = x11ctx.capturables().unwrap()[0].clone();
+        use screen_capture::ScreenCapture;
+        let mut sc = screen_capture::linux::ScreenCaptureX11::new(root, false).unwrap();
+        sc.capture();
+        let (width, height) = sc.size();
+        let mut y = vec![0u8; width * height];
+        let mut u = vec![0u8; width * height / 2];
+        let mut v = vec![0u8; width * height / 2];
+        b.iter(|| sc.fill_yuv(&mut y, &mut u, &mut v, width, width/2, width/2));
     }
 }
