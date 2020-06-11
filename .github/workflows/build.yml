@@ -126,6 +126,6 @@ jobs:
       with:
           files: |
             ${{ matrix.package-files }}
-          prerelease: true
+          prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
