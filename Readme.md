@@ -7,6 +7,20 @@ Weylus in action with [Xournal++](https://github.com/xournalpp/xournalpp):
 
 ![Weylus in action](In_action.gif)
 
+## Table of Contents
+* [Features](#features)
+* [Installation](#installation)
+* [Running](#running)
+    * [Linux](#linux)
+        * [Weylus as Second Screen](#weylus-as-second-screen)
+    * [macOS](#macos)
+    * [Windows](#windows)
+* [Building](#building)
+    * [Docker](#docker)
+* [How does this work?](#how-does-this-work)
+    * [Stylus/Touch](#stylustouch)
+    * [Screen mirroring & window capturing](#screen-mirroring--window-capturing)
+
 ## Features
 - Control your mouse with your tablet
 - Mirror your screen to your tablet
@@ -17,6 +31,7 @@ features on Linux are:
 - Multi-touch: Try it with software that supports multi-touch, like Krita, and see for yourself!
 - Capturing specific windows and only drawing to them
 - Faster screen mirroring
+- Tablet as second screen
 
 ## Installation
 Just grab the latest release for your OS from the
@@ -56,6 +71,48 @@ sudo rm /etc/udev/rules.d/60-weylus.rules
 This allows your user to synthesize input events system-wide, even when another user is logged in.
 Therefore, untrusted users should not be added to the uinput group.
 
+#### Weylus as Second Screen
+On Linux Weylus can be used to turn your tablet into a second screen if your hardware supports it.
+You will need to install the `xf86-video-intel` driver and create the file
+`/etc/X11/xorg.conf.d/20-intel.conf` with the following contents:
+```text
+Section "Device"
+    Identifier "intelgpu0"
+    Driver "intel"
+
+    # this adds two virtual monitors / devices
+    Option "VirtualHeads" "2"
+
+    # if your screen is flickering one of the following options might help
+    Option "TripleBuffer" "true"
+    Option "TearFree"     "true"
+
+    Option "DRI"          "false"
+EndSection
+```
+After a reboot `xrandr` will show two additional monitors `VIRTUAL1` and `VIRTUAL2` and can be used
+to configure them. To activate `VIRTUAL1` with a screen size of 1112x834 and a refresh rate of 60
+fps the following commands can be used:
+```console
+> # this generates all input parameters xrandr needs
+> #from a given screen resolution and refresh rate
+> gtf 1112 834 60
+
+  # 1112x834 @ 60.00 Hz (GTF) hsync: 51.78 kHz; pclk: 75.81 MHz
+  Modeline "1112x834_60.00"  75.81  1112 1168 1288 1464  834 835 838 863  -HSync +Vsync
+> # setup the monitor
+> xrandr --newmode "1112x834_60.00"  75.81  1112 1168 1288 1464  834 835 838 863  -HSync +Vsync
+> xrandr --addmode VIRTUAL1 1112x834_60.00
+> xrandr --output VIRTUAL1 --mode 1112x834_60.00
+> # check if everything is in order
+> xrandr
+```
+Now you should be able to configure this monitor in your system setting like a regular second
+monitor and for example set its position relative to your primary monitor.
+
+After setting up the virtual monitor start Weylus and select it in the capture menu. You may want to
+enable displaying the cursor in this case. That is it!
+
 ### macOS
 Weylus needs some permissions to work properly, make sure you enable:
 - Incoming connections
@@ -64,10 +121,6 @@ Weylus needs some permissions to work properly, make sure you enable:
 
 ### Windows
 I am afraid but as of now Weylus has not been tested on Windows.
-
----
-
-That is it, start drawing!
 
 ## Building
 To build Weylus you need to install Rust, Typescript, make, git, a C compiler, nasm and bash. `cargo
