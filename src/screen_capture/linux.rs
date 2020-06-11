@@ -1,4 +1,4 @@
-use std::os::raw::{c_uint, c_void};
+use std::os::raw::{c_uint, c_void, c_int};
 use std::slice::from_raw_parts;
 
 use crate::cerror::CError;
@@ -7,7 +7,7 @@ use crate::x11helper::Capturable;
 
 extern "C" {
     fn start_capture(handle: *const c_void, ctx: *mut c_void, err: *mut CError) -> *mut c_void;
-    fn capture_sceen(handle: *mut c_void, img: *mut CImage, err: *mut CError);
+    fn capture_sceen(handle: *mut c_void, img: *mut CImage, capture_cursor: c_int, err: *mut CError);
     fn stop_capture(handle: *mut c_void, err: *mut CError);
 }
 
@@ -39,10 +39,11 @@ impl CImage {
 pub struct ScreenCaptureX11 {
     handle: *mut c_void,
     img: CImage,
+    capture_cursor: bool,
 }
 
 impl ScreenCaptureX11 {
-    pub fn new(mut capture: Capturable) -> Result<Self, CError> {
+    pub fn new(mut capture: Capturable, capture_cursor: bool) -> Result<Self, CError> {
         let mut err = CError::new();
         fltk::app::lock().unwrap();
         let handle = unsafe { start_capture(capture.handle(), std::ptr::null_mut(), &mut err) };
@@ -53,6 +54,7 @@ impl ScreenCaptureX11 {
             return Ok(Self {
                 handle,
                 img: CImage::new(),
+                capture_cursor
             });
         }
     }
@@ -74,7 +76,7 @@ impl ScreenCapture for ScreenCaptureX11 {
         let mut err = CError::new();
         fltk::app::lock().unwrap();
         unsafe {
-            capture_sceen(self.handle, &mut self.img, &mut err);
+            capture_sceen(self.handle, &mut self.img, self.capture_cursor.into(), &mut err);
         }
         fltk::app::unlock();
     }

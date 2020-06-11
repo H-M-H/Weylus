@@ -84,11 +84,11 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
         .with_label("Start");
 
     let mut check_stylus = CheckButton::default()
-        .with_pos(430, 30 + (padding + height))
+        .with_pos(430, padding + height - 10)
         .with_size(width, 2 * height);
     #[cfg(target_os = "linux")]
     {
-        check_stylus.set_label("Stylus/Pen support\nRequires access to\n/dev/uinput");
+        check_stylus.set_label("Stylus/Pen support\n(Requires access to\n/dev/uinput)");
         check_stylus.set_checked(true);
     }
     #[cfg(not(target_os = "linux"))]
@@ -100,8 +100,16 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
     let mut check_faster_screencapture = CheckButton::default()
         .with_size(width, 2 * height)
         .below_of(&check_stylus, 2 * padding);
+
+    #[allow(unused_mut)]
+    let mut check_capture_cursor = CheckButton::default()
+        .with_size(width, height)
+        .below_of(&check_faster_screencapture, padding)
+        .with_label("Capture Cursor");
+
     #[cfg(target_os = "linux")]
     {
+        check_capture_cursor.set_checked(false);
         check_faster_screencapture.set_checked(true);
         check_faster_screencapture.set_label("Faster screencapture");
     }
@@ -109,12 +117,13 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
     {
         check_faster_screencapture.set_label("Faster screencapture\n(works only on\nLinux)");
         check_faster_screencapture.deactivate();
+        check_capture_cursor.deactivate();
     }
 
     #[cfg(target_os = "linux")]
     let label_capturable_choice = Frame::default()
         .with_size(width, height)
-        .below_of(&check_faster_screencapture, padding)
+        .below_of(&check_capture_cursor, padding)
         .with_label("Capture:");
 
     #[cfg(not(target_os = "linux"))]
@@ -130,7 +139,7 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
     #[cfg(not(target_os = "linux"))]
     choice_capturable.deactivate();
 
-    let mut but_update_capturables = Button::default()
+    let but_update_capturables = Button::default()
         .with_size(width, height)
         .below_of(&choice_capturable, padding)
         .with_label("Refresh");
@@ -153,8 +162,10 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
     wind.show();
 
     let but_toggle_ref = Rc::new(RefCell::new(but_toggle));
+    let but_update_capturables_ref = Rc::new(RefCell::new(but_update_capturables));
     let choice_capturable_ref = Rc::new(RefCell::new(choice_capturable));
     let check_faster_screencapture_ref = Rc::new(RefCell::new(check_faster_screencapture));
+    let check_capture_cursor_ref = Rc::new(RefCell::new(check_capture_cursor));
     let output_server_addr = Arc::new(Mutex::new(output_server_addr));
     let output = Arc::new(Mutex::new(output));
 
@@ -196,49 +207,53 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
 
         {
             let choice_capturable_ref = choice_capturable_ref.clone();
-            but_update_capturables.set_callback(Box::new(move || {
-                let mut choice_capturable = choice_capturable_ref.borrow_mut();
-                choice_capturable.clear();
-                let capturables = x11_context.capturables().unwrap();
-                {
-                    let mut current_capturable = current_capturable.borrow_mut();
-                    if current_capturable.is_none() {
-                        let first_capturable = capturables[0].clone();
-                        current_capturable.replace(first_capturable);
-                    }
-                }
-                for c in capturables {
-                    let current_capturable = current_capturable.clone();
-                    let chars = c
-                        .name()
-                        .replace("\\", "\\\\")
-                        .replace("/", "\\/")
-                        .replace("_", "\\_")
-                        .replace("&", "\\&");
-                    let chars = chars.chars();
-                    let mut name = String::new();
-                    for (i, c) in chars.enumerate() {
-                        if i >= 32 {
-                            name.push_str("...");
-                            break;
+            but_update_capturables_ref
+                .borrow_mut()
+                .set_callback(Box::new(move || {
+                    let mut choice_capturable = choice_capturable_ref.borrow_mut();
+                    choice_capturable.clear();
+                    let capturables = x11_context.capturables().unwrap();
+                    {
+                        let mut current_capturable = current_capturable.borrow_mut();
+                        if current_capturable.is_none() {
+                            let first_capturable = capturables[0].clone();
+                            current_capturable.replace(first_capturable);
                         }
-                        name.push(c);
                     }
-                    choice_capturable.add(
-                        &name,
-                        Shortcut::None,
-                        MenuFlag::Normal,
-                        Box::new(move || {
-                            current_capturable.replace(Some(c.clone()));
-                        }),
-                    );
-                }
-            }));
+                    for c in capturables {
+                        let current_capturable = current_capturable.clone();
+                        let chars = c
+                            .name()
+                            .replace("\\", "\\\\")
+                            .replace("/", "\\/")
+                            .replace("_", "\\_")
+                            .replace("&", "\\&");
+                        let chars = chars.chars();
+                        let mut name = String::new();
+                        for (i, c) in chars.enumerate() {
+                            if i >= 32 {
+                                name.push_str("...");
+                                break;
+                            }
+                            name.push(c);
+                        }
+                        choice_capturable.add(
+                            &name,
+                            Shortcut::None,
+                            MenuFlag::Normal,
+                            Box::new(move || {
+                                current_capturable.replace(Some(c.clone()));
+                            }),
+                        );
+                    }
+                }));
         }
 
-        but_update_capturables.do_callback();
+        but_update_capturables_ref.borrow_mut().do_callback();
 
         let check_faster_screencapture_ref = check_faster_screencapture_ref.clone();
+        let check_capture_cursor_ref = check_capture_cursor_ref.clone();
+        let but_update_capturables_ref = but_update_capturables_ref.clone();
 
         check_faster_screencapture_ref
             .clone()
@@ -248,10 +263,12 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                 let mut choice_capturable = choice_capturable_ref.borrow_mut();
                 if checked {
                     choice_capturable.deactivate();
-                    but_update_capturables.deactivate();
+                    but_update_capturables_ref.borrow_mut().deactivate();
+                    check_capture_cursor_ref.borrow_mut().deactivate();
                 } else {
                     choice_capturable.activate();
-                    but_update_capturables.activate();
+                    but_update_capturables_ref.borrow_mut().activate();
+                    check_capture_cursor_ref.borrow_mut().activate();
                 }
             }));
     }
@@ -285,22 +302,31 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                     let (sender_gui2ws_tmp, receiver_gui2ws) = mpsc::channel();
                     sender_gui2ws = Some(sender_gui2ws_tmp);
                     #[cfg(target_os = "linux")]
-                    crate::websocket::run(
-                        sender_ws2gui.clone(),
-                        receiver_gui2ws,
-                        SocketAddr::new(bind_addr, ws_pointer_port),
-                        SocketAddr::new(bind_addr, ws_video_port),
-                        password,
-                        screen_update_interval,
-                        check_stylus.is_checked(),
-                        check_faster_screencapture_ref.borrow().is_checked(),
-                        current_capturable
-                            .clone()
-                            .borrow()
-                            .as_ref()
-                            .unwrap()
-                            .clone(),
-                    );
+                    {
+                        let faster_screencapture =
+                            check_faster_screencapture_ref.borrow().is_checked();
+                        if !faster_screencapture {
+                            current_capturable.replace(None);
+                            but_update_capturables_ref.borrow_mut().do_callback();
+                        }
+                        crate::websocket::run(
+                            sender_ws2gui.clone(),
+                            receiver_gui2ws,
+                            SocketAddr::new(bind_addr, ws_pointer_port),
+                            SocketAddr::new(bind_addr, ws_video_port),
+                            password,
+                            screen_update_interval,
+                            check_stylus.is_checked(),
+                            faster_screencapture,
+                            current_capturable
+                                .clone()
+                                .borrow()
+                                .as_ref()
+                                .unwrap()
+                                .clone(),
+                            check_capture_cursor_ref.borrow().is_checked(),
+                        );
+                    }
                     #[cfg(not(target_os = "linux"))]
                     crate::websocket::run(
                         sender_ws2gui.clone(),

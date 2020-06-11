@@ -41,6 +41,7 @@ pub fn run(
     stylus_support: bool,
     faster_capture: bool,
     capture: Capturable,
+    capture_cursor: bool,
 ) {
     let clients = Arc::new(Mutex::new(HashMap::<
         SocketAddr,
@@ -107,7 +108,13 @@ pub fn run(
                     clients3,
                     shutdown3,
                     sender3,
-                    move || create_xscreen_stream_handler(capture.clone(), screen_update_interval),
+                    move || {
+                        create_xscreen_stream_handler(
+                            capture.clone(),
+                            screen_update_interval,
+                            capture_cursor,
+                        )
+                    },
                 )
             });
         } else {
@@ -212,9 +219,10 @@ fn create_mouse_stream_handler() -> Result<PointerStreamHandler<Mouse>, Box<dyn 
 fn create_xscreen_stream_handler(
     capture: Capturable,
     update_interval: Duration,
+    capture_cursor: bool,
 ) -> Result<ScreenStreamHandler<ScreenCaptureX11>, Box<dyn std::error::Error>> {
     Ok(ScreenStreamHandler::new(
-        ScreenCaptureX11::new(capture)?,
+        ScreenCaptureX11::new(capture, capture_cursor)?,
         update_interval,
     ))
 }
