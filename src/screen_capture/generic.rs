@@ -1,5 +1,5 @@
-use image::GenericImageView;
-use image::Pixel;
+use image_autopilot::GenericImageView;
+use image_autopilot::Pixel;
 
 use crate::screen_capture::ScreenCapture;
 

@@ -158,6 +158,13 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
         .with_label("Connect your\ntablet to:");
     output_server_addr.hide();
 
+    let mut but_show_qr = Button::default()
+        .with_size(120, height)
+        .with_pos(but_toggle.x() - 165, but_toggle.y())
+        .with_label("Show QR Code");
+
+    but_show_qr.hide();
+
     wind.make_resizable(true);
     wind.end();
     wind.show();
@@ -384,7 +391,47 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                     let mut output_server_addr = output_server_addr.lock()?;
 
                     #[cfg(not(target_os = "windows"))]
-                    output_server_addr.set_value(&format!("http://{}", web_sock.to_string()));
+                    {
+                        use image::Luma;
+                        use qrcode::QrCode;
+                        let mut addr_string = format!("http://{}", web_sock.to_string());
+                        output_server_addr.set_value(&addr_string);
+                        let password = password.map_or(None, |pw| Some(pw.to_string()));
+                        but_show_qr.set_callback(Box::new(move || {
+                            if let Some(password) = &password {
+                                addr_string.push_str("?password=");
+                                addr_string.push_str(&percent_encoding::utf8_percent_encode(
+                                    &password,
+                                    percent_encoding::NON_ALPHANUMERIC,
+                                ).to_string());
+                                info!("{}", &addr_string);
+                            }
+                            let code = QrCode::new(&addr_string).unwrap();
+                            let img_buf = code.render::<Luma<u8>>().build();
+                            let width = img_buf.width() as i32;
+                            let height = img_buf.height() as i32;
+                            let image = image::DynamicImage::ImageLuma8(img_buf);
+                            let mut buf = vec![];
+                            image
+                                .write_to(&mut buf, image::ImageOutputFormat::Png)
+                                .unwrap();
+                            let png = fltk::image::PngImage::from_data(&buf).unwrap();
+
+                            let mut qr_popup = Window::default()
+                                .with_size(width, height)
+                                .center_screen()
+                                .with_label(&format!(
+                                    "Weylus - QR Code for: {}",
+                                    web_sock.to_string(),
+                                ));
+                            let mut frame = Frame::new(0, 0, width, height, "");
+                            frame.set_image(&png);
+                            qr_popup.make_resizable(true);
+                            qr_popup.end();
+                            qr_popup.show();
+                        }));
+                        but_show_qr.show();
+                    }
                     #[cfg(target_os = "windows")]
                     {
                         if web_sock.ip().is_unspecified() {
@@ -405,6 +452,7 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                         sender_gui2ws.send(Gui2WsMessage::Shutdown)?;
                     }
                     but.set_label("Start");
+                    but_show_qr.hide();
                 }
                 is_server_running = !is_server_running;
                 Ok(())
