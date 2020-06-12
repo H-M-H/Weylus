@@ -147,7 +147,7 @@ Window* get_client_list(Display* disp, unsigned long* size, Error* err)
 		{
 			fill_error(
 				err,
-				1,
+				2,
 				"Cannot get client list properties. "
 				"_NET_CLIENT_LIST: %s or _WIN_CLIENT_LIST: %s",
 				err_net.error_str,
@@ -176,12 +176,12 @@ int create_capturables(Display* disp, Capturable** capturables, int size, Error*
 		if (num_monitors < 0)
 		{
 			num_monitors = 0;
-			fill_error(err, 1, "Failed to query monitor info via xrandr.");
+			fill_error(err, 2, "Failed to query monitor info via xrandr.");
 		}
 	}
 	else
 	{
-		fill_error(err, 1, "Xrandr is unsupported on this X server.");
+		fill_error(err, 2, "Xrandr is unsupported on this X server.");
 	}
 
 	Window* client_list;

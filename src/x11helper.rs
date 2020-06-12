@@ -2,6 +2,8 @@ use std::ffi::CStr;
 use std::fmt;
 use std::os::raw::{c_char, c_float, c_int, c_void};
 
+use tracing::debug;
+
 use crate::cerror::CError;
 
 extern "C" {
@@ -145,7 +147,11 @@ impl X11Context {
         };
         fltk::app::unlock();
         if err.is_err() {
-            return Err(err);
+            if err.code() == 2 {
+                debug!("{}", err);
+            } else {
+                return Err(err);
+            }
         }
         Ok(handles[0..size as usize]
             .iter()

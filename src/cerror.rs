@@ -21,6 +21,10 @@ impl CError {
     pub fn is_err(&self) -> bool {
         self.code != 0
     }
+
+    pub fn code(&self) -> i32 {
+        self.code as i32
+    }
 }
 
 impl fmt::Display for CError {
