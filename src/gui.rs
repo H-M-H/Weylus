@@ -169,6 +169,8 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
     wind.end();
     wind.show();
 
+    let wind_ref = Rc::new(RefCell::new(wind));
+
     let but_toggle_ref = Rc::new(RefCell::new(but_toggle));
     let but_update_capturables_ref = Rc::new(RefCell::new(but_update_capturables));
     let choice_capturable_ref = Rc::new(RefCell::new(choice_capturable));
@@ -176,6 +178,10 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
     let check_capture_cursor_ref = Rc::new(RefCell::new(check_capture_cursor));
     let output_server_addr = Arc::new(Mutex::new(output_server_addr));
     let output = Arc::new(Mutex::new(output));
+
+    let qr_popup_ref = Rc::new(RefCell::new(Window::default()));
+    let qr_img_frame_ref = Rc::new(RefCell::new(Frame::new(0, 0, 0, 0, "")));
+    qr_popup_ref.borrow().end();
 
     let (sender_ws2gui, _receiver_ws2gui) = mpsc::channel();
     let (sender_web2gui, receiver_web2gui) = mpsc::channel();
@@ -286,6 +292,9 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
 
     let mut is_server_running = false;
 
+    let but_toggle_ref2 = but_toggle_ref.clone();
+    let wind_ref2 = wind_ref.clone();
+
     but_toggle_ref
         .clone()
         .borrow_mut()
@@ -293,6 +302,10 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
             if let Err(err) = || -> Result<(), Box<dyn std::error::Error>> {
                 let but_toggle_ref = but_toggle_ref.clone();
                 let mut but = but_toggle_ref.try_borrow_mut()?;
+
+                let wind_ref = wind_ref.clone();
+                let qr_popup_ref = qr_popup_ref.clone();
+                let qr_img_frame_ref = qr_img_frame_ref.clone();
 
                 if !is_server_running {
                     let password_string = input_password.value();
@@ -394,19 +407,23 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                     {
                         use image::Luma;
                         use qrcode::QrCode;
-                        let mut addr_string = format!("http://{}", web_sock.to_string());
+                        let addr_string = format!("http://{}", web_sock.to_string());
                         output_server_addr.set_value(&addr_string);
                         let password = password.map_or(None, |pw| Some(pw.to_string()));
                         but_show_qr.set_callback(Box::new(move || {
+                            let mut url_string = addr_string.clone();
                             if let Some(password) = &password {
-                                addr_string.push_str("?password=");
-                                addr_string.push_str(&percent_encoding::utf8_percent_encode(
-                                    &password,
-                                    percent_encoding::NON_ALPHANUMERIC,
-                                ).to_string());
-                                info!("{}", &addr_string);
+                                url_string.push_str("?password=");
+                                url_string.push_str(
+                                    &percent_encoding::utf8_percent_encode(
+                                        &password,
+                                        percent_encoding::NON_ALPHANUMERIC,
+                                    )
+                                    .to_string(),
+                                );
+                                info!("{}", &url_string);
                             }
-                            let code = QrCode::new(&addr_string).unwrap();
+                            let code = QrCode::new(&url_string).unwrap();
                             let img_buf = code.render::<Luma<u8>>().build();
                             let width = img_buf.width() as i32;
                             let height = img_buf.height() as i32;
@@ -417,18 +434,23 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                                 .unwrap();
                             let png = fltk::image::PngImage::from_data(&buf).unwrap();
 
-                            let mut qr_popup = Window::default()
-                                .with_size(width, height)
-                                .center_screen()
-                                .with_label(&format!(
-                                    "Weylus - QR Code for: {}",
-                                    web_sock.to_string(),
-                                ));
-                            let mut frame = Frame::new(0, 0, width, height, "");
-                            frame.set_image(&png);
-                            qr_popup.make_resizable(true);
-                            qr_popup.end();
+                            let mut qr_popup = qr_popup_ref.borrow_mut();
+                            let wind = wind_ref.borrow();
+                            qr_popup.resize(
+                                wind.x() + (wind.width() - width) / 2,
+                                wind.y() + (wind.height() - height) / 2,
+                                width,
+                                height,
+                            );
+                            qr_popup.set_label(&format!(
+                                "Weylus - QR Code for: {}",
+                                web_sock.to_string(),
+                            ));
+                            let mut qr_img_frame = qr_img_frame_ref.borrow_mut();
+                            qr_img_frame.resize(0, 0, width, height);
+                            qr_img_frame.set_image(&png);
                             qr_popup.show();
+                            qr_popup.make_current();
                         }));
                         but_show_qr.show();
                     }
@@ -453,6 +475,7 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                     }
                     but.set_label("Start");
                     but_show_qr.hide();
+                    qr_popup_ref.borrow_mut().hide();
                 }
                 is_server_running = !is_server_running;
                 Ok(())
@@ -460,6 +483,16 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                 error!("{}", err);
             };
         }));
+
+    wind_ref2.borrow_mut().handle(Box::new(move |ev| match ev {
+        fltk::Event::Hide => {
+            if is_server_running {
+                but_toggle_ref2.borrow_mut().do_callback();
+            }
+            std::process::exit(0);
+        }
+        _ => false,
+    }));
 
     app.run().expect("Failed to run Gui!");
 }
