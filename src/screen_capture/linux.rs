@@ -1,4 +1,4 @@
-use std::os::raw::{c_uint, c_void, c_int};
+use std::os::raw::{c_int, c_uint, c_void};
 use std::slice::from_raw_parts;
 
 use crate::cerror::CError;
@@ -7,7 +7,12 @@ use crate::x11helper::Capturable;
 
 extern "C" {
     fn start_capture(handle: *const c_void, ctx: *mut c_void, err: *mut CError) -> *mut c_void;
-    fn capture_sceen(handle: *mut c_void, img: *mut CImage, capture_cursor: c_int, err: *mut CError);
+    fn capture_sceen(
+        handle: *mut c_void,
+        img: *mut CImage,
+        capture_cursor: c_int,
+        err: *mut CError,
+    );
     fn stop_capture(handle: *mut c_void, err: *mut CError);
 }
 
@@ -54,7 +59,7 @@ impl ScreenCaptureX11 {
             return Ok(Self {
                 handle,
                 img: CImage::new(),
-                capture_cursor
+                capture_cursor,
             });
         }
     }
@@ -76,7 +81,12 @@ impl ScreenCapture for ScreenCaptureX11 {
         let mut err = CError::new();
         fltk::app::lock().unwrap();
         unsafe {
-            capture_sceen(self.handle, &mut self.img, self.capture_cursor.into(), &mut err);
+            capture_sceen(
+                self.handle,
+                &mut self.img,
+                self.capture_cursor.into(),
+                &mut err,
+            );
         }
         fltk::app::unlock();
     }
@@ -95,30 +105,27 @@ impl ScreenCapture for ScreenCaptureX11 {
         let height = self.img.height as usize;
 
         // Y
-        for yy in 0..height-height%2 {
-            for xx in 0..width-width%2 {
-                let i = width * yy + xx;
-                let b = data[4 * i] as i32;
-                let g = data[4 * i + 1] as i32;
-                let r = data[4 * i + 2] as i32;
+        for yy in 0..height - height % 2 {
+            for xx in 0..width - width % 2 {
+                let i = 4 * (width * yy + xx);
+                let b = data[i] as i32;
+                let g = data[i + 1] as i32;
+                let r = data[i + 2] as i32;
                 y[y_line_size * yy + xx] = (((66 * r + 129 * g + 25 * b + 128) >> 8) + 16) as u8;
             }
         }
 
+        let y_len = 4 * width;
         // Cb and Cr
         for yy in 0..(height / 2) {
             for xx in 0..(width / 2) {
-                let mut b = data[8 * (yy * width + xx)] as i32 + data[8 * (yy * width + xx) + 4] as i32;
-                let mut g =
-                    data[8 * (yy * width + xx) + 1] as i32 + data[8 * (yy * width + xx) + 1 + 4] as i32;
-                let mut r =
-                    data[8 * (yy * width + xx) + 2] as i32 + data[8 * (yy * width + xx) + 2 + 4] as i32;
-                b += data[8 * (yy * width + xx) + 4 * width] as i32
-                    + data[8 * (yy * width + xx) + 4 + 4 * width] as i32;
-                g += data[8 * (yy * width + xx) + 1 + 4 * width] as i32
-                    + data[8 * (yy * width + xx) + 1 + 4 + 4 * width] as i32;
-                r += data[8 * (yy * width + xx) + 2 + 4 * width] as i32
-                    + data[8 * (yy * width + xx) + 2 + 4 + 4 * width] as i32;
+                let i = 8 * (yy * width + xx);
+                let mut b = data[i] as i32 + data[i + 4] as i32;
+                let mut g = data[i + 1] as i32 + data[i + 1 + 4] as i32;
+                let mut r = data[i + 2] as i32 + data[i + 2 + 4] as i32;
+                b += data[i + y_len] as i32 + data[i + 4 + y_len] as i32;
+                g += data[i + 1 + y_len] as i32 + data[i + 1 + 4 + y_len] as i32;
+                r += data[i + 2 + y_len] as i32 + data[i + 2 + 4 + y_len] as i32;
                 r >>= 2;
                 g >>= 2;
                 b >>= 2;
