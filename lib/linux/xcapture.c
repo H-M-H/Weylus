@@ -48,15 +48,6 @@ void* start_capture(Capturable* cap, CaptureContext* ctx, Error* err)
 		return NULL;
 	}
 
-	int major, minor;
-	Bool pixmaps = False;
-	XShmQueryVersion(cap->disp, &major, &minor, &pixmaps);
-	if (pixmaps != True)
-	{
-		fill_error(err, 1, "This version of XShmExtension does not support shared memory pixmaps!");
-		return NULL;
-	}
-
 	if (!ctx)
 		ctx = malloc(sizeof(CaptureContext));
 	ctx->cap = *cap;
