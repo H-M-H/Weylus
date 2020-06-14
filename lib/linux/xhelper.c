@@ -6,9 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-
-#include "xhelper.h"
 #include "../error.h"
+#include "xhelper.h"
 
 int locale_to_utf8(char* src, char* dest, size_t size)
 {
@@ -199,7 +198,7 @@ int create_capturables(Display* disp, Capturable** capturables, int size, Error*
 	strncpy(c->name, "Desktop", sizeof(c->name) - 1);
 	c->type = WINDOW;
 	c->c.winfo.win = root;
-	c->c.winfo.should_activate = 0;
+	c->c.winfo.is_regular_window = 0;
 	++i;
 
 	for (; i < (size_t)num_monitors + 1 && i < (size_t)size; ++i)
@@ -245,7 +244,7 @@ int create_capturables(Display* disp, Capturable** capturables, int size, Error*
 		c->type = WINDOW;
 		strncpy(c->name, title_utf8, sizeof(c->name) - 1);
 		c->c.winfo.win = client_list[j];
-		c->c.winfo.should_activate = 1;
+		c->c.winfo.is_regular_window = 1;
 		free(title_utf8);
 		free(desktop);
 	}
@@ -348,7 +347,7 @@ void client_msg(
 void activate_window(Display* disp, WindowInfo* winfo, Error* err)
 {
 	// do not activate windows like the root window or root windows of a screen
-	if (!winfo->should_activate)
+	if (!winfo->is_regular_window)
 		return;
 
 	Window* active_window = 0;

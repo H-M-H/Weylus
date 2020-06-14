@@ -16,7 +16,7 @@
 typedef struct WindowInfo
 {
 	Window win;
-	int should_activate;
+	int is_regular_window;
 } WindowInfo;
 
 typedef struct RectInfo
@@ -54,4 +54,3 @@ void get_geometry(
 
 void get_geometry_relative(
 	Capturable* cap, float* x, float* y, float* width, float* height, Error* err);
-

@@ -3,6 +3,7 @@
 #include <X11/Xutil.h>
 
 #include <X11/extensions/XShm.h>
+#include <X11/extensions/Xcomposite.h>
 #include <X11/extensions/Xfixes.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,6 +30,7 @@ struct CaptureContext
 	XImage* ximg;
 	XShmSegmentInfo shminfo;
 	int has_xfixes;
+	int has_pixmaps;
 };
 
 typedef struct CaptureContext CaptureContext;
@@ -49,8 +51,20 @@ void* start_capture(Capturable* cap, CaptureContext* ctx, Error* err)
 	}
 
 	if (!ctx)
+	{
 		ctx = malloc(sizeof(CaptureContext));
+
+		int major, minor;
+		Bool pixmaps = False;
+		XShmQueryVersion(cap->disp, &major, &minor, &pixmaps);
+		ctx->has_pixmaps = pixmaps == True ? 1 : 0;
+		if (ctx->has_pixmaps && cap->type == WINDOW && cap->c.winfo.is_regular_window)
+		{
+			XCompositeRedirectWindow(cap->disp, cap->c.winfo.win, False);
+		}
+	}
 	ctx->cap = *cap;
+
 	strncpy(ctx->cap.name, cap->name, sizeof(ctx->cap.name));
 
 	int event_base, error_base;
@@ -97,6 +111,8 @@ void stop_capture(CaptureContext* ctx, Error* err)
 	{
 		fill_error(err, 1, "Failed to detach shared memory!");
 	}
+	if (ctx->has_pixmaps && ctx->cap.type == WINDOW && ctx->cap.c.winfo.is_regular_window)
+		XCompositeUnredirectWindow(ctx->cap.disp, ctx->cap.c.winfo.win, False);
 	free(ctx);
 }
 
@@ -127,9 +143,13 @@ void capture_sceen(CaptureContext* ctx, struct Image* img, int capture_cursor, E
 		Window* active_window;
 		unsigned long size;
 
+		int is_offscreen = ctx->cap.c.winfo.is_regular_window &&
+						   (x < 0 || y < 0 || x + (int)width > ctx->cap.screen->width ||
+							y + (int)height > ctx->cap.screen->height);
+
 		active_window =
 			(Window*)get_property(ctx->cap.disp, root, XA_WINDOW, "_NET_ACTIVE_WINDOW", &size, err);
-		if (*active_window == ctx->cap.c.winfo.win)
+		if (*active_window == ctx->cap.c.winfo.win && !is_offscreen)
 		{
 			// cap window within its root so menus are visible as strictly speaking menus do not
 			// belong to the window itself ...
@@ -139,7 +159,16 @@ void capture_sceen(CaptureContext* ctx, struct Image* img, int capture_cursor, E
 		{
 			// ... but only if it is the active window as we might be recording the wrong thing
 			// otherwise. If it is not active just record the window itself.
-			XShmGetImage(ctx->cap.disp, ctx->cap.c.winfo.win, ctx->ximg, 0, 0, 0x00ffffff);
+			// also if pixmaps are supported use those as they support capturing windows even if
+			// they are offscreen
+			if (is_offscreen && ctx->has_pixmaps)
+			{
+				Pixmap pm = XCompositeNameWindowPixmap(ctx->cap.disp, ctx->cap.c.winfo.win);
+				XShmGetImage(ctx->cap.disp, pm, ctx->ximg, 0, 0, 0x00ffffff);
+				XFreePixmap(ctx->cap.disp, pm);
+			}
+			else
+				XShmGetImage(ctx->cap.disp, ctx->cap.c.winfo.win, ctx->ximg, 0, 0, 0x00ffffff);
 		}
 		free(active_window);
 		break;
