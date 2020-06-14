@@ -1,4 +1,5 @@
-use std::os::raw::c_int;
+use std::ffi::CString;
+use std::os::raw::{c_char, c_int};
 
 use crate::input::device::InputDevice;
 use crate::protocol::Button;
@@ -12,9 +13,9 @@ use crate::cerror::CError;
 use tracing::warn;
 
 extern "C" {
-    fn init_uinput_stylus(err: *mut CError) -> c_int;
-    fn init_uinput_mouse(err: *mut CError) -> c_int;
-    fn init_uinput_touch(err: *mut CError) -> c_int;
+    fn init_uinput_stylus(name: *const c_char, err: *mut CError) -> c_int;
+    fn init_uinput_mouse(name: *const c_char, err: *mut CError) -> c_int;
+    fn init_uinput_touch(name: *const c_char, err: *mut CError) -> c_int;
     fn destroy_uinput_device(fd: c_int);
     fn send_uinput_event(device: c_int, typ: c_int, code: c_int, value: c_int, err: *mut CError);
 }
@@ -36,18 +37,21 @@ pub struct GraphicTablet {
 }
 
 impl GraphicTablet {
-    pub fn new(capture: Capturable) -> Result<Self, CError> {
+    pub fn new(capture: Capturable, id: String) -> Result<Self, CError> {
         let mut err = CError::new();
-        let stylus_fd = unsafe { init_uinput_stylus(&mut err) };
+        let name = CString::new(format!("Weylus Stylus - {}", id)).unwrap();
+        let stylus_fd = unsafe { init_uinput_stylus(name.as_ptr(), &mut err) };
         if err.is_err() {
             return Err(err);
         }
-        let mouse_fd = unsafe { init_uinput_mouse(&mut err) };
+        let name = CString::new(format!("Weylus Mouse - {}", id)).unwrap();
+        let mouse_fd = unsafe { init_uinput_mouse(name.as_ptr(), &mut err) };
         if err.is_err() {
             unsafe { destroy_uinput_device(stylus_fd) };
             return Err(err);
         }
-        let touch_fd = unsafe { init_uinput_touch(&mut err) };
+        let name = CString::new(format!("Weylus Touch - {}", id)).unwrap();
+        let touch_fd = unsafe { init_uinput_touch(name.as_ptr(), &mut err) };
         if err.is_err() {
             unsafe { destroy_uinput_device(stylus_fd) };
             unsafe { destroy_uinput_device(mouse_fd) };

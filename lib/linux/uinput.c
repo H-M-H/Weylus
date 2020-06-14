@@ -49,8 +49,7 @@ void setup(int fd, const char* name, Error* err)
 		ERROR(err, 1, "error: UI_DEV_SETUP");
 }
 
-
-void init_mouse(int fd, Error* err)
+void init_mouse(int fd, const char* name, Error* err)
 {
 	// enable synchronization
 	if (ioctl(fd, UI_SET_EVBIT, EV_SYN) < 0)
@@ -79,14 +78,14 @@ void init_mouse(int fd, Error* err)
 	setup_abs(fd, ABS_Y, 0, ABS_MAXVAL, 0, err);
 	OK_OR_ABORT(err);
 
-	setup(fd, "Weylus Mouse", err);
+	setup(fd, name, err);
 	OK_OR_ABORT(err);
 
 	if (ioctl(fd, UI_DEV_CREATE) < 0)
 		ERROR(err, 1, "error: ioctl");
 }
 
-void init_stylus(int fd, Error* err)
+void init_stylus(int fd, const char* name, Error* err)
 {
 	// enable synchronization
 	if (ioctl(fd, UI_SET_EVBIT, EV_SYN) < 0)
@@ -121,14 +120,14 @@ void init_stylus(int fd, Error* err)
 	setup_abs(fd, ABS_TILT_Y, -90, 90, 12, err);
 	OK_OR_ABORT(err);
 
-	setup(fd, "Weylus", err);
+	setup(fd, name, err);
 	OK_OR_ABORT(err);
 
 	if (ioctl(fd, UI_DEV_CREATE) < 0)
 		ERROR(err, 1, "error: ioctl");
 }
 
-void init_touch(int fd, Error* err)
+void init_touch(int fd, const char* name, Error* err)
 {
 	// enable synchronization
 	if (ioctl(fd, UI_SET_EVBIT, EV_SYN) < 0)
@@ -185,14 +184,14 @@ void init_touch(int fd, Error* err)
 	setup_abs(fd, ABS_MT_ORIENTATION, 0, 1, 0, err);
 	OK_OR_ABORT(err);
 
-	setup(fd, "Weylus Touch", err);
+	setup(fd, name, err);
 	OK_OR_ABORT(err);
 
 	if (ioctl(fd, UI_DEV_CREATE) < 0)
 		ERROR(err, 1, "error: ioctl");
 }
 
-int init_uinput_stylus(Error* err)
+int init_uinput_stylus(const char* name, Error* err)
 {
 	int device;
 
@@ -200,13 +199,12 @@ int init_uinput_stylus(Error* err)
 		fill_error(err, 1, "error: failed to open /dev/uinput");
 	else
 	{
-		init_stylus(device, err);
+		init_stylus(device, name, err);
 	}
 	return device;
 }
 
-
-int init_uinput_mouse(Error* err)
+int init_uinput_mouse(const char* name, Error* err)
 {
 	int device;
 
@@ -214,12 +212,12 @@ int init_uinput_mouse(Error* err)
 		fill_error(err, 1, "error: failed to open /dev/uinput");
 	else
 	{
-		init_mouse(device, err);
+		init_mouse(device, name, err);
 	}
 	return device;
 }
 
-int init_uinput_touch(Error* err)
+int init_uinput_touch(const char* name, Error* err)
 {
 	int device;
 
@@ -227,7 +225,7 @@ int init_uinput_touch(Error* err)
 		fill_error(err, 1, "error: failed to open /dev/uinput");
 	else
 	{
-		init_touch(device, err);
+		init_touch(device, name, err);
 	}
 	return device;
 }
