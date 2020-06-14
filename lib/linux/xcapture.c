@@ -30,7 +30,7 @@ struct CaptureContext
 	XImage* ximg;
 	XShmSegmentInfo shminfo;
 	int has_xfixes;
-	int has_pixmaps;
+	int has_offscreen;
 };
 
 typedef struct CaptureContext CaptureContext;
@@ -57,10 +57,14 @@ void* start_capture(Capturable* cap, CaptureContext* ctx, Error* err)
 		int major, minor;
 		Bool pixmaps = False;
 		XShmQueryVersion(cap->disp, &major, &minor, &pixmaps);
-		ctx->has_pixmaps = pixmaps == True ? 1 : 0;
-		if (ctx->has_pixmaps && cap->type == WINDOW && cap->c.winfo.is_regular_window)
+		ctx->has_offscreen = pixmaps == True;
+		if (ctx->has_offscreen && cap->type == WINDOW && cap->c.winfo.is_regular_window)
 		{
-			XCompositeRedirectWindow(cap->disp, cap->c.winfo.win, False);
+			int event_base, error_base;
+			ctx->has_offscreen =
+				XCompositeQueryExtension(cap->disp, &event_base, &error_base) == True;
+			if (ctx->has_offscreen)
+				XCompositeRedirectWindow(cap->disp, cap->c.winfo.win, False);
 		}
 	}
 	ctx->cap = *cap;
@@ -68,7 +72,7 @@ void* start_capture(Capturable* cap, CaptureContext* ctx, Error* err)
 	strncpy(ctx->cap.name, cap->name, sizeof(ctx->cap.name));
 
 	int event_base, error_base;
-	ctx->has_xfixes = XFixesQueryExtension(cap->disp, &event_base, &error_base) == True ? 1 : 0;
+	ctx->has_xfixes = XFixesQueryExtension(cap->disp, &event_base, &error_base) == True;
 
 	int x, y;
 	unsigned int width, height;
@@ -111,7 +115,7 @@ void stop_capture(CaptureContext* ctx, Error* err)
 	{
 		fill_error(err, 1, "Failed to detach shared memory!");
 	}
-	if (ctx->has_pixmaps && ctx->cap.type == WINDOW && ctx->cap.c.winfo.is_regular_window)
+	if (ctx->has_offscreen && ctx->cap.type == WINDOW && ctx->cap.c.winfo.is_regular_window)
 		XCompositeUnredirectWindow(ctx->cap.disp, ctx->cap.c.winfo.win, False);
 	free(ctx);
 }
@@ -136,6 +140,8 @@ void capture_sceen(CaptureContext* ctx, struct Image* img, int capture_cursor, E
 		}
 	}
 
+	Bool get_img_ret = False;
+
 	switch (ctx->cap.type)
 	{
 	case WINDOW:
@@ -153,7 +159,7 @@ void capture_sceen(CaptureContext* ctx, struct Image* img, int capture_cursor, E
 		{
 			// cap window within its root so menus are visible as strictly speaking menus do not
 			// belong to the window itself ...
-			XShmGetImage(ctx->cap.disp, root, ctx->ximg, x, y, 0x00ffffff);
+			get_img_ret = XShmGetImage(ctx->cap.disp, root, ctx->ximg, x, y, 0x00ffffff);
 		}
 		else
 		{
@@ -161,22 +167,35 @@ void capture_sceen(CaptureContext* ctx, struct Image* img, int capture_cursor, E
 			// otherwise. If it is not active just record the window itself.
 			// also if pixmaps are supported use those as they support capturing windows even if
 			// they are offscreen
-			if (is_offscreen && ctx->has_pixmaps)
+			if (is_offscreen)
 			{
-				Pixmap pm = XCompositeNameWindowPixmap(ctx->cap.disp, ctx->cap.c.winfo.win);
-				XShmGetImage(ctx->cap.disp, pm, ctx->ximg, 0, 0, 0x00ffffff);
-				XFreePixmap(ctx->cap.disp, pm);
+				if (ctx->has_offscreen)
+				{
+					Pixmap pm = XCompositeNameWindowPixmap(ctx->cap.disp, ctx->cap.c.winfo.win);
+					get_img_ret = XShmGetImage(ctx->cap.disp, pm, ctx->ximg, 0, 0, 0x00ffffff);
+					XFreePixmap(ctx->cap.disp, pm);
+				}
+				else
+					ERROR(
+						err,
+						1,
+						"Can not capture window as it is off screen and Xcomposite is "
+						"unavailable!");
 			}
 			else
-				XShmGetImage(ctx->cap.disp, ctx->cap.c.winfo.win, ctx->ximg, 0, 0, 0x00ffffff);
+				get_img_ret =
+					XShmGetImage(ctx->cap.disp, ctx->cap.c.winfo.win, ctx->ximg, 0, 0, 0x00ffffff);
 		}
 		free(active_window);
 		break;
 	}
 	case RECT:
-		XShmGetImage(ctx->cap.disp, root, ctx->ximg, x, y, 0x00ffffff);
+		get_img_ret = XShmGetImage(ctx->cap.disp, root, ctx->ximg, x, y, 0x00ffffff);
 		break;
 	}
+
+	if (get_img_ret != True)
+		ERROR(err, 1, "XShmGetImage failed!");
 
 	// capture cursor if requested and if XFixes is available
 	if (capture_cursor && ctx->has_xfixes)

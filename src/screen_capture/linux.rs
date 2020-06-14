@@ -1,6 +1,8 @@
 use std::os::raw::{c_int, c_uint, c_void};
 use std::slice::from_raw_parts;
 
+use tracing::warn;
+
 use crate::cerror::CError;
 use crate::screen_capture::ScreenCapture;
 use crate::x11helper::Capturable;
@@ -89,6 +91,9 @@ impl ScreenCapture for ScreenCaptureX11 {
             );
         }
         fltk::app::unlock();
+        if err.is_err() {
+            warn!("Failed to capture screen: {}", err);
+        }
     }
 
     fn fill_yuv(
