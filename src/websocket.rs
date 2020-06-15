@@ -192,7 +192,7 @@ pub fn run(
             clients3,
             shutdown3,
             sender3,
-            move || create_screen_stream_handler(screen_update_interval),
+            move |_| create_screen_stream_handler(screen_update_interval),
         )
     });
 }
@@ -216,7 +216,7 @@ fn create_mouse_stream_handler(
 }
 
 #[cfg(not(target_os = "linux"))]
-fn create_mouse_stream_handler() -> Result<PointerStreamHandler<Mouse>, Box<dyn std::error::Error>>
+fn create_mouse_stream_handler(_client_addr: &SocketAddr) -> Result<PointerStreamHandler<Mouse>, Box<dyn std::error::Error>>
 {
     Ok(PointerStreamHandler::new(Mouse::new()))
 }
