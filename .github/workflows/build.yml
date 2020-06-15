@@ -31,14 +31,14 @@ jobs:
     - uses: actions/cache@v2
       with:
         path: deps/dist
-        key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}-4
+        key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}-5
     - uses: actions/cache@v2
       with:
         path: |
           ~/.cargo/registry
           ~/.cargo/git
           target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}-4
+        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}-5
     - name: Build
       run: ${{ matrix.build-cmd }}
       shell: bash
