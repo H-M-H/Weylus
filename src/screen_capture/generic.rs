@@ -1,6 +1,8 @@
 use image_autopilot::GenericImageView;
 use image_autopilot::Pixel;
 
+use tracing::trace;
+
 use crate::screen_capture::ScreenCapture;
 
 pub struct ScreenCaptureGeneric {
@@ -33,8 +35,27 @@ impl ScreenCapture for ScreenCaptureGeneric {
             .expect("capture has to be called before invoking fill_yuv");
         let img = &img.image;
 
-        let width = img.width() as usize;
-        let height = img.height() as usize;
+        let (width, height) = self.size();
+
+        #[cfg(debug_assertions)]
+        {
+            trace!("Converting rgb to yuv.");
+            trace!(
+                "width: {} height: {} y.len(): {} u.len(): {} v.len(): {} \
+                y_line_size: {} u_line_size: {} v_line_size: {} \
+                img.width: {} img.height: {}",
+                width,
+                height,
+                y.len(),
+                u.len(),
+                v.len(),
+                y_line_size,
+                u_line_size,
+                v_line_size,
+                img.width(),
+                img.height()
+            );
+        }
 
         // Y
         for yy in 0..height - height % 2 {
@@ -74,8 +95,8 @@ impl ScreenCapture for ScreenCaptureGeneric {
     fn size(&self) -> (usize, usize) {
         self.img.as_ref().map_or((0, 0), |img| {
             (
-                img.size.width.round() as usize,
-                img.size.height.round() as usize,
+                img.image.width() as usize,
+                img.image.height() as usize
             )
         })
     }
