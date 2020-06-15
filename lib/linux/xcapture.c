@@ -31,6 +31,7 @@ struct CaptureContext
 	XShmSegmentInfo shminfo;
 	int has_xfixes;
 	int has_offscreen;
+	Bool last_img_return;
 };
 
 typedef struct CaptureContext CaptureContext;
@@ -68,6 +69,7 @@ void* start_capture(Capturable* cap, CaptureContext* ctx, Error* err)
 		}
 	}
 	ctx->cap = *cap;
+	ctx->last_img_return = True;
 
 	strncpy(ctx->cap.name, cap->name, sizeof(ctx->cap.name));
 
@@ -194,8 +196,22 @@ void capture_sceen(CaptureContext* ctx, struct Image* img, int capture_cursor, E
 		break;
 	}
 
+	Bool last_img_return = ctx->last_img_return;
+	ctx->last_img_return = get_img_ret;
+	// only print an error once and do not repeat this message if consecutive calls to XShmGetImage
+	// fail to avoid spamming the logs.
 	if (get_img_ret != True)
-		ERROR(err, 1, "XShmGetImage failed!");
+	{
+		if (last_img_return != get_img_ret)
+		{
+			ERROR(err, 1, "XShmGetImage failed!");
+		}
+		else
+		{
+			ERROR(err, 2, "XShmGetImage failed!");
+		}
+	}
+
 
 	// capture cursor if requested and if XFixes is available
 	if (capture_cursor && ctx->has_xfixes)

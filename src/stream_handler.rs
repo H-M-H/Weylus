@@ -92,26 +92,28 @@ impl<T: ScreenCapture> StreamHandler for ScreenStreamHandler<T> {
                     if let Err(err) = sender.lock().unwrap().send_message(&Message::text("new")) {
                         warn!("Error sending video: {}", err);
                     }
-                    self.video_encoder = Some(
-                        VideoEncoder::new(width, height, move |data| {
-                            let msg = Message::binary(data);
-                            if let Err(err) = sender.lock().unwrap().send_message(&msg) {
-                                match err {
-                                    WebSocketError::IoError(err) => {
-                                        // ignore broken pipe errors as those are caused by
-                                        // intentionally shutting down the websocket
-                                        if err.kind() == std::io::ErrorKind::BrokenPipe {
-                                            trace!("Error sending video: {}", err);
-                                        } else {
-                                            warn!("Error sending video: {}", err);
-                                        }
+                    let res = VideoEncoder::new(width, height, move |data| {
+                        let msg = Message::binary(data);
+                        if let Err(err) = sender.lock().unwrap().send_message(&msg) {
+                            match err {
+                                WebSocketError::IoError(err) => {
+                                    // ignore broken pipe errors as those are caused by
+                                    // intentionally shutting down the websocket
+                                    if err.kind() == std::io::ErrorKind::BrokenPipe {
+                                        trace!("Error sending video: {}", err);
+                                    } else {
+                                        warn!("Error sending video: {}", err);
                                     }
-                                    _ => warn!("Error sending video: {}", err),
                                 }
+                                _ => warn!("Error sending video: {}", err),
                             }
-                        })
-                        .unwrap(),
-                    )
+                        }
+                    });
+                    if let Err(err) = res {
+                        warn!("{}", err);
+                        return;
+                    }
+                    self.video_encoder = Some(res.unwrap());
                 }
                 let video_encoder = self.video_encoder.as_mut().unwrap();
                 let screen_capture = RefCell::new(&mut self.screen_capture);

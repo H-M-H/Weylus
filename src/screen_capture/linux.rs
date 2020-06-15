@@ -1,7 +1,7 @@
 use std::os::raw::{c_int, c_uint, c_void};
 use std::slice::from_raw_parts;
 
-use tracing::warn;
+use tracing::{warn, trace};
 
 use crate::cerror::CError;
 use crate::screen_capture::ScreenCapture;
@@ -92,7 +92,11 @@ impl ScreenCapture for ScreenCaptureX11 {
         }
         fltk::app::unlock();
         if err.is_err() {
-            warn!("Failed to capture screen: {}", err);
+            if err.code() == 1 {
+                warn!("Failed to capture screen: {}", err);
+            } else {
+                trace!("Failed to capture screen: {}", err);
+            }
         }
     }
 

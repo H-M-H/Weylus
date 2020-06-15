@@ -24,12 +24,16 @@ typedef struct VideoContext
 	void* buf;
 	void* rust_ctx;
 	int pts;
+	int initialized;
 } VideoContext;
 
 int write_video_packet(void* rust_ctx, uint8_t* buf, int buf_size);
 
 void open_video(VideoContext* ctx, Error* err)
 {
+	if (ctx->width <= 1 || ctx->height <= 1)
+		ERROR(err, 1, "Invalid size for video: width = %d, height = %d", ctx->width, ctx->height);
+
 	const AVCodec* codec;
 	int ret;
 
@@ -111,18 +115,21 @@ void open_video(VideoContext* ctx, Error* err)
 	av_dict_set(&opt, "movflags", "frag_custom+empty_moov+default_base_moof", 0);
 	ret = avformat_write_header(ctx->oc, &opt);
 	av_dict_free(&opt);
+	ctx->initialized = 1;
 }
 
 void destroy_video_encoder(VideoContext* ctx)
 {
-	av_write_trailer(ctx->oc);
-	avio_context_free(&ctx->oc->pb);
-	avformat_free_context(ctx->oc);
-	avcodec_close(ctx->c);
-	avcodec_free_context(&ctx->c);
-	av_frame_free(&ctx->frame);
-	av_packet_free(&ctx->pkt);
-	av_free(ctx->buf);
+	if (ctx->initialized)
+	{
+		av_write_trailer(ctx->oc);
+		avio_context_free(&ctx->oc->pb);
+		avformat_free_context(ctx->oc);
+		avcodec_free_context(&ctx->c);
+		av_frame_free(&ctx->frame);
+		av_packet_free(&ctx->pkt);
+		av_free(ctx->buf);
+	}
 	free(ctx);
 }
 
@@ -162,6 +169,7 @@ VideoContext* init_video_encoder(void* rust_ctx, int width, int height)
 	ctx->width = width;
 	ctx->height = height;
 	ctx->pts = 0;
+	ctx->initialized = 0;
 	return ctx;
 }
 
