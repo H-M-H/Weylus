@@ -1,8 +1,9 @@
 #include <X11/X.h>
 #include <X11/Xlib.h>
+#include <X11/extensions/XInput.h>
+#include <X11/extensions/XInput2.h>
 #include <X11/extensions/Xrandr.h>
 #include <X11/extensions/randr.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -395,3 +396,89 @@ void capturable_before_input(Capturable* cap, Error* err)
 }
 
 const char* get_capturable_name(Capturable* c) { return c->name; }
+
+void map_input_device_to_entire_screen(Display* disp, const char* device_name, Error* err)
+{
+
+	XID device_id;
+	int num_devices = 0;
+	XDeviceInfo* devices = XListInputDevices(disp, &num_devices);
+
+	int found = 0;
+	for (int i = 0; i < num_devices; ++i)
+	{
+		if (strcmp(device_name, devices[i].name) == 0)
+		{
+			device_id = devices[i].id;
+			found = 1;
+		}
+	}
+	XFreeDeviceList(devices);
+
+	if (!found)
+		ERROR(err, 2, "Device with name: %s not found!", device_name);
+
+	Atom prop_float, prop_matrix;
+
+	union
+	{
+		unsigned char* c;
+		float* f;
+	} data;
+	int format_return;
+	Atom type_return;
+	unsigned long nitems;
+	unsigned long bytes_after;
+
+	int rc;
+
+	prop_float = XInternAtom(disp, "FLOAT", False);
+	prop_matrix = XInternAtom(disp, "Coordinate Transformation Matrix", False);
+
+	if (!prop_float)
+	{
+		ERROR(err, 1, "Float atom not found. This server is too old.");
+	}
+	if (!prop_matrix)
+	{
+		ERROR(
+			err,
+			1,
+			"Coordinate transformation matrix not found. This "
+			"server is too old.");
+	}
+
+	rc = XIGetProperty(
+		disp,
+		device_id,
+		prop_matrix,
+		0,
+		9,
+		False,
+		prop_float,
+		&type_return,
+		&format_return,
+		&nitems,
+		&bytes_after,
+		&data.c);
+	if (rc != Success || prop_float != type_return || format_return != 32 || nitems != 9 ||
+		bytes_after != 0)
+	{
+		ERROR(err, 1, "Failed to retrieve current property values.");
+	}
+
+	data.f[0] = 1.0;
+	data.f[1] = 0.0;
+	data.f[2] = 0.0;
+	data.f[3] = 0.0;
+	data.f[4] = 1.0;
+	data.f[5] = 0.0;
+	data.f[6] = 0.0;
+	data.f[7] = 0.0;
+	data.f[8] = 1.0;
+
+	XIChangeProperty(
+		disp, device_id, prop_matrix, prop_float, format_return, PropModeReplace, data.c, nitems);
+
+	XFree(data.c);
+}

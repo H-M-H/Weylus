@@ -1,8 +1,8 @@
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
 use std::fmt;
 use std::os::raw::{c_char, c_float, c_int, c_void};
 
-use tracing::debug;
+use tracing::{debug, trace};
 
 use crate::cerror::CError;
 
@@ -27,6 +27,12 @@ extern "C" {
         y: *mut c_float,
         width: *mut c_float,
         height: *mut c_float,
+        err: *mut CError,
+    );
+
+    fn map_input_device_to_entire_screen(
+        disp: *mut c_void,
+        device_name: *const c_char,
         err: *mut CError,
     );
 }
@@ -157,6 +163,25 @@ impl X11Context {
             .iter()
             .map(|handle| Capturable { handle: *handle })
             .collect::<Vec<Capturable>>())
+    }
+
+    pub fn map_input_device_to_entire_screen(&mut self, device_name: &str) -> Result<(), CError> {
+        fltk::app::lock().unwrap();
+        let mut err = CError::new();
+        unsafe {
+            map_input_device_to_entire_screen(
+                self.disp,
+                CString::new(device_name).unwrap().as_ptr(),
+                &mut err,
+            )
+        };
+        fltk::app::unlock();
+        if err.is_err() {
+            trace!("Failed to map input device to screen: {}", &err);
+            Err(err)
+        } else {
+            Ok(())
+        }
     }
 }
 

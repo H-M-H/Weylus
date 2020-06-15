@@ -10,7 +10,7 @@ use crate::x11helper::Capturable;
 
 use crate::cerror::CError;
 
-use tracing::warn;
+use tracing::{warn, trace};
 
 extern "C" {
     fn init_uinput_stylus(name: *const c_char, err: *mut CError) -> c_int;
@@ -39,24 +39,61 @@ pub struct GraphicTablet {
 impl GraphicTablet {
     pub fn new(capture: Capturable, id: String) -> Result<Self, CError> {
         let mut err = CError::new();
-        let name = CString::new(format!("Weylus Stylus - {}", id)).unwrap();
-        let stylus_fd = unsafe { init_uinput_stylus(name.as_ptr(), &mut err) };
+        let name_stylus = format!("Weylus Stylus - {}", id);
+        let stylus_fd = unsafe {
+            init_uinput_stylus(
+                CString::new(name_stylus.as_bytes()).unwrap().as_ptr(),
+                &mut err,
+            )
+        };
         if err.is_err() {
             return Err(err);
         }
-        let name = CString::new(format!("Weylus Mouse - {}", id)).unwrap();
-        let mouse_fd = unsafe { init_uinput_mouse(name.as_ptr(), &mut err) };
+        let name_mouse = format!("Weylus Mouse - {}", id);
+        let mouse_fd = unsafe {
+            init_uinput_mouse(
+                CString::new(name_mouse.as_bytes()).unwrap().as_ptr(),
+                &mut err,
+            )
+        };
         if err.is_err() {
             unsafe { destroy_uinput_device(stylus_fd) };
             return Err(err);
         }
-        let name = CString::new(format!("Weylus Touch - {}", id)).unwrap();
-        let touch_fd = unsafe { init_uinput_touch(name.as_ptr(), &mut err) };
+        let name_touch = format!("Weylus Touch - {}", id);
+        let touch_fd = unsafe {
+            init_uinput_touch(
+                CString::new(name_touch.as_bytes()).unwrap().as_ptr(),
+                &mut err,
+            )
+        };
         if err.is_err() {
             unsafe { destroy_uinput_device(stylus_fd) };
             unsafe { destroy_uinput_device(mouse_fd) };
             return Err(err);
         }
+        std::thread::spawn(move || {
+            if let Some(mut x11ctx) = crate::x11helper::X11Context::new() {
+                let t0 = std::time::Instant::now();
+
+                while t0 + std::time::Duration::from_secs(3) > std::time::Instant::now() {
+                    // give X some time to register the new devices.
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+
+                    // map them to the whole screen and not only one monitor
+                    let res1 = x11ctx.map_input_device_to_entire_screen(&name_mouse);
+                    let res2 = x11ctx.map_input_device_to_entire_screen(&name_touch);
+                    // for some reason the stylus does not support a Coordinate Transformation Matrix
+                    // probably because no touch events are registered and thus the mapping is already
+                    // correct
+                    if res1.is_ok() && res2.is_ok() {
+                        trace!("Succeeded mapping input devices to screen!");
+                        return;
+                    }
+                }
+                warn!("Failed to map input devices to screen!");
+            }
+        });
         let tblt = Self {
             stylus_fd,
             mouse_fd,

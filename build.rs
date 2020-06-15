@@ -87,4 +87,5 @@ fn linux() {
     println!("cargo:rustc-link-lib=Xrandr");
     println!("cargo:rustc-link-lib=Xfixes");
     println!("cargo:rustc-link-lib=Xcomposite");
+    println!("cargo:rustc-link-lib=Xi");
 }
