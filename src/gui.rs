@@ -129,7 +129,7 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
     #[cfg(not(target_os = "linux"))]
     let label_capturable_choice = Frame::default()
         .with_size(width, height)
-        .below_of(&check_faster_screencapture, padding)
+        .below_of(&check_capture_cursor, padding)
         .with_label("Capturing windows/regions is\nonly supported on Linux!");
 
     #[allow(unused_mut)]
