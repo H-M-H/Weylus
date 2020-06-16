@@ -22,7 +22,7 @@ fn write_video_packet(video_encoder: *mut c_void, buf: *const c_uchar, buf_size:
     (video_encoder.write_data)(unsafe {
         std::slice::from_raw_parts(buf as *const u8, buf_size as usize)
     });
-    return 0;
+    0
 }
 
 pub struct VideoEncoder {

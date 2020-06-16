@@ -1,7 +1,7 @@
 use std::os::raw::{c_int, c_uint, c_void};
 use std::slice::from_raw_parts;
 
-use tracing::{warn, trace};
+use tracing::{trace, warn};
 
 use crate::cerror::CError;
 use crate::screen_capture::ScreenCapture;
@@ -56,13 +56,13 @@ impl ScreenCaptureX11 {
         let handle = unsafe { start_capture(capture.handle(), std::ptr::null_mut(), &mut err) };
         fltk::app::unlock();
         if err.is_err() {
-            return Err(err);
+            Err(err)
         } else {
-            return Ok(Self {
+            Ok(Self {
                 handle,
                 img: CImage::new(),
                 capture_cursor,
-            });
+            })
         }
     }
 }

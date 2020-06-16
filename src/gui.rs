@@ -186,15 +186,12 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
     let (sender_ws2gui, _receiver_ws2gui) = mpsc::channel();
     let (sender_web2gui, receiver_web2gui) = mpsc::channel();
 
-    {
-        let output = output.clone();
-        std::thread::spawn(move || {
-            while let Ok(log_message) = log_receiver.recv() {
-                let output = output.lock().unwrap();
-                output.insert(&log_message);
-            }
-        });
-    }
+    std::thread::spawn(move || {
+        while let Ok(log_message) = log_receiver.recv() {
+            let output = output.lock().unwrap();
+            output.insert(&log_message);
+        }
+    });
 
     {
         let output_server_addr = output_server_addr.clone();
@@ -389,7 +386,7 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                                     }
                                 }
                             }
-                            if ips.len() > 0 {
+                            if !ips.is_empty() {
                                 web_sock.set_ip(ips[0]);
                             }
                             if ips.len() > 1 {
@@ -409,7 +406,7 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                         use qrcode::QrCode;
                         let addr_string = format!("http://{}", web_sock.to_string());
                         output_server_addr.set_value(&addr_string);
-                        let password = password.map_or(None, |pw| Some(pw.to_string()));
+                        let password = password.map(|pw| pw.to_string());
                         but_show_qr.set_callback(Box::new(move || {
                             let mut url_string = addr_string.clone();
                             if let Some(password) = &password {

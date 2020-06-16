@@ -1,5 +1,4 @@
-use serde::{Deserialize, Serialize, Deserializer};
-
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum NetMessage {
@@ -33,17 +32,16 @@ pub enum PointerEventType {
 bitflags! {
     #[derive(Serialize, Deserialize)]
     pub struct Button: u8 {
-        const NONE = 0b00000000;
-        const PRIMARY = 0b00000001;
-        const SECONDARY = 0b00000010;
-        const AUXILARY = 0b00000100;
-        const FOURTH = 0b00001000;
-        const FIFTH = 0b00010000;
+        const NONE = 0b0000_0000;
+        const PRIMARY = 0b0000_0001;
+        const SECONDARY = 0b0000_0010;
+        const AUXILARY = 0b0000_0100;
+        const FOURTH = 0b0000_1000;
+        const FIFTH = 0b0001_0000;
     }
 }
 
-fn from_str<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Button, D::Error>
-{
+fn from_str<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Button, D::Error> {
     let bits: u8 = Deserialize::deserialize(deserializer)?;
     Ok(Button::from_bits_truncate(bits))
 }

@@ -168,12 +168,9 @@ impl X11Context {
     pub fn map_input_device_to_entire_screen(&mut self, device_name: &str) -> Result<(), CError> {
         fltk::app::lock().unwrap();
         let mut err = CError::new();
+        let device_name_c_str = CString::new(device_name).unwrap();
         unsafe {
-            map_input_device_to_entire_screen(
-                self.disp,
-                CString::new(device_name).unwrap().as_ptr(),
-                &mut err,
-            )
+            map_input_device_to_entire_screen(self.disp, device_name_c_str.as_ptr(), &mut err)
         };
         fltk::app::unlock();
         if err.is_err() {

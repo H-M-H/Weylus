@@ -7,7 +7,6 @@ extern crate bitflags;
 
 use std::io::Write;
 use std::sync::mpsc;
-use tracing_subscriber;
 use tracing_subscriber::layer::SubscriberExt;
 
 mod cerror;

@@ -1,6 +1,6 @@
 use handlebars::Handlebars;
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Method, Request, Response, Server, StatusCode, server::conn::AddrStream};
+use hyper::{server::conn::AddrStream, Body, Method, Request, Response, Server, StatusCode};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -8,7 +8,7 @@ use std::sync::mpsc;
 use std::sync::mpsc::SendError;
 use std::sync::Arc;
 use tokio::sync::mpsc as mpsc_tokio;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 #[derive(Serialize)]
 struct WebConfig {
@@ -168,11 +168,9 @@ async fn run_server(
     });
     let server = Server::bind(&addr).serve(service);
     let server = server.with_graceful_shutdown(async move {
-        loop {
-            match receiver.recv().await {
-                Some(Gui2WebMessage::Shutdown) => return,
-                None => return,
-            }
+        match receiver.recv().await {
+            Some(Gui2WebMessage::Shutdown) => return,
+            None => return,
         }
     });
     info!("Webserver listening at {}...", addr);

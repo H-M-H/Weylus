@@ -40,33 +40,22 @@ impl GraphicTablet {
     pub fn new(capture: Capturable, id: String) -> Result<Self, CError> {
         let mut err = CError::new();
         let name_stylus = format!("Weylus Stylus - {}", id);
-        let stylus_fd = unsafe {
-            init_uinput_stylus(
-                CString::new(name_stylus.as_bytes()).unwrap().as_ptr(),
-                &mut err,
-            )
-        };
+        let name_stylus_c_str = CString::new(name_stylus.as_bytes()).unwrap();
+        let stylus_fd = unsafe { init_uinput_stylus(name_stylus_c_str.as_ptr(), &mut err) };
         if err.is_err() {
             return Err(err);
         }
         let name_mouse = format!("Weylus Mouse - {}", id);
-        let mouse_fd = unsafe {
-            init_uinput_mouse(
-                CString::new(name_mouse.as_bytes()).unwrap().as_ptr(),
-                &mut err,
-            )
-        };
+        let name_mouse_c_str = CString::new(name_mouse.as_bytes()).unwrap();
+
+        let mouse_fd = unsafe { init_uinput_mouse(name_mouse_c_str.as_ptr(), &mut err) };
         if err.is_err() {
             unsafe { destroy_uinput_device(stylus_fd) };
             return Err(err);
         }
         let name_touch = format!("Weylus Touch - {}", id);
-        let touch_fd = unsafe {
-            init_uinput_touch(
-                CString::new(name_touch.as_bytes()).unwrap().as_ptr(),
-                &mut err,
-            )
-        };
+        let name_touch_c_str = CString::new(name_touch.as_bytes()).unwrap();
+        let touch_fd = unsafe { init_uinput_touch(name_touch_c_str.as_ptr(), &mut err) };
         if err.is_err() {
             unsafe { destroy_uinput_device(stylus_fd) };
             unsafe { destroy_uinput_device(mouse_fd) };

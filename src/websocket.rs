@@ -53,24 +53,21 @@ pub fn run(
     let shutdown2 = shutdown.clone();
     let shutdown3 = shutdown.clone();
     let sender2 = sender.clone();
-    let sender3 = sender.clone();
+    let sender3 = sender;
 
-    spawn(move || loop {
-        match receiver.recv() {
-            Err(_) | Ok(Gui2WsMessage::Shutdown) => {
-                let clients = clients.lock().unwrap();
-                for client in clients.values() {
-                    let client = client.lock().unwrap();
-                    if let Err(err) = client.shutdown_all() {
-                        error!("Could not shutdown websocket: {}", err);
-                    }
+    spawn(move || match receiver.recv() {
+        Err(_) | Ok(Gui2WsMessage::Shutdown) => {
+            let clients = clients.lock().unwrap();
+            for client in clients.values() {
+                let client = client.lock().unwrap();
+                if let Err(err) = client.shutdown_all() {
+                    error!("Could not shutdown websocket: {}", err);
                 }
-                shutdown.store(true, Ordering::Relaxed);
-                return;
             }
+            shutdown.store(true, Ordering::Relaxed);
         }
     });
-    let pass: Option<String> = password.map_or(None, |s| Some(s.to_string()));
+    let pass: Option<String> = password.map(|s| s.to_string());
     {
         let capture = capture.clone();
         if stylus_support {
@@ -100,7 +97,7 @@ pub fn run(
         }
     }
 
-    let pass: Option<String> = password.map_or(None, |s| Some(s.to_string()));
+    let pass: Option<String> = password.map(|s| s.to_string());
     {
         if faster_capture {
             spawn(move || {
@@ -216,8 +213,9 @@ fn create_mouse_stream_handler(
 }
 
 #[cfg(not(target_os = "linux"))]
-fn create_mouse_stream_handler(_client_addr: &SocketAddr) -> Result<PointerStreamHandler<Mouse>, Box<dyn std::error::Error>>
-{
+fn create_mouse_stream_handler(
+    _client_addr: &SocketAddr,
+) -> Result<PointerStreamHandler<Mouse>, Box<dyn std::error::Error>> {
     Ok(PointerStreamHandler::new(Mouse::new()))
 }
 
@@ -314,7 +312,7 @@ fn listen_websocket<T, F>(
                     }
 
                     let mut authed = password.is_none();
-                    let password = password.unwrap_or("".into());
+                    let password = password.unwrap_or_else(|| "".into());
                     let mut stream_handler = stream_handler.unwrap();
                     for msg in ws_receiver.incoming_messages() {
                         match msg {
