@@ -90,7 +90,7 @@ impl VideoEncoder {
         let v = unsafe { std::slice::from_raw_parts_mut(data[2], v_linesize * self.height) };
         fill_yuv(y, u, v, y_linesize, u_linesize, v_linesize);
         let mut err = CError::new();
-        unsafe { encode_video_frame(self.handle, (Instant::now() - self.start_time).as_micros() as c_int, &mut err) };
+        unsafe { encode_video_frame(self.handle, (Instant::now() - self.start_time).as_millis() as c_int, &mut err) };
     }
 
     pub fn check_size(&self, width: usize, height: usize) -> bool {

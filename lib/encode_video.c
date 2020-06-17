@@ -58,7 +58,7 @@ void open_video(VideoContext* ctx, Error* err)
 	/* resolution must be a multiple of two */
 	ctx->c->width = ctx->width;
 	ctx->c->height = ctx->height;
-	ctx->c->time_base = (AVRational){1, 1000000};
+	ctx->c->time_base = (AVRational){1, 1000};
 	ctx->c->framerate = (AVRational){0, 1};
 
 	ctx->c->gop_size = 12;
