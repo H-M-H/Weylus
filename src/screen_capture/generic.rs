@@ -35,6 +35,8 @@ impl ScreenCapture for ScreenCaptureGeneric {
 
                 let img = &img.image;
                 // Y
+                // YUV402p requires that width and height are even, so we just clip a row or column
+                // if necessary
                 for yy in 0..height - height % 2 {
                     for xx in 0..width - width % 2 {
                         let p = img.get_pixel(xx as u32, yy as u32).to_rgb();

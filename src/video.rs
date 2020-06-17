@@ -30,7 +30,11 @@ fn write_video_packet(video_encoder: *mut c_void, buf: *const c_uchar, buf_size:
 }
 
 pub enum PixelProvider<'a> {
+    // no restrictions on dimension
     BGRA(&'a [u8]),
+
+    // this writes to raw yuv420p ffmpeg buffers and those require that width and height are
+    // even, this means a column or row of pixels of the source image might need to be clipped
     FillYUV420P(Box<dyn FnOnce(&mut [u8], &mut [u8], &mut [u8], usize, usize, usize) + 'a>),
 }
 
@@ -49,8 +53,8 @@ impl VideoEncoder {
         write_data: impl Fn(&[u8]) + 'static,
     ) -> Result<Box<Self>, CError> {
         // yuv420p only supports even width and height
-        let width = width - width % 2;
-        let height = height - height % 2;
+        let width = width;
+        let height = height;
         let mut video_encoder = Box::new(Self {
             handle: std::ptr::null_mut(),
             width,
@@ -118,7 +122,7 @@ impl VideoEncoder {
     }
 
     pub fn check_size(&self, width: usize, height: usize) -> bool {
-        (self.width == width - width % 2) && (self.height == height - height % 2)
+        (self.width == width) && (self.height == height)
     }
 }
 

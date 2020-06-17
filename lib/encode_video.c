@@ -171,16 +171,16 @@ VideoContext* init_video_encoder(void* rust_ctx, int width, int height)
 {
 	VideoContext* ctx = malloc(sizeof(VideoContext));
 	ctx->rust_ctx = rust_ctx;
-	ctx->width = width;
-	ctx->height = height;
+	ctx->width = width - width%2;
+	ctx->height = height - height%2;
 	ctx->pts = 0;
 	ctx->initialized = 0;
 	ctx->sws = sws_getContext(
 		width,
 		height,
 		AV_PIX_FMT_BGRA,
-		width,
-		height,
+		ctx->width, // note that this is != width, this is in purpose as this allows proper
+		ctx->height, // rescaling if dimensions of provided image data are not even
 		AV_PIX_FMT_YUV420P,
 		SWS_FAST_BILINEAR,
 		NULL,
