@@ -98,7 +98,7 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     #[bench]
-    fn bench_video_x11_fill_yuv(b: &mut Bencher) {
+    fn bench_video_x11(b: &mut Bencher) {
         let mut x11ctx = x11helper::X11Context::new().unwrap();
         let root = x11ctx.capturables().unwrap()[0].clone();
         use screen_capture::ScreenCapture;
@@ -109,43 +109,7 @@ mod tests {
         let mut encoder = video::VideoEncoder::new(width, height, |_| {}).unwrap();
         b.iter(|| {
             sc.capture();
-            encoder.encode(None, |y, u, v, y_linesize, u_linesize, v_linesize| {
-                sc.fill_yuv(y, u, v, y_linesize, u_linesize, v_linesize)
-            })
+            encoder.encode(sc.pixel_provider())
         });
-    }
-
-    #[cfg(target_os = "linux")]
-    #[bench]
-    fn bench_video_x11_sws_scale(b: &mut Bencher) {
-        let mut x11ctx = x11helper::X11Context::new().unwrap();
-        let root = x11ctx.capturables().unwrap()[0].clone();
-        use screen_capture::ScreenCapture;
-        let mut sc = screen_capture::linux::ScreenCaptureX11::new(root, false).unwrap();
-        sc.capture();
-        let (width, height) = sc.size();
-
-        let mut encoder = video::VideoEncoder::new(width, height, |_| {}).unwrap();
-        b.iter(|| {
-            sc.capture();
-            encoder.encode(sc.bgra(), |y, u, v, y_linesize, u_linesize, v_linesize| {
-                sc.fill_yuv(y, u, v, y_linesize, u_linesize, v_linesize)
-            })
-        });
-    }
-
-    #[cfg(target_os = "linux")]
-    #[bench]
-    fn bench_fill_yuv_x11(b: &mut Bencher) {
-        let mut x11ctx = x11helper::X11Context::new().unwrap();
-        let root = x11ctx.capturables().unwrap()[0].clone();
-        use screen_capture::ScreenCapture;
-        let mut sc = screen_capture::linux::ScreenCaptureX11::new(root, false).unwrap();
-        sc.capture();
-        let (width, height) = sc.size();
-        let mut y = vec![0u8; width * height];
-        let mut u = vec![0u8; width * height / 2];
-        let mut v = vec![0u8; width * height / 2];
-        b.iter(|| sc.fill_yuv(&mut y, &mut u, &mut v, width, width / 2, width / 2));
     }
 }
