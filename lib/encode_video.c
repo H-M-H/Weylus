@@ -9,6 +9,9 @@
 #include <libavutil/imgutils.h>
 #include <libavutil/opt.h>
 
+#include <libswscale/swscale.h>
+#include <stdint.h>
+
 #include "error.h"
 
 typedef struct VideoContext
@@ -24,6 +27,7 @@ typedef struct VideoContext
 	void* buf;
 	void* rust_ctx;
 	int pts;
+	struct SwsContext* sws;
 	int initialized;
 } VideoContext;
 
@@ -129,6 +133,7 @@ void destroy_video_encoder(VideoContext* ctx)
 		av_frame_free(&ctx->frame);
 		av_packet_free(&ctx->pkt);
 		av_free(ctx->buf);
+		sws_freeContext(ctx->sws);
 	}
 	free(ctx);
 }
@@ -170,16 +175,38 @@ VideoContext* init_video_encoder(void* rust_ctx, int width, int height)
 	ctx->height = height;
 	ctx->pts = 0;
 	ctx->initialized = 0;
+	ctx->sws = sws_getContext(
+		width,
+		height,
+		AV_PIX_FMT_BGRA,
+		width,
+		height,
+		AV_PIX_FMT_YUV420P,
+		SWS_FAST_BILINEAR,
+		NULL,
+		NULL,
+		NULL);
 	return ctx;
 }
 
-uint8_t** get_video_frame_data(VideoContext* ctx, int* Y_linesize, int* U_linesize, int* V_linesize)
+uint8_t** get_video_frame_data(VideoContext* ctx, int** linesizes)
 {
 	// make sure the frame data is writable
 	av_frame_make_writable(ctx->frame);
 
-	*Y_linesize = ctx->frame->linesize[0];
-	*U_linesize = ctx->frame->linesize[1];
-	*V_linesize = ctx->frame->linesize[2];
+	*linesizes = ctx->frame->linesize;
 	return ctx->frame->data;
+}
+
+void convert_bgra2yuv420p(
+	VideoContext* ctx,
+	const void* data,
+	int width,
+	int height,
+	uint8_t* const* dst,
+	const int* dst_stride)
+{
+	const uint8_t* const* src = (const uint8_t* const*)&data;
+	const int src_stride[] = {width * 4, 0, 0, 0};
+	sws_scale(ctx->sws, src, src_stride, 0, height, dst, dst_stride);
 }

@@ -18,6 +18,10 @@ pub trait ScreenCapture {
         v_line_size: usize,
     );
 
+    fn bgra(&self) -> Option<&[u8]> {
+        None
+    }
+
     /// width and size of captured image
     fn size(&self) -> (usize, usize);
 }

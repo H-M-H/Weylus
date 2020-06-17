@@ -144,6 +144,10 @@ impl ScreenCapture for ScreenCaptureX11 {
         }
     }
 
+    fn bgra(&self) -> Option<&[u8]> {
+        Some(self.img.data())
+    }
+
     fn size(&self) -> (usize, usize) {
         (self.img.width as usize, self.img.height as usize)
     }

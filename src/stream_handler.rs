@@ -116,10 +116,11 @@ impl<T: ScreenCapture> StreamHandler for ScreenStreamHandler<T> {
                     self.video_encoder = Some(res.unwrap());
                 }
                 let video_encoder = self.video_encoder.as_mut().unwrap();
-                let screen_capture = RefCell::new(&mut self.screen_capture);
-                video_encoder.encode(|y, u, v, y_linesize, u_linesize, v_linesize| {
+                let bgra = self.screen_capture.bgra();
+                let screen_capture = RefCell::new(&self.screen_capture);
+                video_encoder.encode(bgra, |y, u, v, y_linesize, u_linesize, v_linesize| {
                     screen_capture
-                        .borrow_mut()
+                        .borrow()
                         .fill_yuv(y, u, v, y_linesize, u_linesize, v_linesize)
                 });
                 self.last_update = Instant::now();
