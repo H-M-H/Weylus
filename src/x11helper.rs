@@ -33,6 +33,7 @@ extern "C" {
     fn map_input_device_to_entire_screen(
         disp: *mut c_void,
         device_name: *const c_char,
+        libinput: c_int,
         err: *mut CError,
     );
 }
@@ -165,12 +166,21 @@ impl X11Context {
             .collect::<Vec<Capturable>>())
     }
 
-    pub fn map_input_device_to_entire_screen(&mut self, device_name: &str) -> Result<(), CError> {
+    pub fn map_input_device_to_entire_screen(
+        &mut self,
+        device_name: &str,
+        libinput: bool,
+    ) -> Result<(), CError> {
         fltk::app::lock().unwrap();
         let mut err = CError::new();
         let device_name_c_str = CString::new(device_name).unwrap();
         unsafe {
-            map_input_device_to_entire_screen(self.disp, device_name_c_str.as_ptr(), &mut err)
+            map_input_device_to_entire_screen(
+                self.disp,
+                device_name_c_str.as_ptr(),
+                libinput.into(),
+                &mut err,
+            )
         };
         fltk::app::unlock();
         if err.is_err() {

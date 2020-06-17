@@ -397,7 +397,8 @@ void capturable_before_input(Capturable* cap, Error* err)
 
 const char* get_capturable_name(Capturable* c) { return c->name; }
 
-void map_input_device_to_entire_screen(Display* disp, const char* device_name, Error* err)
+void map_input_device_to_entire_screen(
+	Display* disp, const char* device_name, int libinput, Error* err)
 {
 
 	XID device_id;
@@ -432,8 +433,11 @@ void map_input_device_to_entire_screen(Display* disp, const char* device_name, E
 
 	int rc;
 
+	const char* prop_name =
+		libinput ? "libinput Calibration Matrix" : "Coordinate Transformation Matrix";
+
 	prop_float = XInternAtom(disp, "FLOAT", False);
-	prop_matrix = XInternAtom(disp, "Coordinate Transformation Matrix", False);
+	prop_matrix = XInternAtom(disp, prop_name, False);
 
 	if (!prop_float)
 	{

@@ -69,12 +69,10 @@ impl GraphicTablet {
                 std::thread::sleep(std::time::Duration::from_secs(3));
 
                 // map them to the whole screen and not only one monitor
-                let res1 = x11ctx.map_input_device_to_entire_screen(&name_mouse);
-                let res2 = x11ctx.map_input_device_to_entire_screen(&name_touch);
-                // for some reason the stylus does not support a Coordinate Transformation Matrix
-                // probably because no touch events are registered and thus the mapping is already
-                // correct
-                if res1.is_ok() && res2.is_ok() {
+                let res1 = x11ctx.map_input_device_to_entire_screen(&name_mouse, false);
+                let res2 = x11ctx.map_input_device_to_entire_screen(&name_touch, false);
+                let res3 = x11ctx.map_input_device_to_entire_screen(&name_stylus, true);
+                if res1.is_ok() && res2.is_ok() && res3.is_ok() {
                     trace!("Succeeded mapping input devices to screen!");
                     return;
                 }
