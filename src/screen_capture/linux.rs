@@ -100,52 +100,8 @@ impl ScreenCapture for ScreenCaptureX11 {
         }
     }
 
-    fn fill_yuv(
-        &self,
-        y: &mut [u8],
-        u: &mut [u8],
-        v: &mut [u8],
-        y_line_size: usize,
-        u_line_size: usize,
-        v_line_size: usize,
-    ) {
-        let data = self.img.data();
-        let width = self.img.width as usize;
-        let height = self.img.height as usize;
-
-        // Y
-        for yy in 0..height - height % 2 {
-            for xx in 0..width - width % 2 {
-                let i = 4 * (width * yy + xx);
-                let b = data[i] as i32;
-                let g = data[i + 1] as i32;
-                let r = data[i + 2] as i32;
-                y[y_line_size * yy + xx] = (((66 * r + 129 * g + 25 * b + 128) >> 8) + 16) as u8;
-            }
-        }
-
-        let y_len = 4 * width;
-        // Cb and Cr
-        for yy in 0..(height / 2) {
-            for xx in 0..(width / 2) {
-                let i = 8 * (yy * width + xx);
-                let mut b = data[i] as i32 + data[i + 4] as i32;
-                let mut g = data[i + 1] as i32 + data[i + 1 + 4] as i32;
-                let mut r = data[i + 2] as i32 + data[i + 2 + 4] as i32;
-                b += data[i + y_len] as i32 + data[i + 4 + y_len] as i32;
-                g += data[i + 1 + y_len] as i32 + data[i + 1 + 4 + y_len] as i32;
-                r += data[i + 2 + y_len] as i32 + data[i + 2 + 4 + y_len] as i32;
-                r >>= 2;
-                g >>= 2;
-                b >>= 2;
-                u[yy * u_line_size + xx] = (((128 + 112 * b - 38 * r - 74 * g) >> 8) + 128) as u8;
-                v[yy * v_line_size + xx] = (((128 + 112 * r - 94 * g - 18 * b) >> 8) + 128) as u8;
-            }
-        }
-    }
-
-    fn bgra(&self) -> Option<&[u8]> {
-        Some(self.img.data())
+    fn pixel_provider(&self) -> crate::video::PixelProvider {
+        crate::video::PixelProvider::BGRA(self.img.data())
     }
 
     fn size(&self) -> (usize, usize) {

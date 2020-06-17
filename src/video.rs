@@ -29,6 +29,11 @@ fn write_video_packet(video_encoder: *mut c_void, buf: *const c_uchar, buf_size:
     0
 }
 
+pub enum PixelProvider<'a> {
+    BGRA(&'a [u8]),
+    FillYUV420P(Box<dyn FnOnce(&mut [u8], &mut [u8], &mut [u8], usize, usize, usize) + 'a>),
+}
+
 pub struct VideoEncoder {
     handle: *mut c_void,
     width: usize,
@@ -72,13 +77,12 @@ impl VideoEncoder {
 
     pub fn encode(
         &mut self,
-        bgra: Option<&[u8]>,
-        fill_yuv: impl Fn(&mut [u8], &mut [u8], &mut [u8], usize, usize, usize),
+        pixel_provider: PixelProvider
     ) {
         let linsizes: *mut c_int = std::ptr::null_mut();
         let data = unsafe { get_video_frame_data(self.handle, &linsizes) };
-        match bgra {
-            Some(bgra) => unsafe {
+        match pixel_provider {
+            PixelProvider::BGRA(bgra) => unsafe {
                 convert_bgra2yuv420p(
                     self.handle,
                     bgra.as_ptr(),
@@ -88,7 +92,7 @@ impl VideoEncoder {
                     linsizes,
                 );
             },
-            None => {
+            PixelProvider::FillYUV420P(fill_yuv) => {
                 let linesizes_slice = unsafe { std::slice::from_raw_parts(linsizes, 3) };
                 let y_linesize = linesizes_slice[0] as usize;
                 let u_linesize = linesizes_slice[1] as usize;

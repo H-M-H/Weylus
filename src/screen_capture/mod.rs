@@ -7,20 +7,7 @@ pub trait ScreenCapture {
     /// capture screen
     fn capture(&mut self);
 
-    /// capture screen to YUV
-    fn fill_yuv(
-        &self,
-        y: &mut [u8],
-        u: &mut [u8],
-        v: &mut [u8],
-        y_line_size: usize,
-        u_line_size: usize,
-        v_line_size: usize,
-    );
-
-    fn bgra(&self) -> Option<&[u8]> {
-        None
-    }
+    fn pixel_provider(&self) -> crate::video::PixelProvider;
 
     /// width and size of captured image
     fn size(&self) -> (usize, usize);

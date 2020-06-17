@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use websocket::{Message, OwnedMessage, WebSocketError};
@@ -116,13 +115,7 @@ impl<T: ScreenCapture> StreamHandler for ScreenStreamHandler<T> {
                     self.video_encoder = Some(res.unwrap());
                 }
                 let video_encoder = self.video_encoder.as_mut().unwrap();
-                let bgra = self.screen_capture.bgra();
-                let screen_capture = RefCell::new(&self.screen_capture);
-                video_encoder.encode(bgra, |y, u, v, y_linesize, u_linesize, v_linesize| {
-                    screen_capture
-                        .borrow()
-                        .fill_yuv(y, u, v, y_linesize, u_linesize, v_linesize)
-                });
+                video_encoder.encode(self.screen_capture.pixel_provider());
                 self.last_update = Instant::now();
             }
             _ => (),
