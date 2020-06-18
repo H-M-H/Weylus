@@ -133,6 +133,9 @@ function init(password: string, websocket_pointer_port: number, websocket_video_
         let pointerHandler = new PointerHandler(video, webSocket);
     }
 
+    webSocket.onerror = () => handle_disconnect("Lost connection.");
+    webSocket.onclose = () => handle_disconnect("Connection closed.");
+
     // videostreaming
     let video = document.getElementById("video") as HTMLVideoElement;
 
@@ -146,6 +149,8 @@ function init(password: string, websocket_pointer_port: number, websocket_video_
             videoWebSocket.send(password);
         videoWebSocket.send("");
     }
+    videoWebSocket.onerror = () => handle_disconnect("Lost connection.");
+    videoWebSocket.onclose = () => handle_disconnect("Connection closed.");
     process_stream(videoWebSocket, video);
     window.onunload = () => { webSocket.close(); videoWebSocket.close(); }
 }
@@ -155,4 +160,13 @@ function init(password: string, websocket_pointer_port: number, websocket_video_
 // workaround
 function stretch_video(video: HTMLVideoElement) {
     video.style.transform = "scaleX(" + document.body.clientWidth / video.clientWidth + ") scaleY(" + document.body.clientHeight / video.clientHeight + ")";
+}
+
+
+function handle_disconnect(msg: string) {
+    let video = document.getElementById("video") as HTMLVideoElement;
+    video.onclick = () => {
+        if (window.confirm(msg + " Reload the page?"))
+            location.reload();
+    }
 }
