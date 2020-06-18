@@ -6,11 +6,11 @@ use crate::protocol::Button;
 use crate::protocol::PointerEvent;
 use crate::protocol::PointerEventType;
 use crate::protocol::PointerType;
-use crate::x11helper::Capturable;
+use crate::x11helper::{Capturable, X11Context};
 
 use crate::cerror::CError;
 
-use tracing::{trace, warn};
+use tracing::warn;
 
 extern "C" {
     fn init_uinput_stylus(name: *const c_char, err: *mut CError) -> c_int;
@@ -37,6 +37,13 @@ pub struct GraphicTablet {
     enable_mouse: bool,
     enable_stylus: bool,
     enable_touch: bool,
+    name_mouse_device: String,
+    name_stylus_device: String,
+    name_touch_device: String,
+    num_mouse_mapping_tries: usize,
+    num_stylus_mapping_tries: usize,
+    num_touch_mapping_tries: usize,
+    x11ctx: Option<X11Context>,
 }
 
 impl GraphicTablet {
@@ -70,24 +77,6 @@ impl GraphicTablet {
             unsafe { destroy_uinput_device(mouse_fd) };
             return Err(err);
         }
-        std::thread::spawn(move || {
-            if let Some(mut x11ctx) = crate::x11helper::X11Context::new() {
-                // give X some time to register the new devices
-                // and wait long enough to override whatever your desktop
-                // environment decides to do once it detects them
-                std::thread::sleep(std::time::Duration::from_secs(3));
-
-                // map them to the whole screen and not only one monitor
-                let res1 = x11ctx.map_input_device_to_entire_screen(&name_mouse, false);
-                let res2 = x11ctx.map_input_device_to_entire_screen(&name_touch, false);
-                let res3 = x11ctx.map_input_device_to_entire_screen(&name_stylus, true);
-                if res1.is_ok() && res2.is_ok() && res3.is_ok() {
-                    trace!("Succeeded mapping input devices to screen!");
-                    return;
-                }
-                warn!("Failed to map input devices to screen!");
-            }
-        });
         let tblt = Self {
             stylus_fd,
             mouse_fd,
@@ -101,6 +90,13 @@ impl GraphicTablet {
             enable_mouse,
             enable_stylus,
             enable_touch,
+            name_mouse_device: name_mouse,
+            name_touch_device: name_touch,
+            name_stylus_device: name_stylus,
+            num_mouse_mapping_tries: 0,
+            num_stylus_mapping_tries: 0,
+            num_touch_mapping_tries: 0,
+            x11ctx: X11Context::new(),
         };
         Ok(tblt)
     }
@@ -204,6 +200,23 @@ const EC_MSC_TIMESTAMP: c_int = 0x05;
 // This corresponds to PointerEvent values of 1.0
 const ABS_MAX: f64 = 65535.0;
 
+
+// This specifies how many times it should be attempted to map the input devices created via uinput
+// to the entire screen and not only a single monitor. Actually this is a workaround because
+// apparently it is impossible to set the correct mapping in a sane way. The reason is that X needs
+// some time to register new input devices, which makes it impossible to configure them right after
+// creation as the devices won't be available for configuration at that time. This means one has to
+// wait an unspecified amount of time until the devices show up. But just sleeping for example 3
+// seconds does not solve the issue either because the input device for the stylus does not show up
+// if there has not been any input. As a matter of fact things are even more compilcated as for
+// some reason the stylus device created via uinput creates two devices for X. One can not be
+// mapped to the screen (this is the device that shows up with out the need to send actual inputs
+// via uinput) and another one that can be mapped to the screen. But this is the device that
+// requires sending inputs via uinput first other wise it does not show up. This is why this crude
+// method of just setting the mapping forcefully on the first MAX_SCREEN_MAPPING_TRIES input events
+// has been choosen. If anyone knows a better solution: PLEASE FIX THIS!
+const MAX_SCREEN_MAPPING_TRIES: usize = 100;
+
 impl InputDevice for GraphicTablet {
     fn send_event(&mut self, event: &PointerEvent) {
         match event.pointer_type {
@@ -240,6 +253,11 @@ impl InputDevice for GraphicTablet {
         self.height = geometry.height;
         match event.pointer_type {
             PointerType::Touch => {
+                if self.num_touch_mapping_tries < MAX_SCREEN_MAPPING_TRIES {
+                    if let Some(x11ctx) = &mut self.x11ctx {
+                        x11ctx.map_input_device_to_entire_screen(&self.name_touch_device, false);
+                    }
+                }
                 match event.event_type {
                     PointerEventType::DOWN | PointerEventType::MOVE => {
                         let slot: usize;
@@ -376,6 +394,11 @@ impl InputDevice for GraphicTablet {
                 };
             }
             PointerType::Pen => {
+                if self.num_stylus_mapping_tries < MAX_SCREEN_MAPPING_TRIES {
+                    if let Some(x11ctx) = &mut self.x11ctx {
+                        x11ctx.map_input_device_to_entire_screen(&self.name_stylus_device, true);
+                    }
+                }
                 match event.event_type {
                     PointerEventType::DOWN | PointerEventType::MOVE => {
                         if let PointerEventType::DOWN = event.event_type {
@@ -425,6 +448,11 @@ impl InputDevice for GraphicTablet {
                 self.send(self.stylus_fd, ET_SYNC, EC_SYNC_REPORT, 0);
             }
             PointerType::Mouse | PointerType::Unknown => {
+                if self.num_mouse_mapping_tries < MAX_SCREEN_MAPPING_TRIES {
+                    if let Some(x11ctx) = &mut self.x11ctx {
+                        x11ctx.map_input_device_to_entire_screen(&self.name_mouse_device, false);
+                    }
+                }
                 match event.event_type {
                     PointerEventType::DOWN | PointerEventType::MOVE => {
                         if let PointerEventType::DOWN = event.event_type {

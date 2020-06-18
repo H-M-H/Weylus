@@ -397,10 +397,18 @@ void capturable_before_input(Capturable* cap, Error* err)
 
 const char* get_capturable_name(Capturable* c) { return c->name; }
 
-void map_input_device_to_entire_screen(
-	Display* disp, const char* device_name, int libinput, Error* err)
+void map_input_device_to_entire_screen(Display* disp, const char* device_name, int pen, Error* err)
 {
 
+	// for some reason a device simualting a stylus does NOT create a single device in
+	// XListInputDevices but actually two: One with the original name and the other one with
+	// "Pen (0)" appended to it. The problem is that the original device does NOT permit setting
+	// "Coordinate Transformation Matrix". This can only be done for the device with "Pen (0)"
+	// appended. So this here is a dirty workaround assuming the configurable stylus/pen device is
+	// always called original name + "Pen" + whatever.
+	char pen_name[256];
+	if (pen)
+		snprintf(pen_name, sizeof(pen_name), "%s Pen", device_name);
 	XID device_id;
 	int num_devices = 0;
 	XDeviceInfo* devices = XListInputDevices(disp, &num_devices);
@@ -408,10 +416,12 @@ void map_input_device_to_entire_screen(
 	int found = 0;
 	for (int i = 0; i < num_devices; ++i)
 	{
-		if (strcmp(device_name, devices[i].name) == 0)
+		if ((!pen && strcmp(device_name, devices[i].name) == 0) ||
+			(pen && strncmp(pen_name, devices[i].name, strlen(pen_name)) == 0))
 		{
 			device_id = devices[i].id;
 			found = 1;
+			break;
 		}
 	}
 	XFreeDeviceList(devices);
@@ -433,11 +443,8 @@ void map_input_device_to_entire_screen(
 
 	int rc;
 
-	const char* prop_name =
-		libinput ? "libinput Calibration Matrix" : "Coordinate Transformation Matrix";
-
 	prop_float = XInternAtom(disp, "FLOAT", False);
-	prop_matrix = XInternAtom(disp, prop_name, False);
+	prop_matrix = XInternAtom(disp, "Coordinate Transformation Matrix", False);
 
 	if (!prop_float)
 	{
