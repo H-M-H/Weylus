@@ -195,7 +195,7 @@ pub fn run(
             clients2,
             shutdown2,
             sender2,
-            |_| create_mouse_stream_handler(enable_mouse, enable_stylus, enable_touch),
+            move |_| create_mouse_stream_handler(enable_mouse, enable_stylus, enable_touch),
         )
     });
 
