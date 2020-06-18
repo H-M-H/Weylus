@@ -195,7 +195,7 @@ pub fn run(
             clients2,
             shutdown2,
             sender2,
-            || create_mouse_stream_handler(enable_mouse, enable_stylus, enable_touch),
+            |_| create_mouse_stream_handler(enable_mouse, enable_stylus, enable_touch),
         )
     });
 
@@ -247,7 +247,6 @@ fn create_mouse_stream_handler(
 
 #[cfg(not(target_os = "linux"))]
 fn create_mouse_stream_handler(
-    _client_addr: &SocketAddr,
     enable_mouse: bool,
     enable_stylus: bool,
     enable_touch: bool,
