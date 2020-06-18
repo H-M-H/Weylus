@@ -42,7 +42,9 @@ except a modern browser are required on your tablet.
 Start Weylus, preferably set a password in the password box and press the Start button. This will
 start a webserver running on your computer. To control your computer with your tablet you need to
 open the url `http://<address of your computer>:<port set in the menu, default is 1701>`, if
-possible Weylus will display to you the url you need to open.
+possible Weylus will display to you the url you need to open. Optionally Weylus can show a QR code
+with the encoded address. You may want to add a bookmark to your home screen on your tablet as this
+enables running Weylus in full screen mode (on iOS/iPadOS this needs to be done with Safari).
 
 ### Linux
 Weylus uses the `uinput` interface to simulate input events on Linux. **To enable stylus and
@@ -73,6 +75,11 @@ Therefore, untrusted users should not be added to the uinput group.
 
 #### Weylus as Second Screen
 On Linux Weylus can be used to turn your tablet into a second screen if your hardware supports it.
+
+But first a word of waring: The following configuration may break starting the X server. This means
+you might end up without a graphical login or X may get stuck and just display a black screen. So
+make sure you know what you are doing or are at least able to recover from a broken X server.
+
 You will need to install the `xf86-video-intel` driver and create the file
 `/etc/X11/xorg.conf.d/20-intel.conf` with the following contents:
 ```text
