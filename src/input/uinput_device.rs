@@ -34,10 +34,19 @@ pub struct GraphicTablet {
     y: f64,
     width: f64,
     height: f64,
+    enable_mouse: bool,
+    enable_stylus: bool,
+    enable_touch: bool,
 }
 
 impl GraphicTablet {
-    pub fn new(capture: Capturable, id: String) -> Result<Self, CError> {
+    pub fn new(
+        capture: Capturable,
+        id: String,
+        enable_mouse: bool,
+        enable_stylus: bool,
+        enable_touch: bool,
+    ) -> Result<Self, CError> {
         let mut err = CError::new();
         let name_stylus = format!("Weylus Stylus - {}", id);
         let name_stylus_c_str = CString::new(name_stylus.as_bytes()).unwrap();
@@ -89,6 +98,9 @@ impl GraphicTablet {
             y: 0.0,
             width: 1.0,
             height: 1.0,
+            enable_mouse,
+            enable_stylus,
+            enable_touch,
         };
         Ok(tblt)
     }
@@ -194,6 +206,24 @@ const ABS_MAX: f64 = 65535.0;
 
 impl InputDevice for GraphicTablet {
     fn send_event(&mut self, event: &PointerEvent) {
+        match event.pointer_type {
+            PointerType::Mouse | PointerType::Unknown => {
+                if !self.enable_mouse {
+                    return;
+                }
+            }
+            PointerType::Pen => {
+                if !self.enable_stylus {
+                    return;
+                }
+            }
+            PointerType::Touch => {
+                if !self.enable_touch {
+                    return;
+                }
+            }
+        }
+
         if let Err(err) = self.capture.before_input() {
             warn!("Failed to activate window, sending no input ({})", err);
             return;

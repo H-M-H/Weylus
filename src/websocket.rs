@@ -42,6 +42,9 @@ pub fn run(
     faster_capture: bool,
     capture: Capturable,
     capture_cursor: bool,
+    enable_mouse: bool,
+    enable_stylus: bool,
+    enable_touch: bool,
 ) {
     let clients = Arc::new(Mutex::new(HashMap::<
         SocketAddr,
@@ -79,7 +82,13 @@ pub fn run(
                     shutdown2,
                     sender2,
                     move |client_addr| {
-                        create_graphic_tablet_stream_handler(client_addr, capture.clone())
+                        create_graphic_tablet_stream_handler(
+                            client_addr,
+                            capture.clone(),
+                            enable_mouse,
+                            enable_stylus,
+                            enable_touch,
+                        )
                     },
                 )
             });
@@ -91,7 +100,14 @@ pub fn run(
                     clients2,
                     shutdown2,
                     sender2,
-                    move |_| create_mouse_stream_handler(capture.clone()),
+                    move |_| {
+                        create_mouse_stream_handler(
+                            capture.clone(),
+                            enable_mouse,
+                            enable_stylus,
+                            enable_touch,
+                        )
+                    },
                 )
             });
         }
@@ -139,6 +155,9 @@ pub fn run(
     ws_video_socket_addr: SocketAddr,
     password: Option<&str>,
     screen_update_interval: Duration,
+    enable_mouse: bool,
+    enable_stylus: bool,
+    enable_touch: bool,
 ) {
     let clients = Arc::new(Mutex::new(HashMap::<
         SocketAddr,
@@ -176,7 +195,7 @@ pub fn run(
             clients2,
             shutdown2,
             sender2,
-            create_mouse_stream_handler,
+            || create_mouse_stream_handler(enable_mouse, enable_stylus, enable_touch),
         )
     });
 
@@ -198,25 +217,46 @@ pub fn run(
 fn create_graphic_tablet_stream_handler(
     client_addr: &SocketAddr,
     capture: Capturable,
+    enable_mouse: bool,
+    enable_stylus: bool,
+    enable_touch: bool,
 ) -> Result<PointerStreamHandler<GraphicTablet>, Box<dyn std::error::Error>> {
     Ok(PointerStreamHandler::new(GraphicTablet::new(
         capture,
         client_addr.to_string(),
+        enable_mouse,
+        enable_stylus,
+        enable_touch,
     )?))
 }
 
 #[cfg(target_os = "linux")]
 fn create_mouse_stream_handler(
     capture: Capturable,
+    enable_mouse: bool,
+    enable_stylus: bool,
+    enable_touch: bool,
 ) -> Result<PointerStreamHandler<Mouse>, Box<dyn std::error::Error>> {
-    Ok(PointerStreamHandler::new(Mouse::new(capture)))
+    Ok(PointerStreamHandler::new(Mouse::new(
+        capture,
+        enable_mouse,
+        enable_stylus,
+        enable_touch,
+    )))
 }
 
 #[cfg(not(target_os = "linux"))]
 fn create_mouse_stream_handler(
     _client_addr: &SocketAddr,
+    enable_mouse: bool,
+    enable_stylus: bool,
+    enable_touch: bool,
 ) -> Result<PointerStreamHandler<Mouse>, Box<dyn std::error::Error>> {
-    Ok(PointerStreamHandler::new(Mouse::new()))
+    Ok(PointerStreamHandler::new(Mouse::new(
+        enable_mouse,
+        enable_stylus,
+        enable_touch,
+    )))
 }
 
 #[cfg(target_os = "linux")]

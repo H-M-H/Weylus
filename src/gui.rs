@@ -83,23 +83,68 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
         .below_of(&input_limit_screen_updates, 3 * padding)
         .with_label("Start");
 
+    let mut label_enable_input = Frame::default()
+        .with_pos(430, 30)
+        .with_size(width, 15)
+        .with_label("Enabled input methods:");
+    label_enable_input.set_tooltip(
+        "Specifies which types of pointerevents from the browser will \
+        be accepted. This might be useful if touch rejection does not work properly and you only \
+        want to use a pen/stylus.",
+    );
+
+    let check_enable_mouse = CheckButton::default()
+        .with_size(64, height)
+        .below_of(&label_enable_input, 0)
+        .with_label("Mouse");
+    check_enable_mouse.set_checked(true);
+
+    let check_enable_stylus = CheckButton::default()
+        .with_size(64, height)
+        .right_of(&check_enable_mouse, 2)
+        .with_label("Stylus");
+    check_enable_stylus.set_checked(true);
+
+    let check_enable_touch = CheckButton::default()
+        .with_size(63, height)
+        .right_of(&check_enable_stylus, 2)
+        .with_label("Touch");
+    check_enable_touch.set_checked(true);
+
+    let mut label_only_linux = Frame::default()
+        .with_size(width, 15)
+        .below_of(&check_enable_mouse, 5)
+        .with_label("Available only on Linux:");
+    #[cfg(target_os = "linux")]
+    label_only_linux.hide();
+
+    #[allow(unused_mut)]
     let mut check_stylus = CheckButton::default()
-        .with_pos(430, padding + height - 10)
-        .with_size(width, 2 * height);
+        .with_pos(430, padding + 3 * height)
+        .with_size(width, height)
+        .with_label("Stylus && Touch Simulation");
+    check_stylus.set_tooltip(
+        "Enables things like pressure sensitivity and multitouch. \
+        Requires /dev/uinput to be writable!",
+    );
     #[cfg(target_os = "linux")]
     {
-        check_stylus.set_label("Stylus/Pen support\n(Requires access to\n/dev/uinput)");
         check_stylus.set_checked(true);
     }
     #[cfg(not(target_os = "linux"))]
     {
-        check_stylus.set_label("Stylus/Pen support\n(works only on\nLinux)");
         check_stylus.deactivate();
     }
 
     let mut check_faster_screencapture = CheckButton::default()
-        .with_size(width, 2 * height)
-        .below_of(&check_stylus, 2 * padding);
+        .with_size(width, height)
+        .below_of(&check_stylus, padding)
+        .with_label("Better screen capturing");
+
+    check_faster_screencapture.set_tooltip(
+        "Enables faster screen capturing and more fine grained \
+        control about what to capture.",
+    );
 
     #[allow(unused_mut)]
     let mut check_capture_cursor = CheckButton::default()
@@ -111,26 +156,17 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
     {
         check_capture_cursor.set_checked(false);
         check_faster_screencapture.set_checked(true);
-        check_faster_screencapture.set_label("Faster screencapture");
     }
     #[cfg(not(target_os = "linux"))]
     {
-        check_faster_screencapture.set_label("Faster screencapture\n(works only on\nLinux)");
         check_faster_screencapture.deactivate();
         check_capture_cursor.deactivate();
     }
 
-    #[cfg(target_os = "linux")]
     let label_capturable_choice = Frame::default()
         .with_size(width, height)
         .below_of(&check_capture_cursor, padding)
         .with_label("Capture:");
-
-    #[cfg(not(target_os = "linux"))]
-    let label_capturable_choice = Frame::default()
-        .with_size(width, height)
-        .below_of(&check_capture_cursor, padding)
-        .with_label("Capturing windows/regions is\nonly supported on Linux!");
 
     #[allow(unused_mut)]
     let mut choice_capturable = Choice::default()
@@ -139,11 +175,14 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
     #[cfg(not(target_os = "linux"))]
     choice_capturable.deactivate();
 
-    #[allow(unused_mut)]
     let mut but_update_capturables = Button::default()
         .with_size(width, height)
         .below_of(&choice_capturable, padding)
         .with_label("Refresh");
+    but_update_capturables.set_tooltip(
+        "Refresh list of capturable objects, e. g. if you opened a \
+        new window after starting Weylus.",
+    );
     #[cfg(not(target_os = "linux"))]
     but_update_capturables.deactivate();
 
@@ -343,6 +382,9 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                                 .unwrap()
                                 .clone(),
                             check_capture_cursor_ref.borrow().is_checked(),
+                            check_enable_mouse.is_checked(),
+                            check_enable_stylus.is_checked(),
+                            check_enable_touch.is_checked(),
                         );
                     }
                     #[cfg(not(target_os = "linux"))]
@@ -353,6 +395,9 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                         SocketAddr::new(bind_addr, ws_video_port),
                         password,
                         screen_update_interval,
+                        check_enable_mouse.is_checked(),
+                        check_enable_stylus.is_checked(),
+                        check_enable_touch.is_checked(),
                     );
 
                     let (sender_gui2web_tmp, receiver_gui2web) = mpsc_tokio::channel(100);
