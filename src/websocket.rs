@@ -5,24 +5,25 @@ use std::sync::{
     mpsc, Arc, Mutex,
 };
 use std::thread::spawn;
-use std::time::Duration;
-use tracing::{error, info, warn};
+use tracing::{error, info, trace, warn};
 
 use websocket::sender::Writer;
+use websocket::server::upgrade::{sync::Buffer as WsBuffer, WsUpgrade};
 use websocket::sync::Server;
-use websocket::OwnedMessage;
+use websocket::{Message, OwnedMessage, WebSocketError};
 
-use crate::input::mouse_device::Mouse;
-#[cfg(target_os = "linux")]
-use crate::input::uinput_device::GraphicTablet;
-use crate::stream_handler::{PointerStreamHandler, ScreenStreamHandler, StreamHandler};
-
+use crate::input::device::InputDevice;
+use crate::protocol::{ClientConfiguration, MessageInbound, MessageOutbound, PointerEvent};
 use crate::screen_capture::generic::ScreenCaptureGeneric;
-
 #[cfg(target_os = "linux")]
 use crate::screen_capture::linux::ScreenCaptureX11;
+use crate::screen_capture::ScreenCapture;
 #[cfg(target_os = "linux")]
-use crate::x11helper::Capturable;
+use crate::x11helper::{Capturable, X11Context};
+
+use crate::video::VideoEncoder;
+
+type WsWriter = Arc<Mutex<websocket::sender::Writer<std::net::TcpStream>>>;
 
 pub enum Ws2GuiMessage {}
 
@@ -30,33 +31,19 @@ pub enum Gui2WsMessage {
     Shutdown,
 }
 
-#[cfg(target_os = "linux")]
 pub fn run(
     sender: mpsc::Sender<Ws2GuiMessage>,
     receiver: mpsc::Receiver<Gui2WsMessage>,
-    ws_pointer_socket_addr: SocketAddr,
-    ws_video_socket_addr: SocketAddr,
+    ws_socket_addr: SocketAddr,
     password: Option<&str>,
-    screen_update_interval: Duration,
-    stylus_support: bool,
-    faster_capture: bool,
-    capture: Capturable,
-    capture_cursor: bool,
-    enable_mouse: bool,
-    enable_stylus: bool,
-    enable_touch: bool,
 ) {
     let clients = Arc::new(Mutex::new(HashMap::<
         SocketAddr,
         Arc<Mutex<Writer<TcpStream>>>,
     >::new()));
     let clients2 = clients.clone();
-    let clients3 = clients.clone();
     let shutdown = Arc::new(AtomicBool::new(false));
     let shutdown2 = shutdown.clone();
-    let shutdown3 = shutdown.clone();
-    let sender2 = sender.clone();
-    let sender3 = sender;
 
     spawn(move || match receiver.recv() {
         Err(_) | Ok(Gui2WsMessage::Shutdown) => {
@@ -71,225 +58,16 @@ pub fn run(
         }
     });
     let pass: Option<String> = password.map(|s| s.to_string());
-    {
-        let capture = capture.clone();
-        if stylus_support {
-            spawn(move || {
-                listen_websocket(
-                    ws_pointer_socket_addr,
-                    pass,
-                    clients2,
-                    shutdown2,
-                    sender2,
-                    move |client_addr| {
-                        create_graphic_tablet_stream_handler(
-                            client_addr,
-                            capture.clone(),
-                            enable_mouse,
-                            enable_stylus,
-                            enable_touch,
-                        )
-                    },
-                )
-            });
-        } else {
-            spawn(move || {
-                listen_websocket(
-                    ws_pointer_socket_addr,
-                    pass,
-                    clients2,
-                    shutdown2,
-                    sender2,
-                    move |_| {
-                        create_mouse_stream_handler(
-                            capture.clone(),
-                            enable_mouse,
-                            enable_stylus,
-                            enable_touch,
-                        )
-                    },
-                )
-            });
-        }
-    }
-
-    let pass: Option<String> = password.map(|s| s.to_string());
-    {
-        if faster_capture {
-            spawn(move || {
-                listen_websocket(
-                    ws_video_socket_addr,
-                    pass,
-                    clients3,
-                    shutdown3,
-                    sender3,
-                    move |_| {
-                        create_xscreen_stream_handler(
-                            capture.clone(),
-                            screen_update_interval,
-                            capture_cursor,
-                        )
-                    },
-                )
-            });
-        } else {
-            spawn(move || {
-                listen_websocket(
-                    ws_video_socket_addr,
-                    pass,
-                    clients3,
-                    shutdown3,
-                    sender3,
-                    move |_| create_screen_stream_handler(screen_update_interval),
-                )
-            });
-        }
-    }
+    spawn(move || listen_websocket(ws_socket_addr, pass, clients2, shutdown2, sender));
 }
 
-#[cfg(not(target_os = "linux"))]
-pub fn run(
-    sender: mpsc::Sender<Ws2GuiMessage>,
-    receiver: mpsc::Receiver<Gui2WsMessage>,
-    ws_pointer_socket_addr: SocketAddr,
-    ws_video_socket_addr: SocketAddr,
-    password: Option<&str>,
-    screen_update_interval: Duration,
-    enable_mouse: bool,
-    enable_stylus: bool,
-    enable_touch: bool,
-) {
-    let clients = Arc::new(Mutex::new(HashMap::<
-        SocketAddr,
-        Arc<Mutex<Writer<TcpStream>>>,
-    >::new()));
-    let clients2 = clients.clone();
-    let clients3 = clients.clone();
-    let shutdown = Arc::new(AtomicBool::new(false));
-    let shutdown2 = shutdown.clone();
-    let shutdown3 = shutdown.clone();
-    let sender2 = sender.clone();
-    let sender3 = sender.clone();
-
-    spawn(move || loop {
-        match receiver.recv() {
-            Err(_) | Ok(Gui2WsMessage::Shutdown) => {
-                let clients = clients.lock().unwrap();
-                for client in clients.values() {
-                    let client = client.lock().unwrap();
-                    if let Err(err) = client.shutdown_all() {
-                        error!("Could not shutdown websocket: {}", err);
-                    }
-                }
-                shutdown.store(true, Ordering::Relaxed);
-                return;
-            }
-        }
-    });
-    let pass: Option<String> = password.map_or(None, |s| Some(s.to_string()));
-
-    spawn(move || {
-        listen_websocket(
-            ws_pointer_socket_addr,
-            pass,
-            clients2,
-            shutdown2,
-            sender2,
-            move |_| create_mouse_stream_handler(enable_mouse, enable_stylus, enable_touch),
-        )
-    });
-
-    let pass: Option<String> = password.map_or(None, |s| Some(s.to_string()));
-
-    spawn(move || {
-        listen_websocket(
-            ws_video_socket_addr,
-            pass,
-            clients3,
-            shutdown3,
-            sender3,
-            move |_| create_screen_stream_handler(screen_update_interval),
-        )
-    });
-}
-
-#[cfg(target_os = "linux")]
-fn create_graphic_tablet_stream_handler(
-    client_addr: &SocketAddr,
-    capture: Capturable,
-    enable_mouse: bool,
-    enable_stylus: bool,
-    enable_touch: bool,
-) -> Result<PointerStreamHandler<GraphicTablet>, Box<dyn std::error::Error>> {
-    Ok(PointerStreamHandler::new(GraphicTablet::new(
-        capture,
-        client_addr.to_string(),
-        enable_mouse,
-        enable_stylus,
-        enable_touch,
-    )?))
-}
-
-#[cfg(target_os = "linux")]
-fn create_mouse_stream_handler(
-    capture: Capturable,
-    enable_mouse: bool,
-    enable_stylus: bool,
-    enable_touch: bool,
-) -> Result<PointerStreamHandler<Mouse>, Box<dyn std::error::Error>> {
-    Ok(PointerStreamHandler::new(Mouse::new(
-        capture,
-        enable_mouse,
-        enable_stylus,
-        enable_touch,
-    )))
-}
-
-#[cfg(not(target_os = "linux"))]
-fn create_mouse_stream_handler(
-    enable_mouse: bool,
-    enable_stylus: bool,
-    enable_touch: bool,
-) -> Result<PointerStreamHandler<Mouse>, Box<dyn std::error::Error>> {
-    Ok(PointerStreamHandler::new(Mouse::new(
-        enable_mouse,
-        enable_stylus,
-        enable_touch,
-    )))
-}
-
-#[cfg(target_os = "linux")]
-fn create_xscreen_stream_handler(
-    capture: Capturable,
-    update_interval: Duration,
-    capture_cursor: bool,
-) -> Result<ScreenStreamHandler<ScreenCaptureX11>, Box<dyn std::error::Error>> {
-    Ok(ScreenStreamHandler::new(
-        ScreenCaptureX11::new(capture, capture_cursor)?,
-        update_interval,
-    ))
-}
-
-fn create_screen_stream_handler(
-    update_interval: Duration,
-) -> Result<ScreenStreamHandler<ScreenCaptureGeneric>, Box<dyn std::error::Error>> {
-    Ok(ScreenStreamHandler::new(
-        ScreenCaptureGeneric::new(),
-        update_interval,
-    ))
-}
-
-fn listen_websocket<T, F>(
+fn listen_websocket(
     addr: SocketAddr,
     password: Option<String>,
     clients: Arc<Mutex<HashMap<SocketAddr, Arc<Mutex<Writer<TcpStream>>>>>>,
     shutdown: Arc<AtomicBool>,
     _sender: mpsc::Sender<Ws2GuiMessage>,
-    create_stream_handler: F,
-) where
-    T: StreamHandler,
-    F: Fn(&SocketAddr) -> Result<T, Box<dyn std::error::Error>> + Send + 'static + Clone,
-{
+) {
     let server = Server::bind(addr);
     if let Err(err) = server {
         error!("Failed binding to socket: {}", err);
@@ -311,91 +89,9 @@ fn listen_websocket<T, F>(
         }
         let clients = clients.clone();
         let password = password.clone();
-        let create_stream_handler = create_stream_handler.clone();
         match server.accept() {
             Ok(request) => {
-                spawn(move || {
-                    let client = request.accept();
-                    if let Err((_, err)) = client {
-                        warn!("Failed to accept client: {}", err);
-                        return;
-                    }
-                    let client = client.unwrap();
-                    if let Err(err) = client.set_nonblocking(false) {
-                        warn!("Failed to set client to blocking mode: {}", err);
-                    }
-                    let peer_addr = client.peer_addr();
-                    if let Err(err) = peer_addr {
-                        warn!("Failed to retrieve client address: {}", err);
-                        return;
-                    }
-                    let peer_addr = peer_addr.unwrap();
-                    let client = client.split();
-                    if let Err(err) = client {
-                        warn!("Failed to setup connection: {}", err);
-                        return;
-                    }
-                    let (mut ws_receiver, ws_sender) = client.unwrap();
-
-                    let ws_sender = Arc::new(Mutex::new(ws_sender));
-
-                    let stream_handler = create_stream_handler(&peer_addr);
-                    if let Err(err) = stream_handler {
-                        error!("Failed to create stream handler: {}", err);
-                        return;
-                    }
-
-                    {
-                        let mut clients = clients.lock().unwrap();
-                        clients.insert(peer_addr, ws_sender.clone());
-                    }
-
-                    let mut authed = password.is_none();
-                    let password = password.unwrap_or_else(|| "".into());
-                    let mut stream_handler = stream_handler.unwrap();
-                    for msg in ws_receiver.incoming_messages() {
-                        match msg {
-                            Ok(msg) => {
-                                if !authed {
-                                    if let OwnedMessage::Text(pw) = &msg {
-                                        if pw == &password {
-                                            authed = true;
-                                        } else {
-                                            warn!(
-                                                "Authentication failed: {} sent wrong password: '{}'",
-                                                peer_addr, pw
-                                            );
-                                            let mut clients = clients.lock().unwrap();
-                                            clients.remove(&peer_addr);
-                                            return;
-                                        }
-                                    }
-                                } else {
-                                    stream_handler.process(ws_sender.clone(), &msg);
-                                }
-                                if msg.is_close() {
-                                    let mut clients = clients.lock().unwrap();
-                                    clients.remove(&peer_addr);
-                                    return;
-                                }
-                            }
-                            Err(err) => {
-                                match err {
-                                    // this happens on calling shutdown, no need to log this
-                                    websocket::WebSocketError::NoDataAvailable => (),
-                                    _ => warn!(
-                                        "Error reading message from websocket, closing ({})",
-                                        err
-                                    ),
-                                }
-
-                                let mut clients = clients.lock().unwrap();
-                                clients.remove(&peer_addr);
-                                return;
-                            }
-                        }
-                    }
-                });
+                spawn(move || handle_connection(request, clients, password));
             }
             Err(_) => {
                 if shutdown.load(Ordering::Relaxed) {
@@ -403,5 +99,294 @@ fn listen_websocket<T, F>(
                 }
             }
         };
+    }
+}
+
+fn handle_connection(
+    request: WsUpgrade<TcpStream, Option<WsBuffer>>,
+    clients: Arc<Mutex<HashMap<SocketAddr, Arc<Mutex<Writer<TcpStream>>>>>>,
+    password: Option<String>,
+) {
+    let client = request.accept();
+    if let Err((_, err)) = client {
+        warn!("Failed to accept client: {}", err);
+        return;
+    }
+    let client = client.unwrap();
+    if let Err(err) = client.set_nonblocking(false) {
+        warn!("Failed to set client to blocking mode: {}", err);
+    }
+    let peer_addr = client.peer_addr();
+    if let Err(err) = peer_addr {
+        warn!("Failed to retrieve client address: {}", err);
+        return;
+    }
+    let peer_addr = peer_addr.unwrap();
+    let client = client.split();
+    if let Err(err) = client {
+        warn!("Failed to setup connection: {}", err);
+        return;
+    }
+    let (mut ws_receiver, ws_sender) = client.unwrap();
+
+    let ws_sender = Arc::new(Mutex::new(ws_sender));
+
+    {
+        let mut clients = clients.lock().unwrap();
+        clients.insert(peer_addr, ws_sender.clone());
+    }
+
+    let mut ws_handler = WsHandler::new(ws_sender, &peer_addr);
+
+    let mut authed = password.is_none();
+    let password = password.unwrap_or_else(|| "".into());
+    for msg in ws_receiver.incoming_messages() {
+        match msg {
+            Ok(msg) => {
+                if !authed {
+                    if let OwnedMessage::Text(pw) = &msg {
+                        if pw == &password {
+                            authed = true;
+                        } else {
+                            warn!(
+                                "Authentication failed: {} sent wrong password: '{}'",
+                                peer_addr, pw
+                            );
+                            let mut clients = clients.lock().unwrap();
+                            clients.remove(&peer_addr);
+                            return;
+                        }
+                    }
+                } else {
+                    ws_handler.process(&msg);
+                }
+                if msg.is_close() {
+                    let mut clients = clients.lock().unwrap();
+                    clients.remove(&peer_addr);
+                    return;
+                }
+            }
+            Err(err) => {
+                match err {
+                    // this happens on calling shutdown, no need to log this
+                    WebSocketError::NoDataAvailable => (),
+                    _ => warn!("Error reading message from websocket, closing ({})", err),
+                }
+
+                let mut clients = clients.lock().unwrap();
+                clients.remove(&peer_addr);
+                return;
+            }
+        }
+    }
+}
+
+struct WsHandler {
+    sender: WsWriter,
+    client_addr: SocketAddr,
+    screen_capture: Option<Box<dyn ScreenCapture>>,
+    video_encoder: Option<Box<VideoEncoder>>,
+    input_device: Option<Box<dyn InputDevice>>,
+    config: ClientConfiguration,
+    #[cfg(target_os = "linux")]
+    x11ctx: Option<X11Context>,
+    #[cfg(target_os = "linux")]
+    capturables: Vec<Capturable>,
+}
+
+impl WsHandler {
+    fn new(sender: WsWriter, client_addr: &SocketAddr) -> Self {
+        Self {
+            sender,
+            client_addr: *client_addr,
+            screen_capture: None,
+            video_encoder: None,
+            input_device: None,
+            config: ClientConfiguration::new(),
+            #[cfg(target_os = "linux")]
+            x11ctx: X11Context::new(),
+            #[cfg(target_os = "linux")]
+            capturables: Vec::new(),
+        }
+    }
+
+    fn send_msg(&self, msg: &MessageOutbound) {
+        if let Err(err) = self
+            .sender
+            .lock()
+            .unwrap()
+            .send_message(&Message::text(serde_json::to_string(msg).unwrap()))
+        {
+            warn!("Failed to send message to websocket: {}", err);
+        }
+    }
+
+    fn send_video_frame(&mut self) {
+        if self.screen_capture.is_none() {
+            warn!("Screen capture not initalized, can not send video frame!");
+            return;
+        }
+        self.screen_capture.as_mut().unwrap().capture();
+        let screen_capture = self.screen_capture.as_ref().unwrap();
+        let (width, height) = screen_capture.size();
+        // video encoder is not setup or setup for encoding the wrong size: restart it
+        if self.video_encoder.is_none()
+            || !self
+                .video_encoder
+                .as_ref()
+                .unwrap()
+                .check_size(width, height)
+        {
+            self.send_msg(&MessageOutbound::NewVideo);
+            let sender = self.sender.clone();
+            let res = VideoEncoder::new(width, height, move |data| {
+                let msg = Message::binary(data);
+                if let Err(err) = sender.lock().unwrap().send_message(&msg) {
+                    match err {
+                        WebSocketError::IoError(err) => {
+                            // ignore broken pipe errors as those are caused by
+                            // intentionally shutting down the websocket
+                            if err.kind() == std::io::ErrorKind::BrokenPipe {
+                                trace!("Error sending video: {}", err);
+                            } else {
+                                warn!("Error sending video: {}", err);
+                            }
+                        }
+                        _ => warn!("Error sending video: {}", err),
+                    }
+                }
+            });
+            if let Err(err) = res {
+                warn!("{}", err);
+                return;
+            }
+            self.video_encoder = Some(res.unwrap());
+        }
+        let video_encoder = self.video_encoder.as_mut().unwrap();
+        video_encoder.encode(screen_capture.pixel_provider());
+    }
+
+    fn process_pointer_event(&mut self, event: &PointerEvent) {
+        if self.input_device.is_some() {
+            self.input_device.as_mut().unwrap().send_event(&event)
+        } else {
+            warn!("Pointer device is not initalized, can not process PointerEvent!");
+        }
+    }
+
+    fn send_capturable_list(&mut self) {
+        let mut windows = Vec::<String>::new();
+        #[cfg(not(target_os = "linux"))]
+        {
+            windows.push("Desktop".to_string());
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            if self.config.faster_capture {
+                if let Some(x11ctx) = self.x11ctx.as_mut() {
+                    let capturables = x11ctx.capturables();
+                    match capturables {
+                        Ok(capturables) => {
+                            capturables.iter().for_each(|c| {
+                                windows.push(c.name());
+                            });
+                            self.capturables = capturables;
+                        }
+                        Err(err) => warn!("Failed to get list of capturables: {}", err),
+                    }
+                }
+            } else {
+                windows.push("Desktop".to_string());
+            }
+        }
+        self.send_msg(&MessageOutbound::CapturableList(windows));
+    }
+
+    fn setup(&mut self, config: ClientConfiguration) {
+        self.config = config;
+        #[cfg(target_os = "linux")]
+        {
+            if self.config.capturable_id < self.capturables.len() {
+                let capturable = self.capturables[self.config.capturable_id].clone();
+                if self.config.stylus_support {
+                    let device = crate::input::uinput_device::GraphicTablet::new(
+                        capturable.clone(),
+                        self.client_addr.to_string(),
+                        self.config.enable_mouse,
+                        self.config.enable_stylus,
+                        self.config.enable_touch,
+                    );
+                    if let Err(err) = device {
+                        error!("Failed to create uinput device: {}", err);
+                        self.send_msg(&MessageOutbound::ConfigError(
+                            "Failed to create uinput device!".to_string(),
+                        ));
+                        return;
+                    }
+                    self.input_device = Some(Box::new(device.unwrap()))
+                } else {
+                    self.input_device = Some(Box::new(crate::input::mouse_device::Mouse::new(
+                        capturable.clone(),
+                        self.config.enable_mouse,
+                        self.config.enable_stylus,
+                        self.config.enable_touch,
+                    )))
+                }
+
+                if self.config.faster_capture {
+                    self.screen_capture = Some(Box::new(
+                        ScreenCaptureX11::new(capturable, self.config.capture_cursor).unwrap(),
+                    ))
+                } else {
+                    self.screen_capture = Some(Box::new(ScreenCaptureGeneric::new()))
+                }
+            } else {
+                error!(
+                    "Got invalid id for capturable: {}",
+                    self.config.capturable_id
+                );
+                self.send_msg(&MessageOutbound::ConfigError(
+                    "Invalid id for capturable!".to_string(),
+                ));
+                return;
+            }
+        }
+
+        #[cfg(not(target_os = "linux"))]
+        {
+            self.input_device = Some(Box::new(crate::input::mouse_device::Mouse::new(
+                self.config.enable_mouse,
+                self.config.enable_stylus,
+                self.config.enable_touch,
+            )));
+            self.screen_capture = Some(Box::new(ScreenCaptureGeneric::new()));
+        }
+        self.send_msg(&MessageOutbound::ConfigOk);
+    }
+
+    fn process(&mut self, message: &OwnedMessage) {
+        match message {
+            OwnedMessage::Text(s) => {
+                let message: Result<MessageInbound, _> = serde_json::from_str(&s);
+                match message {
+                    Ok(message) => match message {
+                        MessageInbound::PointerEvent(event) => {
+                            self.process_pointer_event(&event);
+                        }
+                        MessageInbound::GetFrame => self.send_video_frame(),
+                        MessageInbound::GetCapturableList => self.send_capturable_list(),
+                        MessageInbound::Config(config) => self.setup(config),
+                    },
+                    Err(err) => {
+                        warn!("Unable to parse message: {}", err);
+                        self.send_msg(&MessageOutbound::Error(
+                            "Failed to parse message!".to_string(),
+                        ));
+                    }
+                }
+            }
+            _ => (),
+        }
     }
 }

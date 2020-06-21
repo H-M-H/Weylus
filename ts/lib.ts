@@ -1,15 +1,5 @@
-function run(password: string, websocket_pointer_port: number, websocket_video_port: number) {
-    window.onload = () => { init(password, websocket_pointer_port, websocket_video_port) };
-}
-
-class ClientConfig {
-    width: number;
-    height: number;
-
-    constructor(width: number, height: number) {
-        this.width = width;
-        this.height = height;
-    }
+function run(password: string, websocket_port: number) {
+    window.onload = () => { init(password, websocket_port) };
 }
 
 class PEvent {
@@ -84,7 +74,13 @@ class PointerHandler {
     }
 }
 
-function process_stream(videoWebSocket: WebSocket, video: HTMLVideoElement) {
+function handle_messages(
+    webSocket: WebSocket,
+    video: HTMLVideoElement,
+    onConfigOk: Function,
+    onConfigError: Function,
+    onCapturableList: Function,
+) {
     let mediaSource: MediaSource = null;
     let sourceBuffer: SourceBuffer = null;
     let queue = [];
@@ -95,35 +91,48 @@ function process_stream(videoWebSocket: WebSocket, video: HTMLVideoElement) {
             sourceBuffer.appendBuffer(queue.shift());
         }
     }
-    videoWebSocket.onmessage = (event: MessageEvent) => {
+    webSocket.onmessage = (event: MessageEvent) => {
         if (typeof event.data == "string") {
-            if (event.data[0] == "@") {
-                let interval_millis: number = parseInt(event.data.slice(1, -1));
-                setTimeout(() => videoWebSocket.send(""), interval_millis);
-            } else if (event.data == "new") {
-                mediaSource = new MediaSource();
-                sourceBuffer = null;
-                video.src = URL.createObjectURL(mediaSource);
-                mediaSource.addEventListener("sourceopen", (_) => {
-                    let mimeType = 'video/mp4; codecs="avc1.4D403D"';
-                    if (!MediaSource.isTypeSupported(mimeType))
-                        mimeType = "video/mp4";
-                    sourceBuffer = mediaSource.addSourceBuffer(mimeType);
-                    sourceBuffer.addEventListener("updateend", upd_buf);
-                })
-                requestAnimationFrame(() => videoWebSocket.send(""));
+            let msg = JSON.parse(event.data);
+            if (typeof msg == "string") {
+                if (msg == "NewVideo") {
+                    mediaSource = new MediaSource();
+                    sourceBuffer = null;
+                    video.src = URL.createObjectURL(mediaSource);
+                    mediaSource.addEventListener("sourceopen", (_) => {
+                        let mimeType = 'video/mp4; codecs="avc1.4D403D"';
+                        if (!MediaSource.isTypeSupported(mimeType))
+                            mimeType = "video/mp4";
+                        sourceBuffer = mediaSource.addSourceBuffer(mimeType);
+                        sourceBuffer.addEventListener("updateend", upd_buf);
+                    })
+                    requestAnimationFrame(() => webSocket.send('"GetFrame"'));
+                } else if (msg == "ConfigOk") {
+                    onConfigOk();
+                }
+            } else if (typeof msg == "object") {
+                if ("CapturableList" in msg)
+                    onCapturableList(msg["CapturableList"]);
+                else if ("Error" in msg)
+                    alert(msg["Error"]);
+                else if ("ConfigError" in msg) {
+                    onConfigError(msg["ConfigError"]);
+                }
             }
+
             return;
         }
+
+        // not a string -> got a video frame
         queue.push(event.data);
         upd_buf();
         if (video.seekable.length > 0 && video.seekable.end(0) - video.currentTime > 0.01)
             video.currentTime = video.seekable.end(0)
-        requestAnimationFrame(() => videoWebSocket.send(""));
+        requestAnimationFrame(() => webSocket.send('"GetFrame"'));
     }
 }
 
-function init(password: string, websocket_pointer_port: number, websocket_video_port: number) {
+function init(password: string, websocket_port: number) {
 
     // Settings
     let settings = document.getElementById("settings");
@@ -135,13 +144,8 @@ function init(password: string, websocket_pointer_port: number, websocket_video_
     load_settings();
 
     // pointer
-    let webSocket = new WebSocket("ws://" + window.location.hostname + ":" + websocket_pointer_port);
-    webSocket.onopen = function(event) {
-        if (password)
-            webSocket.send(password);
-        let pointerHandler = new PointerHandler(video, webSocket);
-    }
-
+    let webSocket = new WebSocket("ws://" + window.location.hostname + ":" + websocket_port);
+    webSocket.binaryType = "arraybuffer";
     webSocket.onerror = () => handle_disconnect("Lost connection.");
     webSocket.onclose = () => handle_disconnect("Connection closed.");
 
@@ -155,17 +159,31 @@ function init(password: string, websocket_pointer_port: number, websocket_video_
     };
     video.controls = false;
     video.onloadeddata = () => stretch_video(video, do_stretch);
-    let videoWebSocket = new WebSocket("ws://" + window.location.hostname + ":" + websocket_video_port);
-    videoWebSocket.binaryType = "arraybuffer";
-    videoWebSocket.onopen = () => {
+    handle_messages(webSocket, video, () => {
+        new PointerHandler(video, webSocket);
+        webSocket.send('"GetFrame"');
+    },
+        (err) => alert(err),
+        (capturables) => console.log(capturables)
+    );
+    window.onunload = () => { webSocket.close(); }
+    webSocket.onopen = function(event) {
         if (password)
-            videoWebSocket.send(password);
-        videoWebSocket.send("");
+            webSocket.send(password);
+        webSocket.send('"GetCapturableList"');
+        let config =
+        {
+            "stylus_support": true,
+            "enable_mouse": true,
+            "enable_stylus": true,
+            "enable_touch": true,
+            "faster_capture": true,
+            "capturable_id": 0,
+            "capture_cursor": true,
+        }
+        webSocket.send(JSON.stringify({ "Config": config }));
     }
-    videoWebSocket.onerror = () => handle_disconnect("Lost connection.");
-    videoWebSocket.onclose = () => handle_disconnect("Connection closed.");
-    process_stream(videoWebSocket, video);
-    window.onunload = () => { webSocket.close(); videoWebSocket.close(); }
+
 }
 
 
