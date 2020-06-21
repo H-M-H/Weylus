@@ -34,9 +34,6 @@ pub struct GraphicTablet {
     y: f64,
     width: f64,
     height: f64,
-    enable_mouse: bool,
-    enable_stylus: bool,
-    enable_touch: bool,
     name_mouse_device: String,
     name_stylus_device: String,
     name_touch_device: String,
@@ -47,13 +44,7 @@ pub struct GraphicTablet {
 }
 
 impl GraphicTablet {
-    pub fn new(
-        capture: Capturable,
-        id: String,
-        enable_mouse: bool,
-        enable_stylus: bool,
-        enable_touch: bool,
-    ) -> Result<Self, CError> {
+    pub fn new(capture: Capturable, id: String) -> Result<Self, CError> {
         let mut err = CError::new();
         let name_stylus = format!("Weylus Stylus - {}", id);
         let name_stylus_c_str = CString::new(name_stylus.as_bytes()).unwrap();
@@ -87,9 +78,6 @@ impl GraphicTablet {
             y: 0.0,
             width: 1.0,
             height: 1.0,
-            enable_mouse,
-            enable_stylus,
-            enable_touch,
             name_mouse_device: name_mouse,
             name_touch_device: name_touch,
             name_stylus_device: name_stylus,
@@ -200,7 +188,6 @@ const EC_MSC_TIMESTAMP: c_int = 0x05;
 // This corresponds to PointerEvent values of 1.0
 const ABS_MAX: f64 = 65535.0;
 
-
 // This specifies how many times it should be attempted to map the input devices created via uinput
 // to the entire screen and not only a single monitor. Actually this is a workaround because
 // apparently it is impossible to set the correct mapping in a sane way. The reason is that X needs
@@ -219,24 +206,6 @@ const MAX_SCREEN_MAPPING_TRIES: usize = 100;
 
 impl InputDevice for GraphicTablet {
     fn send_event(&mut self, event: &PointerEvent) {
-        match event.pointer_type {
-            PointerType::Mouse | PointerType::Unknown => {
-                if !self.enable_mouse {
-                    return;
-                }
-            }
-            PointerType::Pen => {
-                if !self.enable_stylus {
-                    return;
-                }
-            }
-            PointerType::Touch => {
-                if !self.enable_touch {
-                    return;
-                }
-            }
-        }
-
         if let Err(err) = self.capture.before_input() {
             warn!("Failed to activate window, sending no input ({})", err);
             return;

@@ -313,9 +313,6 @@ impl WsHandler {
                     let device = crate::input::uinput_device::GraphicTablet::new(
                         capturable.clone(),
                         self.client_addr.to_string(),
-                        self.config.enable_mouse,
-                        self.config.enable_stylus,
-                        self.config.enable_touch,
                     );
                     if let Err(err) = device {
                         error!("Failed to create uinput device: {}", err);
@@ -328,9 +325,6 @@ impl WsHandler {
                 } else {
                     self.input_device = Some(Box::new(crate::input::mouse_device::Mouse::new(
                         capturable.clone(),
-                        self.config.enable_mouse,
-                        self.config.enable_stylus,
-                        self.config.enable_touch,
                     )))
                 }
 
@@ -355,11 +349,7 @@ impl WsHandler {
 
         #[cfg(not(target_os = "linux"))]
         {
-            self.input_device = Some(Box::new(crate::input::mouse_device::Mouse::new(
-                self.config.enable_mouse,
-                self.config.enable_stylus,
-                self.config.enable_touch,
-            )));
+            self.input_device = Some(Box::new(crate::input::mouse_device::Mouse::new()));
             self.screen_capture = Some(Box::new(ScreenCaptureGeneric::new()));
         }
         self.send_msg(&MessageOutbound::ConfigOk);
