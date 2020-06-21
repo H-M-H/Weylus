@@ -8,17 +8,6 @@ pub struct ClientConfiguration {
     pub capture_cursor: bool,
 }
 
-impl ClientConfiguration {
-    pub fn new() -> Self {
-        Self {
-            stylus_support: true,
-            faster_capture: true,
-            capturable_id: 0,
-            capture_cursor: false,
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug)]
 pub enum MessageInbound {
     PointerEvent(PointerEvent),

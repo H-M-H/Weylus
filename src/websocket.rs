@@ -187,7 +187,6 @@ struct WsHandler {
     screen_capture: Option<Box<dyn ScreenCapture>>,
     video_encoder: Option<Box<VideoEncoder>>,
     input_device: Option<Box<dyn InputDevice>>,
-    config: ClientConfiguration,
     #[cfg(target_os = "linux")]
     x11ctx: Option<X11Context>,
     #[cfg(target_os = "linux")]
@@ -202,7 +201,6 @@ impl WsHandler {
             screen_capture: None,
             video_encoder: None,
             input_device: None,
-            config: ClientConfiguration::new(),
             #[cfg(target_os = "linux")]
             x11ctx: X11Context::new(),
             #[cfg(target_os = "linux")]
@@ -283,18 +281,16 @@ impl WsHandler {
 
         #[cfg(target_os = "linux")]
         {
-            if self.config.faster_capture {
-                if let Some(x11ctx) = self.x11ctx.as_mut() {
-                    let capturables = x11ctx.capturables();
-                    match capturables {
-                        Ok(capturables) => {
-                            capturables.iter().for_each(|c| {
-                                windows.push(c.name());
-                            });
-                            self.capturables = capturables;
-                        }
-                        Err(err) => warn!("Failed to get list of capturables: {}", err),
+            if let Some(x11ctx) = self.x11ctx.as_mut() {
+                let capturables = x11ctx.capturables();
+                match capturables {
+                    Ok(capturables) => {
+                        capturables.iter().for_each(|c| {
+                            windows.push(c.name());
+                        });
+                        self.capturables = capturables;
                     }
+                    Err(err) => warn!("Failed to get list of capturables: {}", err),
                 }
             } else {
                 windows.push("Desktop".to_string());
@@ -304,12 +300,11 @@ impl WsHandler {
     }
 
     fn setup(&mut self, config: ClientConfiguration) {
-        self.config = config;
         #[cfg(target_os = "linux")]
         {
-            if self.config.capturable_id < self.capturables.len() {
-                let capturable = self.capturables[self.config.capturable_id].clone();
-                if self.config.stylus_support {
+            if config.capturable_id < self.capturables.len() {
+                let capturable = self.capturables[config.capturable_id].clone();
+                if config.stylus_support {
                     let device = crate::input::uinput_device::GraphicTablet::new(
                         capturable.clone(),
                         self.client_addr.to_string(),
@@ -328,9 +323,9 @@ impl WsHandler {
                     )))
                 }
 
-                if self.config.faster_capture {
+                if config.faster_capture {
                     self.screen_capture = Some(Box::new(
-                        ScreenCaptureX11::new(capturable, self.config.capture_cursor).unwrap(),
+                        ScreenCaptureX11::new(capturable, config.capture_cursor).unwrap(),
                     ))
                 } else {
                     self.screen_capture = Some(Box::new(ScreenCaptureGeneric::new()))
@@ -338,7 +333,7 @@ impl WsHandler {
             } else {
                 error!(
                     "Got invalid id for capturable: {}",
-                    self.config.capturable_id
+                    config.capturable_id
                 );
                 self.send_msg(&MessageOutbound::ConfigError(
                     "Invalid id for capturable!".to_string(),

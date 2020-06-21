@@ -7,7 +7,6 @@ use crate::input::device::InputDevice;
 use crate::protocol::Button;
 use crate::protocol::PointerEvent;
 use crate::protocol::PointerEventType;
-use crate::protocol::PointerType;
 
 #[cfg(target_os = "linux")]
 use crate::x11helper::Capturable;
