@@ -61,26 +61,14 @@ class PointerHandler {
     constructor(video: HTMLVideoElement, webSocket: WebSocket) {
         this.video = video;
         this.webSocket = webSocket;
-        this.video.onpointerdown = (e) => { this.onDown(e) };
-        this.video.onpointerup = (e) => { this.onUp(e) };
-        this.video.onpointercancel = (e) => { this.onCancel(e) };
-        this.video.onpointermove = (e) => { this.onMove(e) };
+        this.video.onpointerdown = (e) => { this.onEvent(e, "pointerdown") };
+        this.video.onpointerup = (e) => { this.onEvent(e, "pointerup") };
+        this.video.onpointercancel = (e) => { this.onEvent(e, "pointercancel") };
+        this.video.onpointermove = (e) => { this.onEvent(e, "pointermove") };
     }
 
-    onDown(event: PointerEvent) {
-        this.webSocket.send(JSON.stringify({ "PointerEvent": new PEvent("pointerdown", event, this.video) }));
-    }
-
-    onUp(event: PointerEvent) {
-        this.webSocket.send(JSON.stringify({ "PointerEvent": new PEvent("pointerup", event, this.video) }));
-    }
-
-    onCancel(event: PointerEvent) {
-        this.webSocket.send(JSON.stringify({ "PointerEvent": new PEvent("pointercancel", event, this.video) }));
-    }
-
-    onMove(event: PointerEvent) {
-        this.webSocket.send(JSON.stringify({ "PointerEvent": new PEvent("pointermove", event, this.video) }));
+    onEvent(event: PointerEvent, event_type: string) {
+        this.webSocket.send(JSON.stringify({ "PointerEvent": new PEvent(event_type, event, this.video) }));
     }
 }
 
