@@ -2,6 +2,16 @@ function run(password: string, websocket_port: number) {
     window.onload = () => { init(password, websocket_port) };
 }
 
+interface Config {
+    stylus_support?: boolean,
+    enable_mouse?: boolean,
+    enable_stylus?: boolean,
+    enable_touch?: boolean,
+    faster_capture?: boolean,
+    capture_cursor?: boolean,
+    capturable_id?: Number
+}
+
 class PEvent {
     event_type: string;
     pointer_id: number;
@@ -152,7 +162,7 @@ function init(password: string, websocket_port: number) {
     let boolean_settings_els = Object.fromEntries(boolean_settings.map(s => [
         s, document.getElementById(s) as HTMLInputElement
     ]));
-    let get_settings = () => {
+    let get_settings = (): Config => {
         return Object.fromEntries(Object.entries(boolean_settings_els).map(
             ([name, element]) => [name, element.checked]));
     };
@@ -202,7 +212,7 @@ function init(password: string, websocket_port: number) {
     webSocket.onclose = () => handle_disconnect("Connection closed.");
 
     let send_settings = () => {
-        let config = get_settings() as {string: any};
+        let config = get_settings();
         config["capturable_id"] = Number(window_select.value);
         webSocket.send(JSON.stringify({ "Config": config }));
     }
