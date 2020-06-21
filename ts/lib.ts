@@ -57,10 +57,13 @@ class PEvent {
 class PointerHandler {
     video: HTMLVideoElement;
     webSocket: WebSocket;
+    pointerTypes: string[];
 
-    constructor(video: HTMLVideoElement, webSocket: WebSocket) {
+    constructor(video: HTMLVideoElement, webSocket: WebSocket, config: Config) {
         this.video = video;
         this.webSocket = webSocket;
+        this.pointerTypes = ['mouse', 'touch', 'pen'].filter((_, i) =>
+            [config.enable_mouse, config.enable_touch, config.enable_stylus][i]);
         this.video.onpointerdown = (e) => { this.onEvent(e, "pointerdown") };
         this.video.onpointerup = (e) => { this.onEvent(e, "pointerup") };
         this.video.onpointercancel = (e) => { this.onEvent(e, "pointercancel") };
@@ -68,7 +71,8 @@ class PointerHandler {
     }
 
     onEvent(event: PointerEvent, event_type: string) {
-        this.webSocket.send(JSON.stringify({ "PointerEvent": new PEvent(event_type, event, this.video) }));
+        if (this.pointerTypes.includes(event.pointerType))
+            this.webSocket.send(JSON.stringify({ "PointerEvent": new PEvent(event_type, event, this.video) }));
     }
 }
 
@@ -220,7 +224,7 @@ function init(password: string, websocket_port: number) {
     video.controls = false;
     video.onloadeddata = () => stretch_video();
     handle_messages(webSocket, video, () => {
-        new PointerHandler(video, webSocket);
+        new PointerHandler(video, webSocket, get_settings());
         webSocket.send('"GetFrame"');
     },
         (err) => alert(err),
