@@ -14,7 +14,6 @@ mod gui;
 mod input;
 mod protocol;
 mod screen_capture;
-mod stream_handler;
 mod video;
 mod web;
 mod websocket;

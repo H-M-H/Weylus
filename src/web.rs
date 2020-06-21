@@ -13,8 +13,7 @@ use tracing::{error, info, warn};
 #[derive(Serialize)]
 struct WebConfig {
     password: Option<String>,
-    websocket_pointer_port: u16,
-    websocket_video_port: u16,
+    websocket_port: u16,
 }
 
 fn response_from_str(s: &str, content_type: &str) -> Response<Body> {
@@ -73,8 +72,7 @@ async fn serve<'a>(
             info!("Client connected: {}", &addr);
             let config = WebConfig {
                 password: context.password.clone(),
-                websocket_pointer_port: context.ws_pointer_port,
-                websocket_video_port: context.ws_video_port,
+                websocket_port: context.ws_port,
             };
 
             Ok(response_from_str(
@@ -110,8 +108,7 @@ fn log_gui_send_error<T>(res: Result<(), SendError<T>>) {
 
 struct Context<'a> {
     bind_addr: SocketAddr,
-    ws_pointer_port: u16,
-    ws_video_port: u16,
+    ws_port: u16,
     password: Option<String>,
     templates: Handlebars<'a>,
 }
@@ -120,8 +117,7 @@ pub fn run(
     sender: mpsc::Sender<Web2GuiMessage>,
     receiver: mpsc_tokio::Receiver<Gui2WebMessage>,
     bind_addr: &SocketAddr,
-    ws_pointer_port: u16,
-    ws_video_port: u16,
+    ws_port: u16,
     password: Option<&str>,
 ) {
     let mut templates = Handlebars::new();
@@ -136,8 +132,7 @@ pub fn run(
 
     let context = Context {
         bind_addr: *bind_addr,
-        ws_pointer_port,
-        ws_video_port,
+        ws_port,
         password,
         templates,
     };
