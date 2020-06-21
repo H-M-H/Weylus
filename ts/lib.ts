@@ -125,6 +125,15 @@ function process_stream(videoWebSocket: WebSocket, video: HTMLVideoElement) {
 
 function init(password: string, websocket_pointer_port: number, websocket_video_port: number) {
 
+    // Settings
+    let settings = document.getElementById("settings");
+    let handle = document.getElementById("handle");
+    handle.onclick = () => settings.classList.toggle("hide");
+
+    let do_stretch = document.getElementById("stretch") as HTMLInputElement;
+
+    load_settings();
+
     // pointer
     let webSocket = new WebSocket("ws://" + window.location.hostname + ":" + websocket_pointer_port);
     webSocket.onopen = function(event) {
@@ -139,9 +148,13 @@ function init(password: string, websocket_pointer_port: number, websocket_video_
     // videostreaming
     let video = document.getElementById("video") as HTMLVideoElement;
 
-    window.onresize = () => stretch_video(video);
+    window.onresize = () => stretch_video(video, do_stretch);
+    do_stretch.onchange = () => {
+        stretch_video(video, do_stretch);
+        save_settings();
+    };
     video.controls = false;
-    video.onloadeddata = () => stretch_video(video);
+    video.onloadeddata = () => stretch_video(video, do_stretch);
     let videoWebSocket = new WebSocket("ws://" + window.location.hostname + ":" + websocket_video_port);
     videoWebSocket.binaryType = "arraybuffer";
     videoWebSocket.onopen = () => {
@@ -158,8 +171,12 @@ function init(password: string, websocket_pointer_port: number, websocket_video_
 
 // object-fit: fill; <-- this is unfortunately not supported on iOS, so we use the following
 // workaround
-function stretch_video(video: HTMLVideoElement) {
-    video.style.transform = "scaleX(" + document.body.clientWidth / video.clientWidth + ") scaleY(" + document.body.clientHeight / video.clientHeight + ")";
+function stretch_video(video: HTMLVideoElement, do_stretch: HTMLInputElement) {
+    if (do_stretch.checked) {
+        video.style.transform = "scaleX(" + document.body.clientWidth / video.clientWidth + ") scaleY(" + document.body.clientHeight / video.clientHeight + ")";
+    } else {
+        video.style.transform = "none"
+    }
 }
 
 
@@ -169,4 +186,26 @@ function handle_disconnect(msg: string) {
         if (window.confirm(msg + " Reload the page?"))
             location.reload();
     }
+}
+
+
+function load_settings() {
+    let settings_string = localStorage.getItem('settings');
+    let settings = {};
+    if (settings_string === null)
+        return;
+    try {
+        settings = JSON.parse(settings_string);
+    } catch {
+        return;
+    }
+    if (settings['stretch'] !== undefined)
+        (document.getElementById('stretch') as HTMLInputElement).checked = settings['stretch'];
+}
+
+
+function save_settings() {
+    localStorage.setItem('settings', JSON.stringify({
+        'stretch': (document.getElementById('stretch') as HTMLInputElement).checked
+    }));
 }
