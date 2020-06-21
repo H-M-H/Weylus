@@ -4,6 +4,7 @@ function run(password: string, websocket_port: number) {
 
 interface Config {
     stylus_support?: boolean,
+    lefty?: boolean,
     enable_mouse?: boolean,
     enable_stylus?: boolean,
     enable_touch?: boolean,
@@ -144,6 +145,7 @@ function init(password: string, websocket_port: number) {
     // Settings elements
     let boolean_settings = [
         "stretch",
+        "lefty",
         "stylus_support",
         "enable_mouse",
         "enable_stylus",
@@ -173,6 +175,20 @@ function init(password: string, websocket_port: number) {
                 send_settings();
             }
         }
+        if (saved_settings["lefty"])
+            settings.classList.add("lefty");
+    }
+
+    boolean_settings_els["lefty"].onchange = () => {
+        if (boolean_settings_els["lefty"].checked)
+            settings.classList.add("lefty");
+        else
+            settings.classList.remove("lefty");
+        save_settings();
+    }
+
+    document.getElementById("vanish").onclick = () => {
+        settings.classList.add("vanish");
     }
 
     let window_select = document.getElementById("window") as HTMLSelectElement;

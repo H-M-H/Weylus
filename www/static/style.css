@@ -35,8 +35,15 @@ video {
     font-family: sans-serif;
     transition: transform 0.5s;
 }
-#settings.hide {
+#settings.lefty {
+    left: 0;
+    right: auto;
+}
+#settings.hide, #settings.vanish {
     transform: translateX(100%);
+}
+#settings.hide.lefty, #settings.vanish.lefty {
+    transform: translateX(-100%);
 }
 #handle {
     position: absolute;
@@ -49,6 +56,13 @@ video {
     color: #444;
     font-size: 150%;
     text-align:center;
+}
+.lefty #handle {
+    left: auto;
+    right: -1em;
+}
+.vanish #handle {
+    display: none;
 }
 #settings h2 {
     font-size: 1em;
@@ -64,4 +78,35 @@ video {
 }
 select {
     width: 15em;
+}
+#displayoptions {
+    display: flex;
+    flex-direction: row;
+}
+.lefty #displayoptions {
+    flex-direction: row-reverse;
+}
+#displayoptions label {
+    flex-grow: 1;
+}
+#lefty {
+    display: none;
+}
+#leftylabel::before {
+    content: "❮ ";
+}
+.lefty #leftylabel {
+    text-align: right;
+}
+.lefty #leftylabel::before {
+    content: "";
+}
+.lefty #leftylabel::after {
+    content: " ❯";
+}
+#vanish {
+    text-align: right;
+}
+.lefty #vanish {
+    text-align: left;
 }
