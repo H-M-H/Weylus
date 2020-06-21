@@ -17,11 +17,27 @@
 
     <body>
         <video id="video" autoplay muted defaultMuted playsinline></video>
-        <div id="settings" class="hide">
+        <div id="settings">
             <div id="handle">⠿</div>
             <h2>Settings</h2>
             <section>
+                <label for="window">Capture window:</label>
+                <select id="window"></select>
+            </section>
+            <section>
                 <label><input type="checkbox" id="stretch" checked /> Stretch Video</label>
+            </section>
+            <section>
+                <label><input type="checkbox" id="stylus_support" checked /> Stylus Support</label>
+            </section>
+            <section>
+                <label><input type="checkbox" id="enable_mouse" checked /> Enable Mouse</label>
+                <label><input type="checkbox" id="enable_stylus" checked /> Enable Stylus</label>
+                <label><input type="checkbox" id="enable_touch" checked /> Enable Touch</label>
+            </section>
+            <section>
+                <label><input type="checkbox" id="faster_capture" checked />Faster Capture</label>
+                <label><input type="checkbox" id="capture_cursor" checked />Capture Cursor</label>
             </section>
         </div>
     </body>

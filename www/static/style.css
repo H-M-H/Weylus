@@ -46,6 +46,7 @@ video {
     border-radius: 0 0 0 0.25em;
     padding: 0.2em 0 0.1em 0;
     background: #111c;
+    color: #444;
     font-size: 150%;
     text-align:center;
 }
@@ -55,5 +56,12 @@ video {
     text-align: center;
 }
 #settings section {
+    margin-top: 1em;
+}
+#settings section label {
+    display: block;
     margin-top: 0.5em;
+}
+select {
+    width: 15em;
 }

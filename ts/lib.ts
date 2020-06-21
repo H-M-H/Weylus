@@ -134,96 +134,118 @@ function handle_messages(
 
 function init(password: string, websocket_port: number) {
 
-    // Settings
+    // Settings UI
     let settings = document.getElementById("settings");
     let handle = document.getElementById("handle");
     handle.onclick = () => settings.classList.toggle("hide");
 
-    let do_stretch = document.getElementById("stretch") as HTMLInputElement;
+    // Settings elements
+    let boolean_settings = [
+        "stretch",
+        "stylus_support",
+        "enable_mouse",
+        "enable_stylus",
+        "enable_touch",
+        "faster_capture",
+        "capture_cursor"
+    ];
+    let boolean_settings_els = Object.fromEntries(boolean_settings.map(s => [
+        s, document.getElementById(s) as HTMLInputElement
+    ]));
+    let get_settings = () => {
+        return Object.fromEntries(Object.entries(boolean_settings_els).map(
+            ([name, element]) => [name, element.checked]));
+    };
+    let save_settings = () => {
+        localStorage.setItem("settings", JSON.stringify(get_settings()));
+    };
 
-    load_settings();
+    let saved_settings = load_settings();
+    if (saved_settings !== null) {
+        for (const [name, element] of Object.entries(boolean_settings_els)) {
+            if (saved_settings[name] !== undefined) {
+                element.checked = saved_settings[name];
+            }
+            element.onchange = () => {
+                save_settings();
+                send_settings();
+            }
+        }
+    }
+
+    let window_select = document.getElementById("window") as HTMLSelectElement;
+    window_select.onchange = () => send_settings();
+    let set_windows = (window_names: string[]) => {
+        window_select.innerText = "";
+        window_names.forEach((name, i) => {
+            let option = document.createElement("option");
+            option.value = String(i);
+            option.innerText = name;
+            window_select.appendChild(option);
+        });
+    }
 
     // pointer
     let webSocket = new WebSocket("ws://" + window.location.hostname + ":" + websocket_port);
     webSocket.binaryType = "arraybuffer";
-    webSocket.onerror = () => handle_disconnect("Lost connection.");
-    webSocket.onclose = () => handle_disconnect("Connection closed.");
 
     // videostreaming
     let video = document.getElementById("video") as HTMLVideoElement;
 
-    window.onresize = () => stretch_video(video, do_stretch);
-    do_stretch.onchange = () => {
-        stretch_video(video, do_stretch);
+    let handle_disconnect = (msg: string) => {
+        video.onclick = () => {
+            if (window.confirm(msg + " Reload the page?"))
+                location.reload();
+        }
+    }
+    webSocket.onerror = () => handle_disconnect("Lost connection.");
+    webSocket.onclose = () => handle_disconnect("Connection closed.");
+
+    let send_settings = () => {
+        let config = get_settings() as {string: any};
+        config["capturable_id"] = Number(window_select.value);
+        webSocket.send(JSON.stringify({ "Config": config }));
+    }
+
+    let stretch_video = () => {
+        if (boolean_settings_els["stretch"].checked) {
+            video.style.transform = "scaleX(" + document.body.clientWidth / video.clientWidth + ") scaleY(" + document.body.clientHeight / video.clientHeight + ")";
+        } else {
+            video.style.transform = "none"
+        }
+    }
+    window.onresize = () => stretch_video();
+    boolean_settings_els["stretch"].onchange = () => {
+        stretch_video();
         save_settings();
     };
     video.controls = false;
-    video.onloadeddata = () => stretch_video(video, do_stretch);
+    video.onloadeddata = () => stretch_video();
     handle_messages(webSocket, video, () => {
         new PointerHandler(video, webSocket);
         webSocket.send('"GetFrame"');
     },
         (err) => alert(err),
-        (capturables) => console.log(capturables)
+        set_windows
     );
     window.onunload = () => { webSocket.close(); }
     webSocket.onopen = function(event) {
         if (password)
             webSocket.send(password);
         webSocket.send('"GetCapturableList"');
-        let config =
-        {
-            "stylus_support": true,
-            "enable_mouse": true,
-            "enable_stylus": true,
-            "enable_touch": true,
-            "faster_capture": true,
-            "capturable_id": 0,
-            "capture_cursor": true,
-        }
-        webSocket.send(JSON.stringify({ "Config": config }));
+        send_settings();
     }
 
-}
-
-
-// object-fit: fill; <-- this is unfortunately not supported on iOS, so we use the following
-// workaround
-function stretch_video(video: HTMLVideoElement, do_stretch: HTMLInputElement) {
-    if (do_stretch.checked) {
-        video.style.transform = "scaleX(" + document.body.clientWidth / video.clientWidth + ") scaleY(" + document.body.clientHeight / video.clientHeight + ")";
-    } else {
-        video.style.transform = "none"
-    }
-}
-
-
-function handle_disconnect(msg: string) {
-    let video = document.getElementById("video") as HTMLVideoElement;
-    video.onclick = () => {
-        if (window.confirm(msg + " Reload the page?"))
-            location.reload();
-    }
 }
 
 
 function load_settings() {
-    let settings_string = localStorage.getItem('settings');
-    let settings = {};
+    let settings_string = localStorage.getItem("settings");
     if (settings_string === null)
-        return;
+        return null;
     try {
-        settings = JSON.parse(settings_string);
+        return JSON.parse(settings_string);
     } catch {
-        return;
+        return null;
     }
-    if (settings['stretch'] !== undefined)
-        (document.getElementById('stretch') as HTMLInputElement).checked = settings['stretch'];
-}
-
-
-function save_settings() {
-    localStorage.setItem('settings', JSON.stringify({
-        'stretch': (document.getElementById('stretch') as HTMLInputElement).checked
-    }));
 }
