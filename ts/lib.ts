@@ -61,10 +61,10 @@ class PointerHandler {
     constructor(video: HTMLVideoElement, webSocket: WebSocket) {
         this.video = video;
         this.webSocket = webSocket;
-        this.video.addEventListener("pointerdown", (e) => { this.onDown(e) }, false);
-        this.video.addEventListener("pointerup", (e) => { this.onUp(e) }, false);
-        this.video.addEventListener("pointercancel", (e) => { this.onCancel(e) }, false);
-        this.video.addEventListener("pointermove", (e) => { this.onMove(e) }, false);
+        this.video.onpointerdown = (e) => { this.onDown(e) };
+        this.video.onpointerup = (e) => { this.onUp(e) };
+        this.video.onpointercancel = (e) => { this.onCancel(e) };
+        this.video.onpointermove = (e) => { this.onMove(e) };
     }
 
     onDown(event: PointerEvent) {
