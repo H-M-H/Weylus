@@ -11,7 +11,7 @@ pub struct ClientConfiguration {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum MessageInbound {
     PointerEvent(PointerEvent),
-    GetFrame,
+    TryGetFrame,
     GetCapturableList,
     Config(ClientConfiguration),
 }

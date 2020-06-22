@@ -202,7 +202,7 @@ struct VideoConfig {
 
 enum VideoCommands {
     Start(VideoConfig),
-    GetFrame,
+    TryGetFrame,
 }
 
 fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter) {
@@ -210,71 +210,89 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter) {
     let mut video_encoder: Option<Box<VideoEncoder>> = None;
 
     loop {
-        match receiver.recv() {
-            Ok(msg) => {
-                match msg {
-                    VideoCommands::GetFrame => {
-                        if screen_capture.is_none() {
-                            warn!("Screen capture not initalized, can not send video frame!");
-                            continue;
-                        }
-                        screen_capture.as_mut().unwrap().capture();
-                        let screen_capture = screen_capture.as_ref().unwrap();
-                        let (width, height) = screen_capture.size();
-                        // video encoder is not setup or setup for encoding the wrong size: restart it
-                        if video_encoder.is_none()
-                            || !video_encoder.as_ref().unwrap().check_size(width, height)
-                        {
-                            send_msg(&sender, &MessageOutbound::NewVideo);
-                            let sender = sender.clone();
-                            let res = VideoEncoder::new(width, height, move |data| {
-                                let msg = Message::binary(data);
-                                if let Err(err) = sender.lock().unwrap().send_message(&msg) {
-                                    match err {
-                                        WebSocketError::IoError(err) => {
-                                            // ignore broken pipe errors as those are caused by
-                                            // intentionally shutting down the websocket
-                                            if err.kind() == std::io::ErrorKind::BrokenPipe {
-                                                trace!("Error sending video: {}", err);
-                                            } else {
-                                                warn!("Error sending video: {}", err);
-                                            }
-                                        }
-                                        _ => warn!("Error sending video: {}", err),
-                                    }
-                                }
-                            });
-                            if let Err(err) = res {
-                                warn!("{}", err);
-                                continue;
-                            }
-                            video_encoder = Some(res.unwrap());
-                        }
-                        let video_encoder = video_encoder.as_mut().unwrap();
-                        video_encoder.encode(screen_capture.pixel_provider());
-                    }
-                    VideoCommands::Start(config) => {
-                        #[cfg(target_os = "linux")]
-                        {
-                            if config.x11_capture {
-                                screen_capture = Some(Box::new(
-                                    ScreenCaptureX11::new(config.capturable, config.capture_cursor)
-                                        .unwrap(),
-                                ))
-                            } else {
-                                screen_capture = Some(Box::new(ScreenCaptureGeneric::new()))
-                            }
-                        }
+        let msg = receiver.recv();
 
-                        #[cfg(not(target_os = "linux"))]
-                        {
-                            screen_capture = Some(Box::new(ScreenCaptureGeneric::new()));
-                        }
-                        send_msg(&sender, &MessageOutbound::ConfigOk);
+        // stop thread once the channel is closed
+        if msg.is_err() {
+            return;
+        }
+        let mut msg = msg.unwrap();
+
+        // drop frames if the client is requesting frames at a higher rate than they can be
+        // produced here
+        if let VideoCommands::TryGetFrame = msg {
+            loop {
+                match receiver.try_recv() {
+                    Err(mpsc::TryRecvError::Empty) => break,
+                    Err(mpsc::TryRecvError::Disconnected) => return,
+                    Ok(VideoCommands::TryGetFrame) => continue,
+                    Ok(tmp_msg) => {
+                        msg = tmp_msg;
+                        break;
                     }
                 }
             }
-            Err(_) => return,
+        }
+        match msg {
+            VideoCommands::TryGetFrame => {
+                if screen_capture.is_none() {
+                    warn!("Screen capture not initalized, can not send video frame!");
+                    continue;
+                }
+                screen_capture.as_mut().unwrap().capture();
+                let screen_capture = screen_capture.as_ref().unwrap();
+                let (width, height) = screen_capture.size();
+                // video encoder is not setup or setup for encoding the wrong size: restart it
+                if video_encoder.is_none()
+                    || !video_encoder.as_ref().unwrap().check_size(width, height)
+                {
+                    send_msg(&sender, &MessageOutbound::NewVideo);
+                    let sender = sender.clone();
+                    let res = VideoEncoder::new(width, height, move |data| {
+                        let msg = Message::binary(data);
+                        if let Err(err) = sender.lock().unwrap().send_message(&msg) {
+                            match err {
+                                WebSocketError::IoError(err) => {
+                                    // ignore broken pipe errors as those are caused by
+                                    // intentionally shutting down the websocket
+                                    if err.kind() == std::io::ErrorKind::BrokenPipe {
+                                        trace!("Error sending video: {}", err);
+                                    } else {
+                                        warn!("Error sending video: {}", err);
+                                    }
+                                }
+                                _ => warn!("Error sending video: {}", err),
+                            }
+                        }
+                    });
+                    if let Err(err) = res {
+                        warn!("{}", err);
+                        continue;
+                    }
+                    video_encoder = Some(res.unwrap());
+                }
+                let video_encoder = video_encoder.as_mut().unwrap();
+                video_encoder.encode(screen_capture.pixel_provider());
+            }
+            VideoCommands::Start(config) => {
+                #[cfg(target_os = "linux")]
+                {
+                    if config.x11_capture {
+                        screen_capture = Some(Box::new(
+                            ScreenCaptureX11::new(config.capturable, config.capture_cursor)
+                                .unwrap(),
+                        ))
+                    } else {
+                        screen_capture = Some(Box::new(ScreenCaptureGeneric::new()))
+                    }
+                }
+
+                #[cfg(not(target_os = "linux"))]
+                {
+                    screen_capture = Some(Box::new(ScreenCaptureGeneric::new()));
+                }
+                send_msg(&sender, &MessageOutbound::ConfigOk);
+            }
         }
     }
 }
@@ -314,7 +332,7 @@ impl WsHandler {
     }
 
     fn send_video_frame(&mut self) {
-        self.video_sender.send(VideoCommands::GetFrame).unwrap();
+        self.video_sender.send(VideoCommands::TryGetFrame).unwrap();
     }
 
     fn process_pointer_event(&mut self, event: &PointerEvent) {
@@ -409,7 +427,7 @@ impl WsHandler {
                         MessageInbound::PointerEvent(event) => {
                             self.process_pointer_event(&event);
                         }
-                        MessageInbound::GetFrame => self.send_video_frame(),
+                        MessageInbound::TryGetFrame => self.send_video_frame(),
                         MessageInbound::GetCapturableList => self.send_capturable_list(),
                         MessageInbound::Config(config) => self.setup(config),
                     },
