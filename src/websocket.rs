@@ -216,7 +216,7 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter) {
                     VideoCommands::GetFrame => {
                         if screen_capture.is_none() {
                             warn!("Screen capture not initalized, can not send video frame!");
-                            return;
+                            continue;
                         }
                         screen_capture.as_mut().unwrap().capture();
                         let screen_capture = screen_capture.as_ref().unwrap();
@@ -246,7 +246,7 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter) {
                             });
                             if let Err(err) = res {
                                 warn!("{}", err);
-                                return;
+                                continue;
                             }
                             video_encoder = Some(res.unwrap());
                         }
@@ -388,13 +388,12 @@ impl WsHandler {
                 self.send_msg(&MessageOutbound::ConfigError(
                     "Invalid id for capturable!".to_string(),
                 ));
-                return;
             }
         }
 
         #[cfg(not(target_os = "linux"))]
         {
-            input_device = Some(Box::new(crate::input::mouse_device::Mouse::new()));
+            self.input_device = Some(Box::new(crate::input::mouse_device::Mouse::new()));
             self.video_sender
                 .send(VideoCommands::Start(VideoConfig {}))
                 .unwrap();
