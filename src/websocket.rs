@@ -374,7 +374,13 @@ impl WsHandler {
         #[cfg(target_os = "linux")]
         {
             if config.capturable_id < self.capturables.len() {
-                let capturable = self.capturables[config.capturable_id].clone();
+                let capturable = self.capturables[if config.faster_capture {
+                    config.capturable_id
+                } else {
+                    // can only capture desktop if capturing with ScreenCaptureGeneric
+                    0
+                }]
+                .clone();
                 if config.stylus_support {
                     let device = crate::input::uinput_device::GraphicTablet::new(
                         capturable.clone(),
