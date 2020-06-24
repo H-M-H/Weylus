@@ -2,16 +2,139 @@ function run(password: string, websocket_port: number) {
     window.onload = () => { init(password, websocket_port) };
 }
 
-interface Config {
-    stylus_support?: boolean,
-    lefty?: boolean,
-    enable_mouse?: boolean,
-    enable_stylus?: boolean,
-    enable_touch?: boolean,
-    faster_capture?: boolean,
-    capture_cursor?: boolean,
-    capturable_id?: Number
+class Settings {
+    webSocket: WebSocket;
+    checks: Map<string, HTMLInputElement>;
+    capturable_select: HTMLSelectElement;
+    frame_update_limit_input: HTMLInputElement;
+
+    constructor(webSocket: WebSocket) {
+        this.webSocket = webSocket;
+        this.checks = new Map<string, HTMLInputElement>();
+        this.capturable_select = document.getElementById("window") as HTMLSelectElement;
+        this.frame_update_limit_input = document.getElementById("frame_update_limit") as HTMLInputElement;
+
+        // Settings UI
+        let settings = document.getElementById("settings");
+        let handle = document.getElementById("handle");
+
+        // Settings elements
+        settings.querySelectorAll("input[type=checkbox]").forEach(
+            (elem, _key, _parent) => this.checks.set(elem.id, elem as HTMLInputElement)
+        );
+
+        this.load_settings();
+
+        // event handling
+
+        // client only
+        handle.onclick = () => settings.classList.toggle("hide");
+        this.checks.get("lefty").onchange = (e) => {
+            if ((e.target as HTMLInputElement).checked)
+                settings.classList.add("lefty");
+            else
+                settings.classList.remove("lefty");
+            this.save_settings();
+        }
+
+        document.getElementById("vanish").onclick = () => {
+            settings.classList.add("vanish");
+        }
+
+        this.checks.get("stretch").onchange = (e) => {
+            stretch_video();
+            this.save_settings();
+        };
+
+        let upd_pointer_filter = () => { this.save_settings(); new PointerHandler(this.webSocket); }
+        this.checks.get("enable_mouse").onchange = upd_pointer_filter;
+        this.checks.get("enable_stylus").onchange = upd_pointer_filter;
+        this.checks.get("enable_touch").onchange = upd_pointer_filter;
+
+        this.frame_update_limit_input.onchange = () => this.save_settings();
+
+        // server
+        let upd_server_config = () => { this.save_settings(); this.send_server_config() };
+        this.checks.get("faster_capture").onchange = (e) => {
+            this.capturable_select.disabled = !(e.target as HTMLInputElement).checked;
+            this.checks.get("capture_cursor").disabled = !(e.target as HTMLInputElement).checked;
+            upd_server_config()
+        };
+        this.checks.get("stylus_support").onchange = upd_server_config;
+        this.checks.get("capture_cursor").onchange = upd_server_config;
+
+        document.getElementById("refresh").onclick = () => this.webSocket.send('"GetCapturableList"');
+        this.capturable_select.onchange = () => this.send_server_config();
+    }
+
+    send_server_config() {
+        let config = new Object(null);
+        config["capturable_id"] = Number(this.capturable_select.value);
+        for (const key of [
+            "stylus_support",
+            "faster_capture",
+            "capture_cursor"])
+            config[key] = this.checks.get(key).checked
+        this.webSocket.send(JSON.stringify({ "Config": config }));
+    }
+
+    save_settings() {
+        let settings = Object(null);
+        for (const [key, elem] of this.checks.entries())
+            settings[key] = elem.checked;
+        settings["frame_update_limit"] = this.frame_update_limit_input.value;
+        localStorage.setItem("settings", JSON.stringify(settings));
+    }
+
+    load_settings() {
+        let settings_string = localStorage.getItem("settings");
+        if (settings_string === null)
+            return;
+        try {
+            let settings = JSON.parse(settings_string);
+            for (const [key, elem] of this.checks.entries()) {
+                if (typeof settings[key] === "boolean")
+                    elem.checked = settings[key];
+            }
+            this.capturable_select.disabled = !this.checks.get("faster_capture").checked;
+            this.checks.get("capture_cursor").disabled = !this.checks.get("faster_capture").checked;
+            this.frame_update_limit_input.value = settings["frame_update_limit"];
+        } catch {
+            return;
+        }
+    }
+
+    stretched_video() {
+        return this.checks.get("stretch").checked
+    }
+
+    pointer_types() {
+        let ptrs = [];
+        if (this.checks.get("enable_mouse").checked)
+            ptrs.push("mouse");
+        if (this.checks.get("enable_stylus").checked)
+            ptrs.push("pen");
+        if (this.checks.get("enable_touch").checked)
+            ptrs.push("touch");
+        return ptrs;
+    }
+
+    frame_update_limit() {
+        return this.frame_update_limit_input.valueAsNumber
+    }
+
+    onCapturableList(window_names: string[]) {
+        this.capturable_select.innerText = "";
+        window_names.forEach((name, i) => {
+            let option = document.createElement("option");
+            option.value = String(i);
+            option.innerText = name;
+            this.capturable_select.appendChild(option);
+        });
+    }
 }
+
+let settings: Settings;
 
 class PEvent {
     event_type: string;
@@ -60,11 +183,10 @@ class PointerHandler {
     webSocket: WebSocket;
     pointerTypes: string[];
 
-    constructor(video: HTMLVideoElement, webSocket: WebSocket, config: Config) {
-        this.video = video;
+    constructor(webSocket: WebSocket) {
+        this.video = document.getElementById("video") as HTMLVideoElement;
         this.webSocket = webSocket;
-        this.pointerTypes = ['mouse', 'touch', 'pen'].filter((_, i) =>
-            [config.enable_mouse, config.enable_touch, config.enable_stylus][i]);
+        this.pointerTypes = settings.pointer_types();
         this.video.onpointerdown = (e) => { this.onEvent(e, "pointerdown") };
         this.video.onpointerup = (e) => { this.onEvent(e, "pointerup") };
         this.video.onpointercancel = (e) => { this.onEvent(e, "pointercancel") };
@@ -108,8 +230,11 @@ function handle_messages(
                             mimeType = "video/mp4";
                         sourceBuffer = mediaSource.addSourceBuffer(mimeType);
                         sourceBuffer.addEventListener("updateend", upd_buf);
+                        // try to recover from errors by restarting the video
+                        if (sourceBuffer.onerror)
+                            sourceBuffer.onerror = () => settings.send_server_config();
                     })
-                    requestAnimationFrame(() => webSocket.send('"TryGetFrame"'));
+                    webSocket.send('"TryGetFrame"');
                 } else if (msg == "ConfigOk") {
                     onConfigOk();
                 }
@@ -131,139 +256,57 @@ function handle_messages(
         upd_buf();
         if (video.seekable.length > 0 && video.seekable.end(0) - video.currentTime > 0.01)
             video.currentTime = video.seekable.end(0)
-        requestAnimationFrame(() => webSocket.send('"TryGetFrame"'));
+        let upd_limit = settings.frame_update_limit();
+        if (upd_limit > 0)
+            setTimeout(() => webSocket.send('"TryGetFrame"'), upd_limit);
+        else
+            requestAnimationFrame(() => webSocket.send('"TryGetFrame"'));
     }
 }
 
 function init(password: string, websocket_port: number) {
 
-    // Settings UI
-    let settings = document.getElementById("settings");
-    let handle = document.getElementById("handle");
-    handle.onclick = () => settings.classList.toggle("hide");
-
-    // Settings elements
-    let boolean_settings = [
-        "stretch",
-        "lefty",
-        "stylus_support",
-        "enable_mouse",
-        "enable_stylus",
-        "enable_touch",
-        "faster_capture",
-        "capture_cursor"
-    ];
-    let boolean_settings_els = Object.fromEntries(boolean_settings.map(s => [
-        s, document.getElementById(s) as HTMLInputElement
-    ]));
-    let get_settings = (): Config => {
-        return Object.fromEntries(Object.entries(boolean_settings_els).map(
-            ([name, element]) => [name, element.checked]));
-    };
-    let save_settings = () => {
-        localStorage.setItem("settings", JSON.stringify(get_settings()));
-    };
-
-    let saved_settings = load_settings();
-    if (saved_settings !== null) {
-        for (const [name, element] of Object.entries(boolean_settings_els)) {
-            if (saved_settings[name] !== undefined) {
-                element.checked = saved_settings[name];
-            }
-            element.onchange = () => {
-                save_settings();
-                send_settings();
-            }
-        }
-        if (saved_settings["lefty"])
-            settings.classList.add("lefty");
-    }
-
-    boolean_settings_els["lefty"].onchange = () => {
-        if (boolean_settings_els["lefty"].checked)
-            settings.classList.add("lefty");
-        else
-            settings.classList.remove("lefty");
-        save_settings();
-    }
-
-    document.getElementById("vanish").onclick = () => {
-        settings.classList.add("vanish");
-    }
-
-    let window_select = document.getElementById("window") as HTMLSelectElement;
-    window_select.onchange = () => send_settings();
-    let set_windows = (window_names: string[]) => {
-        window_select.innerText = "";
-        window_names.forEach((name, i) => {
-            let option = document.createElement("option");
-            option.value = String(i);
-            option.innerText = name;
-            window_select.appendChild(option);
-        });
-    }
-
-    // pointer
     let webSocket = new WebSocket("ws://" + window.location.hostname + ":" + websocket_port);
     webSocket.binaryType = "arraybuffer";
 
-    // videostreaming
+    settings = new Settings(webSocket);
+
     let video = document.getElementById("video") as HTMLVideoElement;
 
     let handle_disconnect = (msg: string) => {
         video.onclick = () => {
-            if (window.confirm(msg + " Reload the page?"))
+            if (window.confirm(msg + " Reload page?"))
                 location.reload();
         }
     }
     webSocket.onerror = () => handle_disconnect("Lost connection.");
     webSocket.onclose = () => handle_disconnect("Connection closed.");
-
-    let send_settings = () => {
-        let config = get_settings();
-        config["capturable_id"] = Number(window_select.value);
-        webSocket.send(JSON.stringify({ "Config": config }));
-    }
-
-    let stretch_video = () => {
-        if (boolean_settings_els["stretch"].checked) {
-            video.style.transform = "scaleX(" + document.body.clientWidth / video.clientWidth + ") scaleY(" + document.body.clientHeight / video.clientHeight + ")";
-        } else {
-            video.style.transform = "none"
-        }
-    }
     window.onresize = () => stretch_video();
-    boolean_settings_els["stretch"].onchange = () => {
-        stretch_video();
-        save_settings();
-    };
     video.controls = false;
     video.onloadeddata = () => stretch_video();
     handle_messages(webSocket, video, () => {
-        new PointerHandler(video, webSocket, get_settings());
+        new PointerHandler(webSocket);
         webSocket.send('"TryGetFrame"');
     },
         (err) => alert(err),
-        set_windows
+        (window_names) => settings.onCapturableList(window_names)
     );
     window.onunload = () => { webSocket.close(); }
     webSocket.onopen = function(event) {
         if (password)
             webSocket.send(password);
         webSocket.send('"GetCapturableList"');
-        send_settings();
+        settings.send_server_config();
     }
-
 }
 
-
-function load_settings() {
-    let settings_string = localStorage.getItem("settings");
-    if (settings_string === null)
-        return null;
-    try {
-        return JSON.parse(settings_string);
-    } catch {
-        return null;
+// object-fit: fill; <-- this is unfortunately not supported on iOS, so we use the following
+// workaround
+function stretch_video() {
+    let video = document.getElementById("video") as HTMLVideoElement;
+    if (settings.stretched_video()) {
+        video.style.transform = "scaleX(" + document.body.clientWidth / video.clientWidth + ") scaleY(" + document.body.clientHeight / video.clientHeight + ")";
+    } else {
+        video.style.transform = "none"
     }
 }

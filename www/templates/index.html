@@ -19,30 +19,36 @@
         <video id="video" autoplay muted defaultMuted playsinline></video>
         <div id="settings">
             <div id="handle">⠿</div>
-            <h2>Settings</h2>
-            <section>
-                <label for="window">Capture window:</label>
-                <select id="window"></select>
-            </section>
-            <section>
-                <label><input type="checkbox" id="stretch" checked /> Stretch Video</label>
-            </section>
-            <section>
-                <label><input type="checkbox" id="stylus_support" checked /> Stylus Support</label>
-            </section>
-            <section>
-                <label><input type="checkbox" id="enable_mouse" checked /> Enable Mouse</label>
-                <label><input type="checkbox" id="enable_stylus" checked /> Enable Stylus</label>
-                <label><input type="checkbox" id="enable_touch" checked /> Enable Touch</label>
-            </section>
-            <section>
-                <label><input type="checkbox" id="faster_capture" checked />Faster Capture</label>
-                <label><input type="checkbox" id="capture_cursor" checked />Capture Cursor</label>
-            </section>
-            <section id="displayoptions">
-                <label id="leftylabel"><input type="checkbox" id="lefty" />Swap</label>
-                <label id="vanish">Vanish</label>
-            </section>
+            <div id="settings_scroll">
+                <h2>Settings</h2>
+                <section>
+                    <label for="window">Capture window:</label>
+                    <select id="window"></select>
+                    <button id="refresh">Refresh</button>
+                </section>
+                <section>
+                    <label for="frame_update_limit">Limit video update interval (milliseconds):</label>
+                    <input type="number" min="0" id="frame_update_limit" value="0" />
+                    <label><input type="checkbox" id="stretch" checked /> Stretch Video</label>
+                </section>
+                <section>
+                    <label><input type="checkbox" id="stylus_support" checked /> Stylus Support</label>
+                </section>
+                <section>
+                    <label><input type="checkbox" id="enable_mouse" checked /> Enable Mouse</label>
+                    <label><input type="checkbox" id="enable_stylus" checked /> Enable Stylus</label>
+                    <label><input type="checkbox" id="enable_touch" checked /> Enable Touch</label>
+                </section>
+                <section>
+                    <label>The below only works on Linux</label>
+                    <label><input type="checkbox" id="faster_capture" checked />Faster Capture</label>
+                    <label><input type="checkbox" id="capture_cursor" />Capture Cursor</label>
+                </section>
+                <section id="displayoptions">
+                    <label id="leftylabel"><input type="checkbox" id="lefty" />Swap</label>
+                    <label id="vanish">Vanish until page reload</label>
+                </section>
+            </div>
         </div>
     </body>
 
