@@ -118,6 +118,7 @@ void stop_capture(CaptureContext* ctx, Error* err)
 	{
 		fill_error(err, 1, "Failed to detach shared memory!");
 	}
+	shmctl(ctx->shminfo.shmid, IPC_RMID, NULL);
 	if (ctx->has_offscreen && ctx->cap.type == WINDOW && ctx->cap.c.winfo.is_regular_window)
 		XCompositeUnredirectWindow(ctx->cap.disp, ctx->cap.c.winfo.win, False);
 	free(ctx);
@@ -136,6 +137,7 @@ void capture_sceen(CaptureContext* ctx, struct Image* img, int capture_cursor, E
 		XShmDetach(ctx->cap.disp, &ctx->shminfo);
 		XDestroyImage(ctx->ximg);
 		shmdt(ctx->shminfo.shmaddr);
+		shmctl(ctx->shminfo.shmid, IPC_RMID, NULL);
 		CaptureContext* new_ctx = start_capture(&ctx->cap, ctx, err);
 		if (!new_ctx)
 		{
