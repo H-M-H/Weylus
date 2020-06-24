@@ -315,15 +315,25 @@ impl WsHandler {
             let sender = sender.clone();
             spawn(move || handle_video(video_receiver, sender));
         }
+
+        #[cfg(target_os = "linux")]
+        let mut x11ctx = X11Context::new();
+
+        #[cfg(target_os = "linux")]
+        let capturables = x11ctx.as_mut().map_or_else(
+            || Vec::new(),
+            |ctx| ctx.capturables().unwrap_or_else(|_| Vec::new()),
+        );
+
         Self {
             sender,
             client_addr: *client_addr,
             video_sender,
             input_device: None,
             #[cfg(target_os = "linux")]
-            x11ctx: X11Context::new(),
+            x11ctx,
             #[cfg(target_os = "linux")]
-            capturables: Vec::new(),
+            capturables,
         }
     }
 
@@ -438,7 +448,7 @@ impl WsHandler {
                         MessageInbound::Config(config) => self.setup(config),
                     },
                     Err(err) => {
-                        warn!("Unable to parse message: {}", err);
+                        warn!("Unable to parse message: {} ({})", s, err);
                         self.send_msg(&MessageOutbound::Error(
                             "Failed to parse message!".to_string(),
                         ));
