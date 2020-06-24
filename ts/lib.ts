@@ -2,6 +2,17 @@ function run(password: string, websocket_port: number) {
     window.onload = () => { init(password, websocket_port) };
 }
 
+interface Config {
+    stylus_support?: boolean,
+    lefty?: boolean,
+    enable_mouse?: boolean,
+    enable_stylus?: boolean,
+    enable_touch?: boolean,
+    faster_capture?: boolean,
+    capture_cursor?: boolean,
+    capturable_id?: Number
+}
+
 class PEvent {
     event_type: string;
     pointer_id: number;
@@ -47,30 +58,22 @@ class PEvent {
 class PointerHandler {
     video: HTMLVideoElement;
     webSocket: WebSocket;
+    pointerTypes: string[];
 
-    constructor(video: HTMLVideoElement, webSocket: WebSocket) {
+    constructor(video: HTMLVideoElement, webSocket: WebSocket, config: Config) {
         this.video = video;
         this.webSocket = webSocket;
-        this.video.addEventListener("pointerdown", (e) => { this.onDown(e) }, false);
-        this.video.addEventListener("pointerup", (e) => { this.onUp(e) }, false);
-        this.video.addEventListener("pointercancel", (e) => { this.onCancel(e) }, false);
-        this.video.addEventListener("pointermove", (e) => { this.onMove(e) }, false);
+        this.pointerTypes = ['mouse', 'touch', 'pen'].filter((_, i) =>
+            [config.enable_mouse, config.enable_touch, config.enable_stylus][i]);
+        this.video.onpointerdown = (e) => { this.onEvent(e, "pointerdown") };
+        this.video.onpointerup = (e) => { this.onEvent(e, "pointerup") };
+        this.video.onpointercancel = (e) => { this.onEvent(e, "pointercancel") };
+        this.video.onpointermove = (e) => { this.onEvent(e, "pointermove") };
     }
 
-    onDown(event: PointerEvent) {
-        this.webSocket.send(JSON.stringify({ "PointerEvent": new PEvent("pointerdown", event, this.video) }));
-    }
-
-    onUp(event: PointerEvent) {
-        this.webSocket.send(JSON.stringify({ "PointerEvent": new PEvent("pointerup", event, this.video) }));
-    }
-
-    onCancel(event: PointerEvent) {
-        this.webSocket.send(JSON.stringify({ "PointerEvent": new PEvent("pointercancel", event, this.video) }));
-    }
-
-    onMove(event: PointerEvent) {
-        this.webSocket.send(JSON.stringify({ "PointerEvent": new PEvent("pointermove", event, this.video) }));
+    onEvent(event: PointerEvent, event_type: string) {
+        if (this.pointerTypes.includes(event.pointerType))
+            this.webSocket.send(JSON.stringify({ "PointerEvent": new PEvent(event_type, event, this.video) }));
     }
 }
 
@@ -134,57 +137,133 @@ function handle_messages(
 
 function init(password: string, websocket_port: number) {
 
+    // Settings UI
+    let settings = document.getElementById("settings");
+    let handle = document.getElementById("handle");
+    handle.onclick = () => settings.classList.toggle("hide");
+
+    // Settings elements
+    let boolean_settings = [
+        "stretch",
+        "lefty",
+        "stylus_support",
+        "enable_mouse",
+        "enable_stylus",
+        "enable_touch",
+        "faster_capture",
+        "capture_cursor"
+    ];
+    let boolean_settings_els = Object.fromEntries(boolean_settings.map(s => [
+        s, document.getElementById(s) as HTMLInputElement
+    ]));
+    let get_settings = (): Config => {
+        return Object.fromEntries(Object.entries(boolean_settings_els).map(
+            ([name, element]) => [name, element.checked]));
+    };
+    let save_settings = () => {
+        localStorage.setItem("settings", JSON.stringify(get_settings()));
+    };
+
+    let saved_settings = load_settings();
+    if (saved_settings !== null) {
+        for (const [name, element] of Object.entries(boolean_settings_els)) {
+            if (saved_settings[name] !== undefined) {
+                element.checked = saved_settings[name];
+            }
+            element.onchange = () => {
+                save_settings();
+                send_settings();
+            }
+        }
+        if (saved_settings["lefty"])
+            settings.classList.add("lefty");
+    }
+
+    boolean_settings_els["lefty"].onchange = () => {
+        if (boolean_settings_els["lefty"].checked)
+            settings.classList.add("lefty");
+        else
+            settings.classList.remove("lefty");
+        save_settings();
+    }
+
+    document.getElementById("vanish").onclick = () => {
+        settings.classList.add("vanish");
+    }
+
+    let window_select = document.getElementById("window") as HTMLSelectElement;
+    window_select.onchange = () => send_settings();
+    let set_windows = (window_names: string[]) => {
+        window_select.innerText = "";
+        window_names.forEach((name, i) => {
+            let option = document.createElement("option");
+            option.value = String(i);
+            option.innerText = name;
+            window_select.appendChild(option);
+        });
+    }
+
     // pointer
     let webSocket = new WebSocket("ws://" + window.location.hostname + ":" + websocket_port);
     webSocket.binaryType = "arraybuffer";
-    webSocket.onerror = () => handle_disconnect("Lost connection.");
-    webSocket.onclose = () => handle_disconnect("Connection closed.");
 
     // videostreaming
     let video = document.getElementById("video") as HTMLVideoElement;
 
-    window.onresize = () => stretch_video(video);
+    let handle_disconnect = (msg: string) => {
+        video.onclick = () => {
+            if (window.confirm(msg + " Reload the page?"))
+                location.reload();
+        }
+    }
+    webSocket.onerror = () => handle_disconnect("Lost connection.");
+    webSocket.onclose = () => handle_disconnect("Connection closed.");
+
+    let send_settings = () => {
+        let config = get_settings();
+        config["capturable_id"] = Number(window_select.value);
+        webSocket.send(JSON.stringify({ "Config": config }));
+    }
+
+    let stretch_video = () => {
+        if (boolean_settings_els["stretch"].checked) {
+            video.style.transform = "scaleX(" + document.body.clientWidth / video.clientWidth + ") scaleY(" + document.body.clientHeight / video.clientHeight + ")";
+        } else {
+            video.style.transform = "none"
+        }
+    }
+    window.onresize = () => stretch_video();
+    boolean_settings_els["stretch"].onchange = () => {
+        stretch_video();
+        save_settings();
+    };
     video.controls = false;
-    video.onloadeddata = () => stretch_video(video);
+    video.onloadeddata = () => stretch_video();
     handle_messages(webSocket, video, () => {
-        new PointerHandler(video, webSocket);
+        new PointerHandler(video, webSocket, get_settings());
         webSocket.send('"GetFrame"');
     },
         (err) => alert(err),
-        (capturables) => console.log(capturables)
+        set_windows
     );
     window.onunload = () => { webSocket.close(); }
     webSocket.onopen = function(event) {
         if (password)
             webSocket.send(password);
         webSocket.send('"GetCapturableList"');
-        let config =
-        {
-            "stylus_support": true,
-            "enable_mouse": true,
-            "enable_stylus": true,
-            "enable_touch": true,
-            "faster_capture": true,
-            "capturable_id": 0,
-            "capture_cursor": true,
-        }
-        webSocket.send(JSON.stringify({ "Config": config }));
+        send_settings();
     }
 
 }
 
 
-// object-fit: fill; <-- this is unfortunately not supported on iOS, so we use the following
-// workaround
-function stretch_video(video: HTMLVideoElement) {
-    video.style.transform = "scaleX(" + document.body.clientWidth / video.clientWidth + ") scaleY(" + document.body.clientHeight / video.clientHeight + ")";
-}
-
-
-function handle_disconnect(msg: string) {
-    let video = document.getElementById("video") as HTMLVideoElement;
-    video.onclick = () => {
-        if (window.confirm(msg + " Reload the page?"))
-            location.reload();
+function load_settings() {
+    let settings_string = localStorage.getItem("settings");
+    if (settings_string === null)
+        return null;
+    try {
+        return JSON.parse(settings_string);
+    } catch {
+        return null;
     }
 }

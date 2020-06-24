@@ -22,3 +22,91 @@ video {
     display: block;
     margin: auto auto;
 }
+#settings {
+    display: block;
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    transform: none;
+    padding: 1em;
+    background: #111c;
+    color: #ccc;
+    font-family: sans-serif;
+    transition: transform 0.5s;
+}
+#settings.lefty {
+    left: 0;
+    right: auto;
+}
+#settings.hide, #settings.vanish {
+    transform: translateX(100%);
+}
+#settings.hide.lefty, #settings.vanish.lefty {
+    transform: translateX(-100%);
+}
+#handle {
+    position: absolute;
+    top: 0;
+    left: -1em;
+    width: 1em;
+    border-radius: 0 0 0 0.25em;
+    padding: 0.2em 0 0.1em 0;
+    background: #111c;
+    color: #444;
+    font-size: 150%;
+    text-align:center;
+}
+.lefty #handle {
+    left: auto;
+    right: -1em;
+}
+.vanish #handle {
+    display: none;
+}
+#settings h2 {
+    font-size: 1em;
+    margin: 0;
+    text-align: center;
+}
+#settings section {
+    margin-top: 1em;
+}
+#settings section label {
+    display: block;
+    margin-top: 0.5em;
+}
+select {
+    width: 15em;
+}
+#displayoptions {
+    display: flex;
+    flex-direction: row;
+}
+.lefty #displayoptions {
+    flex-direction: row-reverse;
+}
+#displayoptions label {
+    flex-grow: 1;
+}
+#lefty {
+    display: none;
+}
+#leftylabel::before {
+    content: "❮ ";
+}
+.lefty #leftylabel {
+    text-align: right;
+}
+.lefty #leftylabel::before {
+    content: "";
+}
+.lefty #leftylabel::after {
+    content: " ❯";
+}
+#vanish {
+    text-align: right;
+}
+.lefty #vanish {
+    text-align: left;
+}
