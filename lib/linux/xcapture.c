@@ -71,7 +71,8 @@ void* start_capture(Capturable* cap, CaptureContext* ctx, Error* err)
 	ctx->cap = *cap;
 	ctx->last_img_return = True;
 
-	strncpy(ctx->cap.name, cap->name, sizeof(ctx->cap.name));
+	if (&ctx->cap != cap)
+		strncpy(ctx->cap.name, cap->name, sizeof(ctx->cap.name));
 
 	int event_base, error_base;
 	ctx->has_xfixes = XFixesQueryExtension(cap->disp, &event_base, &error_base) == True;
@@ -211,7 +212,6 @@ void capture_sceen(CaptureContext* ctx, struct Image* img, int capture_cursor, E
 			ERROR(err, 2, "XShmGetImage failed!");
 		}
 	}
-
 
 	// capture cursor if requested and if XFixes is available
 	if (capture_cursor && ctx->has_xfixes)

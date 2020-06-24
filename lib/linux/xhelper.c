@@ -362,6 +362,7 @@ void activate_window(Display* disp, WindowInfo* winfo, Error* err)
 		free(active_window);
 		return;
 	}
+	free(active_window);
 
 	unsigned long* desktop;
 	/* desktop ID */
