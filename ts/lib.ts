@@ -109,7 +109,7 @@ function handle_messages(
                         sourceBuffer = mediaSource.addSourceBuffer(mimeType);
                         sourceBuffer.addEventListener("updateend", upd_buf);
                     })
-                    requestAnimationFrame(() => webSocket.send('"GetFrame"'));
+                    requestAnimationFrame(() => webSocket.send('"TryGetFrame"'));
                 } else if (msg == "ConfigOk") {
                     onConfigOk();
                 }
@@ -131,7 +131,7 @@ function handle_messages(
         upd_buf();
         if (video.seekable.length > 0 && video.seekable.end(0) - video.currentTime > 0.01)
             video.currentTime = video.seekable.end(0)
-        requestAnimationFrame(() => webSocket.send('"GetFrame"'));
+        requestAnimationFrame(() => webSocket.send('"TryGetFrame"'));
     }
 }
 
@@ -241,7 +241,7 @@ function init(password: string, websocket_port: number) {
     video.onloadeddata = () => stretch_video();
     handle_messages(webSocket, video, () => {
         new PointerHandler(video, webSocket, get_settings());
-        webSocket.send('"GetFrame"');
+        webSocket.send('"TryGetFrame"');
     },
         (err) => alert(err),
         set_windows
