@@ -61,7 +61,7 @@ video {
     transform: none;
     padding: 1em;
     font-family: sans-serif;
-    transition: transform 0.5s;
+    transition: transform 0.5s, opacity 0.5s;
 }
 #settings.lefty {
     left: 0;
@@ -69,9 +69,11 @@ video {
 }
 #settings.hide, #settings.vanish {
     transform: translateX(100%);
+    opacity: 40%;
 }
 #settings.hide.lefty, #settings.vanish.lefty {
     transform: translateX(-100%);
+    opacity: 40%;
 }
 #handle {
     position: absolute;
