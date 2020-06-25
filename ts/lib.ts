@@ -283,7 +283,8 @@ function init(password: string, websocket_port: number) {
     let video = document.getElementById("video") as HTMLVideoElement;
 
     let handle_disconnect = (msg: string) => {
-        document.body.onclick = video.onclick = () => {
+        document.body.onclick = video.onclick = (e) => {
+            e.stopPropagation();
             if (window.confirm(msg + " Reload page?"))
                 location.reload();
         }
