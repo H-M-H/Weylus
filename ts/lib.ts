@@ -16,6 +16,7 @@ class Settings {
 
         // Settings UI
         let settings = document.getElementById("settings");
+        settings.onclick = (e) => e.stopPropagation();
         let handle = document.getElementById("handle");
 
         // Settings elements
@@ -282,7 +283,7 @@ function init(password: string, websocket_port: number) {
     let video = document.getElementById("video") as HTMLVideoElement;
 
     let handle_disconnect = (msg: string) => {
-        video.onclick = () => {
+        document.body.onclick = video.onclick = () => {
             if (window.confirm(msg + " Reload page?"))
                 location.reload();
         }
