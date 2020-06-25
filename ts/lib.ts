@@ -209,7 +209,7 @@ function frame_timer(webSocket: WebSocket) {
     webSocket.send('"TryGetFrame"');
     let upd_limit = settings.frame_update_limit();
     if (upd_limit > 0)
-        setTimeout(() => () => frame_timer(webSocket), upd_limit);
+        setTimeout(() => frame_timer(webSocket), upd_limit);
     else
         requestAnimationFrame(() => frame_timer(webSocket));
 }
