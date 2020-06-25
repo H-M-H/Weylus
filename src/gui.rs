@@ -31,7 +31,7 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
     let height = 30;
     let padding = 10;
 
-    let app = App::default();
+    let app = App::default().set_scheme(fltk::app::AppScheme::Gtk);
     let mut wind = Window::default()
         .with_size(660, 600)
         .center_screen()
