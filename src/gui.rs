@@ -66,7 +66,7 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
         .with_label("Start");
 
     let output_buf = TextBuffer::default();
-    let output = TextDisplay::default(output_buf)
+    let _output = TextDisplay::default(output_buf)
         .with_size(600, 6 * height)
         .with_pos(30, 600 - 30 - 6 * height);
 
@@ -86,15 +86,15 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
 
     let but_toggle_ref = Rc::new(RefCell::new(but_toggle));
     let output_server_addr = Arc::new(Mutex::new(output_server_addr));
-    let output = Arc::new(Mutex::new(output));
+    let output_buf = Arc::new(Mutex::new(output_buf));
 
     let (sender_ws2gui, _receiver_ws2gui) = mpsc::channel();
     let (sender_web2gui, receiver_web2gui) = mpsc::channel();
 
     std::thread::spawn(move || {
         while let Ok(log_message) = log_receiver.recv() {
-            let output = output.lock().unwrap();
-            output.insert(&log_message);
+            let mut output_buf = output_buf.lock().unwrap();
+            output_buf.append(&log_message);
         }
     });
 
