@@ -239,7 +239,10 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter) {
                     warn!("Screen capture not initalized, can not send video frame!");
                     continue;
                 }
-                screen_capture.as_mut().unwrap().capture();
+                if let Err(err) = screen_capture.as_mut().unwrap().capture() {
+                    warn!("Error capturing screen: {}", err);
+                    continue;
+                }
                 let screen_capture = screen_capture.as_ref().unwrap();
                 let (width, height) = screen_capture.size();
                 // video encoder is not setup or setup for encoding the wrong size: restart it

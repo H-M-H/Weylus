@@ -1,3 +1,6 @@
+use std::error::Error;
+use std::boxed::Box;
+
 use image_autopilot::GenericImageView;
 use image_autopilot::Pixel;
 
@@ -14,8 +17,9 @@ impl ScreenCaptureGeneric {
 }
 
 impl ScreenCapture for ScreenCaptureGeneric {
-    fn capture(&mut self) {
+    fn capture(&mut self) -> Result<(), Box<dyn Error>> {
         self.img = Some(autopilot::bitmap::capture_screen().unwrap());
+        Ok(())
     }
 
     fn pixel_provider(&self) -> crate::video::PixelProvider {

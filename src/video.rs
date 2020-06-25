@@ -1,6 +1,8 @@
 use std::os::raw::{c_int, c_uchar, c_void};
 use std::time::Instant;
 
+use tracing::warn;
+
 use crate::cerror::CError;
 
 extern "C" {
@@ -30,6 +32,7 @@ fn write_video_packet(video_encoder: *mut c_void, buf: *const c_uchar, buf_size:
 }
 
 pub enum PixelProvider<'a> {
+    None,
     // no restrictions on dimension
     BGRA(&'a [u8]),
 
@@ -79,13 +82,13 @@ impl VideoEncoder {
         Ok(video_encoder)
     }
 
-    pub fn encode(
-        &mut self,
-        pixel_provider: PixelProvider
-    ) {
+    pub fn encode(&mut self, pixel_provider: PixelProvider) {
         let linsizes: *mut c_int = std::ptr::null_mut();
         let data = unsafe { get_video_frame_data(self.handle, &linsizes) };
         match pixel_provider {
+            PixelProvider::None => {
+                warn!("Nothing to encode, leaving ffmpeg's frame data unchanged!")
+            }
             PixelProvider::BGRA(bgra) => unsafe {
                 convert_bgra2yuv420p(
                     self.handle,

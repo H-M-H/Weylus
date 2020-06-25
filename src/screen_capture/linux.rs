@@ -1,10 +1,11 @@
+use std::boxed::Box;
+use std::error::Error;
 use std::os::raw::{c_int, c_uint, c_void};
 use std::slice::from_raw_parts;
 
-use tracing::{trace, warn};
-
 use crate::cerror::CError;
 use crate::screen_capture::ScreenCapture;
+use crate::video::PixelProvider;
 use crate::x11helper::Capturable;
 
 extern "C" {
@@ -79,7 +80,7 @@ impl Drop for ScreenCaptureX11 {
 }
 
 impl ScreenCapture for ScreenCaptureX11 {
-    fn capture(&mut self) {
+    fn capture(&mut self) -> Result<(), Box<dyn Error>> {
         let mut err = CError::new();
         fltk::app::lock().unwrap();
         unsafe {
@@ -92,16 +93,19 @@ impl ScreenCapture for ScreenCaptureX11 {
         }
         fltk::app::unlock();
         if err.is_err() {
-            if err.code() == 1 {
-                warn!("Failed to capture screen: {}", err);
-            } else {
-                trace!("Failed to capture screen: {}", err);
-            }
+            self.img.data = std::ptr::null();
+            Err(err)?
+        } else {
+            Ok(())
         }
     }
 
     fn pixel_provider(&self) -> crate::video::PixelProvider {
-        crate::video::PixelProvider::BGRA(self.img.data())
+        if self.img.data.is_null() {
+            PixelProvider::None
+        } else {
+            PixelProvider::BGRA(self.img.data())
+        }
     }
 
     fn size(&self) -> (usize, usize) {
