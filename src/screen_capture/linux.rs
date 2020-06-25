@@ -94,7 +94,7 @@ impl ScreenCapture for ScreenCaptureX11 {
         fltk::app::unlock();
         if err.is_err() {
             self.img.data = std::ptr::null();
-            Err(err)?
+            Err(err.into())
         } else {
             Ok(())
         }

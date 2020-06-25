@@ -324,7 +324,7 @@ impl WsHandler {
 
         #[cfg(target_os = "linux")]
         let capturables = x11ctx.as_mut().map_or_else(
-            || Vec::new(),
+            Vec::new,
             |ctx| ctx.capturables().unwrap_or_else(|_| Vec::new()),
         );
 
