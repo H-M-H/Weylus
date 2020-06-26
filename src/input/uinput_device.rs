@@ -332,7 +332,7 @@ impl InputDevice for GraphicTablet {
                             self.touch_fd,
                             ET_MSC,
                             EC_MSC_TIMESTAMP,
-                            event.timestamp as i32,
+                            (event.timestamp % (i32::MAX as u64 + 1)) as i32,
                         );
                         self.send(self.touch_fd, ET_SYNC, EC_SYNC_REPORT, 0);
                     }
@@ -354,7 +354,7 @@ impl InputDevice for GraphicTablet {
                                 self.touch_fd,
                                 ET_MSC,
                                 EC_MSC_TIMESTAMP,
-                                event.timestamp as i32,
+                                (event.timestamp % (i32::MAX as u64 + 1)) as i32,
                             );
                             self.send(self.touch_fd, ET_SYNC, EC_SYNC_REPORT, 0);
                             self.touches[slot] = None;
@@ -412,7 +412,7 @@ impl InputDevice for GraphicTablet {
                     self.stylus_fd,
                     ET_MSC,
                     EC_MSC_TIMESTAMP,
-                    event.timestamp as i32,
+                    (event.timestamp % (i32::MAX as u64 + 1)) as i32,
                 );
                 self.send(self.stylus_fd, ET_SYNC, EC_SYNC_REPORT, 0);
             }
@@ -466,7 +466,7 @@ impl InputDevice for GraphicTablet {
                     self.mouse_fd,
                     ET_MSC,
                     EC_MSC_TIMESTAMP,
-                    event.timestamp as i32,
+                    (event.timestamp % (i32::MAX as u64 + 1)) as i32,
                 );
                 self.send(self.mouse_fd, ET_SYNC, EC_SYNC_REPORT, 0);
             }
