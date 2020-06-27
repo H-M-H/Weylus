@@ -3,3 +3,4 @@
 -Wall
 -Wextra
 -Ideps/dist/include
+-DHAS_NVENC
