@@ -11,7 +11,7 @@ on:
 jobs:
   build-docker:
     runs-on: ${{ matrix.os }}
-    container: docker://hhmhh/weylus_build:latest
+    container: docker://hhmhh/weylus_build:hw_accel
     strategy:
       fail-fast: false
       matrix:
