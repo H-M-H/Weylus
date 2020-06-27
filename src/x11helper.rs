@@ -1,6 +1,7 @@
 use std::ffi::{CStr, CString};
 use std::fmt;
 use std::os::raw::{c_char, c_float, c_int, c_void};
+use std::sync::Arc;
 
 use tracing::{debug, trace};
 
@@ -40,12 +41,17 @@ extern "C" {
 
 pub struct Capturable {
     handle: *mut c_void,
+    // keep a reference to the display so it is not closed while a capturable still exists
+    disp: Arc<XDisplay>,
 }
 
 impl Clone for Capturable {
     fn clone(&self) -> Self {
         let handle = unsafe { clone_capturable(self.handle) };
-        Self { handle }
+        Self {
+            handle,
+            disp: self.disp.clone(),
+        }
     }
 }
 
@@ -127,17 +133,41 @@ pub struct CaptureGeometry {
     pub height: f64,
 }
 
+struct XDisplay {
+    handle: *mut c_void,
+}
+
+impl XDisplay {
+    pub fn new() -> Option<Self> {
+        let handle = unsafe { XOpenDisplay(std::ptr::null()) };
+        if handle.is_null() {
+            return None;
+        }
+        Some(Self { handle })
+    }
+}
+
+impl Drop for XDisplay {
+    fn drop(&mut self) {
+        fltk::app::lock().unwrap();
+        unsafe { XCloseDisplay(self.handle) };
+        fltk::app::unlock();
+    }
+}
+
 pub struct X11Context {
-    disp: *mut c_void,
+    disp: Arc<XDisplay>,
 }
 
 impl X11Context {
     pub fn new() -> Option<Self> {
-        let disp = unsafe { XOpenDisplay(std::ptr::null()) };
-        if disp.is_null() {
+        let disp = XDisplay::new();
+        if disp.is_none() {
             return None;
         }
-        Some(Self { disp })
+        Some(Self {
+            disp: Arc::new(disp.unwrap()),
+        })
     }
 
     pub fn capturables(&mut self) -> Result<Vec<Capturable>, CError> {
@@ -146,7 +176,7 @@ impl X11Context {
         fltk::app::lock().unwrap();
         let size = unsafe {
             create_capturables(
-                self.disp,
+                self.disp.handle,
                 handles.as_mut_ptr(),
                 handles.len() as c_int,
                 &mut err,
@@ -162,21 +192,20 @@ impl X11Context {
         }
         Ok(handles[0..size as usize]
             .iter()
-            .map(|handle| Capturable { handle: *handle })
+            .map(|handle| Capturable {
+                handle: *handle,
+                disp: self.disp.clone(),
+            })
             .collect::<Vec<Capturable>>())
     }
 
-    pub fn map_input_device_to_entire_screen(
-        &mut self,
-        device_name: &str,
-        pen: bool,
-    ) -> CError {
+    pub fn map_input_device_to_entire_screen(&mut self, device_name: &str, pen: bool) -> CError {
         fltk::app::lock().unwrap();
         let mut err = CError::new();
         let device_name_c_str = CString::new(device_name).unwrap();
         unsafe {
             map_input_device_to_entire_screen(
-                self.disp,
+                self.disp.handle,
                 device_name_c_str.as_ptr(),
                 pen.into(),
                 &mut err,
@@ -187,13 +216,5 @@ impl X11Context {
             trace!("Failed to map input device to screen: {}", &err);
         }
         err
-    }
-}
-
-impl Drop for X11Context {
-    fn drop(&mut self) {
-        fltk::app::lock().unwrap();
-        unsafe { XCloseDisplay(self.disp) };
-        fltk::app::unlock();
     }
 }

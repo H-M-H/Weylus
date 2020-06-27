@@ -46,21 +46,25 @@ impl CImage {
 
 pub struct ScreenCaptureX11 {
     handle: *mut c_void,
+    // keep a reference to the capturable so it is not destroyed until we are done
+    #[allow(dead_code)]
+    capturable: Capturable,
     img: CImage,
     capture_cursor: bool,
 }
 
 impl ScreenCaptureX11 {
-    pub fn new(mut capture: Capturable, capture_cursor: bool) -> Result<Self, CError> {
+    pub fn new(mut capturable: Capturable, capture_cursor: bool) -> Result<Self, CError> {
         let mut err = CError::new();
         fltk::app::lock().unwrap();
-        let handle = unsafe { start_capture(capture.handle(), std::ptr::null_mut(), &mut err) };
+        let handle = unsafe { start_capture(capturable.handle(), std::ptr::null_mut(), &mut err) };
         fltk::app::unlock();
         if err.is_err() {
             Err(err)
         } else {
             Ok(Self {
                 handle,
+                capturable,
                 img: CImage::new(),
                 capture_cursor,
             })
