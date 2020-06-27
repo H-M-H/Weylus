@@ -2,6 +2,7 @@
 /deps/ffmpeg
 /deps/x264
 /deps/dist
+/deps/nv-codec-headers
 c_helper/target
 c_helper/Cargo.lock
 *.js
