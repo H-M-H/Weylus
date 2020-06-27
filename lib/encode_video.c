@@ -23,15 +23,34 @@ typedef struct VideoContext
 	AVStream* st;
 	int width;
 	int height;
+	int width_orig;
+	int height_orig;
 	size_t buf_size;
 	void* buf;
 	void* rust_ctx;
 	int pts;
-	struct SwsContext* sws;
+	struct SwsContext* sws_rgb;
+	struct SwsContext* sws_bgra;
 	int initialized;
+	int frame_allocated;
 } VideoContext;
 
 int write_video_packet(void* rust_ctx, uint8_t* buf, int buf_size);
+
+void set_codec_params(VideoContext* ctx)
+{
+	/* resolution must be a multiple of two */
+	ctx->c->width = ctx->width;
+	ctx->c->height = ctx->height;
+	ctx->c->time_base = (AVRational){1, 1000};
+	ctx->c->framerate = (AVRational){0, 1};
+
+	ctx->c->gop_size = 12;
+	// no B-frames to reduce latency
+	ctx->c->max_b_frames = 0;
+	if (ctx->oc->oformat->flags & AVFMT_GLOBALHEADER)
+		ctx->c->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+}
 
 void open_video(VideoContext* ctx, Error* err)
 {
@@ -47,50 +66,57 @@ void open_video(VideoContext* ctx, Error* err)
 		ERROR(err, 1, "Could not find output format mp4.");
 	}
 
-	// codec = avcodec_find_encoder_by_name("libx264");
+	int using_nvenc = 0;
+#ifdef HAS_NVENC
 	codec = avcodec_find_encoder_by_name("h264_nvenc");
-	if (!codec)
+	if (codec)
 	{
-		ERROR(err, 1, "Codec 'libx264' not found");
+		ctx->c = avcodec_alloc_context3(codec);
+		if (ctx->c)
+		{
+			ctx->c->pix_fmt = AV_PIX_FMT_BGR0;
+			av_opt_set(ctx->c->priv_data, "preset", "llhq", 0);
+			av_opt_set(ctx->c->priv_data, "zerolatency", "1", 0);
+			av_opt_set(ctx->c->priv_data, "rc", "vbr_hq", 0);
+			av_opt_set(ctx->c->priv_data, "cq", "21", 0);
+			set_codec_params(ctx);
+			if (avcodec_open2(ctx->c, codec, NULL) == 0)
+			{
+				using_nvenc = 1;
+			}
+			else
+				avcodec_free_context(&ctx->c);
+		}
 	}
+#endif
 
-	ctx->c = avcodec_alloc_context3(codec);
-	if (!ctx->c)
+	if (!using_nvenc)
 	{
-		ERROR(err, 1, "Could not allocate video codec context");
+		codec = avcodec_find_encoder_by_name("libx264");
+		if (!codec)
+		{
+			ERROR(err, 1, "Codec 'libx264' not found");
+		}
+
+		ctx->c = avcodec_alloc_context3(codec);
+		if (!ctx->c)
+		{
+			ERROR(err, 1, "Could not allocate video codec context");
+		}
+		ctx->c->pix_fmt = AV_PIX_FMT_YUV420P;
+		av_opt_set(ctx->c->priv_data, "preset", "ultrafast", 0);
+		av_opt_set(ctx->c->priv_data, "tune", "zerolatency", 0);
+		av_opt_set(ctx->c->priv_data, "crf", "23", 0);
+		set_codec_params(ctx);
+
+		ret = avcodec_open2(ctx->c, codec, NULL);
+		if (ret < 0)
+		{
+			ERROR(err, 1, "Could not open codec: %s", av_err2str(ret));
+		}
 	}
-
-	/* resolution must be a multiple of two */
-	ctx->c->width = ctx->width;
-	ctx->c->height = ctx->height;
-	ctx->c->time_base = (AVRational){1, 1000};
-	ctx->c->framerate = (AVRational){0, 1};
-
-	ctx->c->gop_size = 12;
-	// no B-frames to reduce latency
-	ctx->c->max_b_frames = 0;
-	ctx->c->pix_fmt = AV_PIX_FMT_YUV420P;
-	//ctx->c->pix_fmt = AV_PIX_FMT_BGR0;
-	if (ctx->oc->oformat->flags & AVFMT_GLOBALHEADER)
-		ctx->c->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
-
-	/*av_opt_set(ctx->c->priv_data, "preset", "ultrafast", 0);
-	av_opt_set(ctx->c->priv_data, "tune", "zerolatency", 0);
-	av_opt_set(ctx->c->priv_data, "crf", "23", 0);*/
-	av_opt_set(ctx->c->priv_data, "preset", "llhp", 0);
-	av_opt_set(ctx->c->priv_data, "zerolatency", "1", 0);
-	av_opt_set(ctx->c->priv_data, "rc", "vbr_hq", 0);
-	av_opt_set(ctx->c->priv_data, "cq", "23", 0);
 
 	ctx->st = avformat_new_stream(ctx->oc, NULL);
-
-	/* open it */
-	ret = avcodec_open2(ctx->c, codec, NULL);
-	if (ret < 0)
-	{
-		ERROR(err, 1, "Could not open codec: %s", av_err2str(ret));
-	}
-
 	avcodec_parameters_from_context(ctx->st->codecpar, ctx->c);
 
 	ctx->frame = av_frame_alloc();
@@ -101,12 +127,6 @@ void open_video(VideoContext* ctx, Error* err)
 	ctx->frame->format = ctx->c->pix_fmt;
 	ctx->frame->width = ctx->c->width;
 	ctx->frame->height = ctx->c->height;
-
-	ret = av_frame_get_buffer(ctx->frame, 32);
-	if (ret < 0)
-	{
-		ERROR(err, 1, "Could not allocate the video frame data");
-	}
 
 	ctx->pkt = av_packet_alloc();
 	if (!ctx->pkt)
@@ -125,6 +145,31 @@ void open_video(VideoContext* ctx, Error* err)
 	av_dict_set(&opt, "movflags", "frag_custom+empty_moov+default_base_moof", 0);
 	ret = avformat_write_header(ctx->oc, &opt);
 	av_dict_free(&opt);
+
+	ctx->sws_rgb = sws_getContext(
+		ctx->width_orig,
+		ctx->height_orig,
+		AV_PIX_FMT_RGB24,
+		ctx->width,  // note that this is != width_orig, this is in purpose as this allows proper
+		ctx->height, // rescaling if dimensions of provided image data are not even
+		ctx->c->pix_fmt,
+		SWS_FAST_BILINEAR,
+		NULL,
+		NULL,
+		NULL);
+
+	ctx->sws_bgra = sws_getContext(
+		ctx->width_orig,
+		ctx->height_orig,
+		AV_PIX_FMT_BGRA,
+		ctx->width,  // note that this is != width_orig, this is in purpose as this allows proper
+		ctx->height, // rescaling if dimensions of provided image data are not even
+		ctx->c->pix_fmt,
+		SWS_FAST_BILINEAR,
+		NULL,
+		NULL,
+		NULL);
+
 	ctx->initialized = 1;
 }
 
@@ -139,7 +184,7 @@ void destroy_video_encoder(VideoContext* ctx)
 		av_frame_free(&ctx->frame);
 		av_packet_free(&ctx->pkt);
 		av_free(ctx->buf);
-		sws_freeContext(ctx->sws);
+		sws_freeContext(ctx->sws_bgra);
 	}
 	free(ctx);
 }
@@ -179,40 +224,62 @@ VideoContext* init_video_encoder(void* rust_ctx, int width, int height)
 	ctx->rust_ctx = rust_ctx;
 	ctx->width = width - width % 2;
 	ctx->height = height - height % 2;
+	ctx->width_orig = width;
+	ctx->height_orig = height;
 	ctx->pts = 0;
 	ctx->initialized = 0;
-	ctx->sws = sws_getContext(
-		width,
-		height,
-		AV_PIX_FMT_BGRA,
-		ctx->width,  // note that this is != width, this is in purpose as this allows proper
-		ctx->height, // rescaling if dimensions of provided image data are not even
-		AV_PIX_FMT_YUV420P,
-		SWS_FAST_BILINEAR,
-		NULL,
-		NULL,
-		NULL);
+	ctx->frame_allocated = 0;
 	return ctx;
 }
 
-uint8_t** get_video_frame_data(VideoContext* ctx, int** linesizes)
+void fill_bgra(VideoContext* ctx, const void* data, Error* err)
 {
-	// make sure the frame data is writable
-	av_frame_make_writable(ctx->frame);
-
-	*linesizes = ctx->frame->linesize;
-	return ctx->frame->data;
+	if (ctx->c->pix_fmt == AV_PIX_FMT_BGR0)
+	{
+		ctx->frame->data[0] = (uint8_t*)data;
+		ctx->frame->linesize[0] = ctx->width_orig * 4;
+	}
+	else
+	{
+		const uint8_t* const* src = (const uint8_t* const*)&data;
+		// 4 colors per pixel
+		const int src_stride[] = {ctx->width_orig * 4, 0, 0, 0};
+		if (!ctx->frame_allocated)
+		{
+			int ret = av_frame_get_buffer(ctx->frame, 32);
+			if (ret < 0)
+			{
+				ERROR(err, 1, "Could not allocate the video frame data");
+			}
+			ctx->frame_allocated = 1;
+		}
+		av_frame_make_writable(ctx->frame);
+		sws_scale(
+			ctx->sws_bgra,
+			src,
+			src_stride,
+			0,
+			ctx->height_orig,
+			ctx->frame->data,
+			ctx->frame->linesize);
+	}
 }
 
-void convert_bgra2yuv420p(
-	VideoContext* ctx,
-	const void* data,
-	int width,
-	int height,
-	uint8_t* const* dst,
-	const int* dst_stride)
+void fill_rgb(VideoContext* ctx, const void* data, Error* err)
 {
 	const uint8_t* const* src = (const uint8_t* const*)&data;
-	const int src_stride[] = {width * 4, 0, 0, 0};
-	sws_scale(ctx->sws, src, src_stride, 0, height, dst, dst_stride);
+	// 3 colors per pixel
+	const int src_stride[] = {ctx->width_orig * 3, 0, 0, 0};
+	if (!ctx->frame_allocated)
+	{
+		int ret = av_frame_get_buffer(ctx->frame, 32);
+		if (ret < 0)
+		{
+			ERROR(err, 1, "Could not allocate the video frame data");
+		}
+		ctx->frame_allocated = 1;
+	}
+	av_frame_make_writable(ctx->frame);
+	sws_scale(
+		ctx->sws_rgb, src, src_stride, 0, ctx->height_orig, ctx->frame->data, ctx->frame->linesize);
 }

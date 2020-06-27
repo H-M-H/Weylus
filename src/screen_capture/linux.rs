@@ -108,7 +108,7 @@ impl ScreenCapture for ScreenCaptureX11 {
         if self.img.data.is_null() {
             PixelProvider::None
         } else {
-            PixelProvider::BGRA(self.img.data())
+            PixelProvider::BGR0(self.img.data())
         }
     }
 

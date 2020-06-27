@@ -14,3 +14,6 @@ RUN cargo install cargo-deb
 RUN curl -LO "https://www.nasm.us/pub/nasm/releasebuilds/2.14.02/nasm-2.14.02.tar.xz" && \
     tar xf "nasm-2.14.02.tar.xz" && cd "nasm-2.14.02" && \
     ./configure --prefix=/usr && make -j$(nproc) && make install && cd .. && rm -rf "nasm-2.14.02*"
+RUN apt-add-repository contrib
+RUN apt-add-repository non-free
+RUN apt-get update && apt-get install -y nvidia-cuda-dev pkg-config
