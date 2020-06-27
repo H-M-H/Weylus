@@ -214,7 +214,6 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter) {
 
         // stop thread once the channel is closed
         if msg.is_err() {
-            std::thread::sleep(std::time::Duration::from_secs(5));
             return;
         }
         let mut msg = msg.unwrap();

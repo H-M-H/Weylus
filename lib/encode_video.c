@@ -47,7 +47,8 @@ void open_video(VideoContext* ctx, Error* err)
 		ERROR(err, 1, "Could not find output format mp4.");
 	}
 
-	codec = avcodec_find_encoder_by_name("libx264");
+	// codec = avcodec_find_encoder_by_name("libx264");
+	codec = avcodec_find_encoder_by_name("h264_nvenc");
 	if (!codec)
 	{
 		ERROR(err, 1, "Codec 'libx264' not found");
@@ -69,12 +70,17 @@ void open_video(VideoContext* ctx, Error* err)
 	// no B-frames to reduce latency
 	ctx->c->max_b_frames = 0;
 	ctx->c->pix_fmt = AV_PIX_FMT_YUV420P;
+	//ctx->c->pix_fmt = AV_PIX_FMT_BGR0;
 	if (ctx->oc->oformat->flags & AVFMT_GLOBALHEADER)
 		ctx->c->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
-	av_opt_set(ctx->c->priv_data, "preset", "ultrafast", 0);
+	/*av_opt_set(ctx->c->priv_data, "preset", "ultrafast", 0);
 	av_opt_set(ctx->c->priv_data, "tune", "zerolatency", 0);
-	av_opt_set(ctx->c->priv_data, "crf", "23", 0);
+	av_opt_set(ctx->c->priv_data, "crf", "23", 0);*/
+	av_opt_set(ctx->c->priv_data, "preset", "llhp", 0);
+	av_opt_set(ctx->c->priv_data, "zerolatency", "1", 0);
+	av_opt_set(ctx->c->priv_data, "rc", "vbr_hq", 0);
+	av_opt_set(ctx->c->priv_data, "cq", "23", 0);
 
 	ctx->st = avformat_new_stream(ctx->oc, NULL);
 
@@ -171,15 +177,15 @@ VideoContext* init_video_encoder(void* rust_ctx, int width, int height)
 {
 	VideoContext* ctx = malloc(sizeof(VideoContext));
 	ctx->rust_ctx = rust_ctx;
-	ctx->width = width - width%2;
-	ctx->height = height - height%2;
+	ctx->width = width - width % 2;
+	ctx->height = height - height % 2;
 	ctx->pts = 0;
 	ctx->initialized = 0;
 	ctx->sws = sws_getContext(
 		width,
 		height,
 		AV_PIX_FMT_BGRA,
-		ctx->width, // note that this is != width, this is in purpose as this allows proper
+		ctx->width,  // note that this is != width, this is in purpose as this allows proper
 		ctx->height, // rescaling if dimensions of provided image data are not even
 		AV_PIX_FMT_YUV420P,
 		SWS_FAST_BILINEAR,
