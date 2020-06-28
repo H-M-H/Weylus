@@ -16,13 +16,14 @@ else
     export FFMPEG_CFLAGS="-I../dist/include"
     export FFMPEG_LIBRARY_PATH="-L../dist/lib"
     if [ "$RUNNER_OS" == "Linux" ]; then
-        export FFMPEG_EXTRA_ARGS="--enable-nvenc --enable-ffnvcodec"
+        export FFMPEG_EXTRA_ARGS="--enable-nvenc --enable-ffnvcodec --enable-vaapi"
     fi
 fi
 
 ./x264.sh
 if [ "$RUNNER_OS" == "Linux" ]; then
     ./nv-codec-headers.sh
+    ./libva.sh
 fi
 ./ffmpeg.sh
 

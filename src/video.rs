@@ -11,8 +11,8 @@ extern "C" {
     fn destroy_video_encoder(handle: *mut c_void);
     fn encode_video_frame(handle: *mut c_void, micros: c_int, err: *mut CError);
 
-    fn fill_rgb(ctx: *mut c_void, data: *const u8, width: c_int, height: c_int, err: *mut CError);
-    fn fill_bgra(ctx: *mut c_void, data: *const u8, width: c_int, height: c_int, err: *mut CError);
+    fn fill_rgb(ctx: *mut c_void, data: *const u8, err: *mut CError);
+    fn fill_bgra(ctx: *mut c_void, data: *const u8, err: *mut CError);
 }
 
 #[no_mangle]
@@ -83,8 +83,6 @@ impl VideoEncoder {
                 fill_bgra(
                     self.handle,
                     bgra.as_ptr(),
-                    self.width as c_int,
-                    self.height as c_int,
                     &mut err,
                 );
             },
@@ -92,19 +90,25 @@ impl VideoEncoder {
                 fill_rgb(
                     self.handle,
                     rgb.as_ptr(),
-                    self.width as c_int,
-                    self.height as c_int,
                     &mut err,
                 );
             },
+        }
+        if err.is_err() {
+            warn!("Failed to fill video frame: {}", err);
+            return;
         }
         unsafe {
             encode_video_frame(
                 self.handle,
                 (Instant::now() - self.start_time).as_millis() as c_int,
                 &mut err,
-            )
-        };
+            );
+        }
+        if err.is_err() {
+            warn!("Failed to encode video frame: {}", err);
+            return;
+        }
     }
 
     pub fn check_size(&self, width: usize, height: usize) -> bool {
