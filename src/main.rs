@@ -92,7 +92,7 @@ mod tests {
         let mut x11ctx = x11helper::X11Context::new().unwrap();
         let root = x11ctx.capturables().unwrap()[0].clone();
         let mut sc = screen_capture::linux::ScreenCaptureX11::new(root, false).unwrap();
-        b.iter(|| sc.capture());
+        b.iter(|| sc.capture().unwrap());
     }
 
     #[cfg(target_os = "linux")]
@@ -102,12 +102,12 @@ mod tests {
         let root = x11ctx.capturables().unwrap()[0].clone();
         use screen_capture::ScreenCapture;
         let mut sc = screen_capture::linux::ScreenCaptureX11::new(root, false).unwrap();
-        sc.capture();
+        sc.capture().unwrap();
         let (width, height) = sc.size();
 
         let mut encoder = video::VideoEncoder::new(width, height, |_| {}).unwrap();
         b.iter(|| {
-            sc.capture();
+            sc.capture().unwrap();
             encoder.encode(sc.pixel_provider())
         });
     }

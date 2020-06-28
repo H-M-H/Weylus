@@ -3,6 +3,7 @@
 #include <libavformat/avio.h>
 #include <libavutil/dict.h>
 #include <libavutil/frame.h>
+#include <libavutil/hwcontext.h>
 #include <libavutil/mem.h>
 #include <libavutil/pixfmt.h>
 
@@ -11,16 +12,21 @@
 
 #include <libswscale/swscale.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #include "error.h"
+#include "libavutil/buffer.h"
+#include "libavutil/error.h"
 
 typedef struct VideoContext
 {
 	AVFormatContext* oc;
 	AVCodecContext* c;
 	AVFrame* frame;
+	AVFrame* frame_hw;
 	AVPacket* pkt;
 	AVStream* st;
+	AVBufferRef* hw_device_ctx;
 	int width;
 	int height;
 	int width_orig;
@@ -33,6 +39,7 @@ typedef struct VideoContext
 	struct SwsContext* sws_bgra;
 	int initialized;
 	int frame_allocated;
+	int using_vaapi;
 } VideoContext;
 
 int write_video_packet(void* rust_ctx, uint8_t* buf, int buf_size);
@@ -52,6 +59,35 @@ void set_codec_params(VideoContext* ctx)
 		ctx->c->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 }
 
+void set_hwframe_ctx(VideoContext* ctx, Error* err)
+{
+	AVBufferRef* hw_frames_ref;
+	AVHWFramesContext* frames_ctx = NULL;
+	if (!(hw_frames_ref = av_hwframe_ctx_alloc(ctx->hw_device_ctx)))
+		ERROR(err, 1, "Failed to create VAAPI frame context.");
+	frames_ctx = (AVHWFramesContext*)(hw_frames_ref->data);
+	frames_ctx->format = AV_PIX_FMT_VAAPI;
+	frames_ctx->sw_format = AV_PIX_FMT_NV12;
+	frames_ctx->width = ctx->width;
+	frames_ctx->height = ctx->height;
+	frames_ctx->initial_pool_size = 20;
+	int ret;
+	if ((ret = av_hwframe_ctx_init(hw_frames_ref)) < 0)
+	{
+		av_buffer_unref(&hw_frames_ref);
+		ERROR(
+			err,
+			1,
+			"Failed to initialize VAAPI frame context."
+			"Error code: %s",
+			av_err2str(ret));
+	}
+	ctx->c->hw_frames_ctx = av_buffer_ref(hw_frames_ref);
+	if (!ctx->c->hw_frames_ctx)
+		ERROR(err, 1, "Out of memory!");
+	av_buffer_unref(&hw_frames_ref);
+}
+
 void open_video(VideoContext* ctx, Error* err)
 {
 	if (ctx->width <= 1 || ctx->height <= 1)
@@ -66,31 +102,68 @@ void open_video(VideoContext* ctx, Error* err)
 		ERROR(err, 1, "Could not find output format mp4.");
 	}
 
-	int using_nvenc = 0;
-#ifdef HAS_NVENC
-	codec = avcodec_find_encoder_by_name("h264_nvenc");
-	if (codec)
+	int using_hw = 0;
+
+	char* vaapi_device = getenv("VAAPI_DEVICE");
+
+	if (av_hwdevice_ctx_create(
+			&ctx->hw_device_ctx, AV_HWDEVICE_TYPE_VAAPI, vaapi_device, NULL, 0) == 0)
 	{
-		ctx->c = avcodec_alloc_context3(codec);
-		if (ctx->c)
+		codec = avcodec_find_encoder_by_name("h264_vaapi");
+		if (codec)
 		{
-			ctx->c->pix_fmt = AV_PIX_FMT_BGR0;
-			av_opt_set(ctx->c->priv_data, "preset", "llhq", 0);
-			av_opt_set(ctx->c->priv_data, "zerolatency", "1", 0);
-			av_opt_set(ctx->c->priv_data, "rc", "vbr_hq", 0);
-			av_opt_set(ctx->c->priv_data, "cq", "21", 0);
-			set_codec_params(ctx);
-			if (avcodec_open2(ctx->c, codec, NULL) == 0)
+			ctx->c = avcodec_alloc_context3(codec);
+			if (ctx->c)
 			{
-				using_nvenc = 1;
+				ctx->c->pix_fmt = AV_PIX_FMT_VAAPI;
+				av_opt_set(ctx->c->priv_data, "quality", "7", 0);
+				av_opt_set(ctx->c->priv_data, "qp", "23", 0);
+				set_codec_params(ctx);
+				Error err = {0};
+				set_hwframe_ctx(ctx, &err);
+				if (err.code == 0 && avcodec_open2(ctx->c, codec, NULL) == 0)
+				{
+					using_hw = 1;
+					ctx->using_vaapi = 1;
+				}
+				else
+				{
+					avcodec_free_context(&ctx->c);
+					av_buffer_unref(&ctx->hw_device_ctx);
+				}
 			}
-			else
-				avcodec_free_context(&ctx->c);
+		}
+		else
+			av_buffer_unref(&ctx->hw_device_ctx);
+	}
+
+#ifdef HAS_NVENC
+	if (!using_hw)
+	{
+		codec = avcodec_find_encoder_by_name("h264_nvenc");
+		if (codec)
+		{
+			ctx->c = avcodec_alloc_context3(codec);
+			if (ctx->c)
+			{
+				ctx->c->pix_fmt = AV_PIX_FMT_BGR0;
+				av_opt_set(ctx->c->priv_data, "preset", "llhq", 0);
+				av_opt_set(ctx->c->priv_data, "zerolatency", "1", 0);
+				av_opt_set(ctx->c->priv_data, "rc", "vbr_hq", 0);
+				av_opt_set(ctx->c->priv_data, "cq", "21", 0);
+				set_codec_params(ctx);
+				if (avcodec_open2(ctx->c, codec, NULL) == 0)
+				{
+					using_hw = 1;
+				}
+				else
+					avcodec_free_context(&ctx->c);
+			}
 		}
 	}
 #endif
 
-	if (!using_nvenc)
+	if (!using_hw)
 	{
 		codec = avcodec_find_encoder_by_name("libx264");
 		if (!codec)
@@ -116,15 +189,23 @@ void open_video(VideoContext* ctx, Error* err)
 		}
 	}
 
+	enum AVPixelFormat sw_pix_fmt = ctx->c->pix_fmt;
+	if (ctx->using_vaapi)
+		sw_pix_fmt = AV_PIX_FMT_NV12;
+
 	ctx->st = avformat_new_stream(ctx->oc, NULL);
 	avcodec_parameters_from_context(ctx->st->codecpar, ctx->c);
 
 	ctx->frame = av_frame_alloc();
 	if (!ctx->frame)
-	{
 		ERROR(err, 1, "Could not allocate video frame");
+	if (ctx->using_vaapi)
+	{
+		ctx->frame_hw = av_frame_alloc();
+		if (!ctx->frame_hw)
+			ERROR(err, 1, "Could not allocate video hardware frame");
 	}
-	ctx->frame->format = ctx->c->pix_fmt;
+	ctx->frame->format = sw_pix_fmt;
 	ctx->frame->width = ctx->c->width;
 	ctx->frame->height = ctx->c->height;
 
@@ -152,7 +233,7 @@ void open_video(VideoContext* ctx, Error* err)
 		AV_PIX_FMT_RGB24,
 		ctx->width,  // note that this is != width_orig, this is in purpose as this allows proper
 		ctx->height, // rescaling if dimensions of provided image data are not even
-		ctx->c->pix_fmt,
+		sw_pix_fmt,
 		SWS_FAST_BILINEAR,
 		NULL,
 		NULL,
@@ -164,7 +245,7 @@ void open_video(VideoContext* ctx, Error* err)
 		AV_PIX_FMT_BGRA,
 		ctx->width,  // note that this is != width_orig, this is in purpose as this allows proper
 		ctx->height, // rescaling if dimensions of provided image data are not even
-		ctx->c->pix_fmt,
+		sw_pix_fmt,
 		SWS_FAST_BILINEAR,
 		NULL,
 		NULL,
@@ -182,20 +263,25 @@ void destroy_video_encoder(VideoContext* ctx)
 		avformat_free_context(ctx->oc);
 		avcodec_free_context(&ctx->c);
 		av_frame_free(&ctx->frame);
+		if (ctx->using_vaapi)
+			av_frame_free(&ctx->frame_hw);
 		av_packet_free(&ctx->pkt);
 		av_free(ctx->buf);
 		sws_freeContext(ctx->sws_bgra);
 	}
+	if (ctx->using_vaapi)
+		av_buffer_unref(&ctx->hw_device_ctx);
 	free(ctx);
 }
 
 void encode_video_frame(VideoContext* ctx, int micros, Error* err)
 {
 	int ret;
+	AVFrame* frame = ctx->using_vaapi ? ctx->frame_hw : ctx->frame;
 
-	ctx->frame->pts = micros;
+	frame->pts = micros;
 
-	ret = avcodec_send_frame(ctx->c, ctx->frame);
+	ret = avcodec_send_frame(ctx->c, frame);
 	if (ret < 0)
 		ERROR(err, 1, "Error sending a frame for encoding");
 
@@ -229,12 +315,29 @@ VideoContext* init_video_encoder(void* rust_ctx, int width, int height)
 	ctx->pts = 0;
 	ctx->initialized = 0;
 	ctx->frame_allocated = 0;
+	ctx->using_vaapi = 0;
 	return ctx;
+}
+
+void alloc_frame_buffer(VideoContext* ctx, Error* err)
+{
+	int ret = av_frame_get_buffer(ctx->frame, 32);
+	if (ret < 0)
+		ERROR(err, 1, "Could not allocate video frame data: %s", av_err2str(ret));
+	if (ctx->using_vaapi)
+	{
+		ret = av_hwframe_get_buffer(ctx->c->hw_frames_ctx, ctx->frame_hw, 0);
+		if (ret < 0)
+			ERROR(err, 1, "Could not allocate video hardware frame data: %s", av_err2str(ret));
+		if (!ctx->frame_hw->hw_frames_ctx)
+			ERROR(err, 2, "Could not allocate video hardware frame data");
+	}
+	ctx->frame_allocated = 1;
 }
 
 void fill_bgra(VideoContext* ctx, const void* data, Error* err)
 {
-	if (ctx->c->pix_fmt == AV_PIX_FMT_BGR0)
+	if (ctx->frame->format == AV_PIX_FMT_BGR0)
 	{
 		ctx->frame->data[0] = (uint8_t*)data;
 		ctx->frame->linesize[0] = ctx->width_orig * 4;
@@ -246,14 +349,12 @@ void fill_bgra(VideoContext* ctx, const void* data, Error* err)
 		const int src_stride[] = {ctx->width_orig * 4, 0, 0, 0};
 		if (!ctx->frame_allocated)
 		{
-			int ret = av_frame_get_buffer(ctx->frame, 32);
-			if (ret < 0)
-			{
-				ERROR(err, 1, "Could not allocate the video frame data");
-			}
-			ctx->frame_allocated = 1;
+			alloc_frame_buffer(ctx, err);
+			OK_OR_ABORT(err);
 		}
 		av_frame_make_writable(ctx->frame);
+		if (ctx->using_vaapi)
+			av_frame_make_writable(ctx->frame_hw);
 		sws_scale(
 			ctx->sws_bgra,
 			src,
@@ -262,6 +363,13 @@ void fill_bgra(VideoContext* ctx, const void* data, Error* err)
 			ctx->height_orig,
 			ctx->frame->data,
 			ctx->frame->linesize);
+	}
+	if (ctx->using_vaapi)
+	{
+		av_frame_make_writable(ctx->frame_hw);
+		int ret = av_hwframe_transfer_data(ctx->frame_hw, ctx->frame, 0);
+		if (ret < 0)
+			ERROR(err, 1, "Could upload video frame to hardware: %s", av_err2str(ret));
 	}
 }
 
@@ -272,14 +380,17 @@ void fill_rgb(VideoContext* ctx, const void* data, Error* err)
 	const int src_stride[] = {ctx->width_orig * 3, 0, 0, 0};
 	if (!ctx->frame_allocated)
 	{
-		int ret = av_frame_get_buffer(ctx->frame, 32);
-		if (ret < 0)
-		{
-			ERROR(err, 1, "Could not allocate the video frame data");
-		}
-		ctx->frame_allocated = 1;
+		alloc_frame_buffer(ctx, err);
+		OK_OR_ABORT(err);
 	}
 	av_frame_make_writable(ctx->frame);
 	sws_scale(
 		ctx->sws_rgb, src, src_stride, 0, ctx->height_orig, ctx->frame->data, ctx->frame->linesize);
+	if (ctx->using_vaapi)
+	{
+		av_frame_make_writable(ctx->frame_hw);
+		int ret = av_hwframe_transfer_data(ctx->frame_hw, ctx->frame, 0);
+		if (ret < 0)
+			ERROR(err, 1, "Could upload video frame to hardware: %s", av_err2str(ret));
+	}
 }

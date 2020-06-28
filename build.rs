@@ -6,6 +6,12 @@ fn build_ffmpeg() {
         return;
     }
 
+    Command::new("bash")
+        .arg(Path::new("clean.sh"))
+        .current_dir("deps")
+        .status()
+        .expect("Failed to run clean ffmpeg build!");
+
     if !Command::new("bash")
         .arg(Path::new("build.sh"))
         .current_dir("deps")
@@ -90,4 +96,9 @@ fn linux() {
     println!("cargo:rustc-link-lib=Xfixes");
     println!("cargo:rustc-link-lib=Xcomposite");
     println!("cargo:rustc-link-lib=Xi");
+    println!("cargo:rustc-link-lib=static=va");
+    println!("cargo:rustc-link-lib=static=va-drm");
+    println!("cargo:rustc-link-lib=static=va-glx");
+    println!("cargo:rustc-link-lib=static=va-x11");
+    println!("cargo:rustc-link-lib=drm");
 }
