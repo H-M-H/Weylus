@@ -104,6 +104,7 @@ void open_video(VideoContext* ctx, Error* err)
 
 	int using_hw = 0;
 
+#ifdef HAS_VAAPI
 	char* vaapi_device = getenv("VAAPI_DEVICE");
 
 	if (av_hwdevice_ctx_create(
@@ -136,6 +137,7 @@ void open_video(VideoContext* ctx, Error* err)
 		else
 			av_buffer_unref(&ctx->hw_device_ctx);
 	}
+#endif
 
 #ifdef HAS_NVENC
 	if (!using_hw)
