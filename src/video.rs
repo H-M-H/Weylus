@@ -45,7 +45,6 @@ impl VideoEncoder {
         height: usize,
         write_data: impl Fn(&[u8]) + 'static,
     ) -> Result<Box<Self>, CError> {
-        // yuv420p only supports even width and height
         let width = width;
         let height = height;
         let mut video_encoder = Box::new(Self {
