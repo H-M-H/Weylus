@@ -63,6 +63,7 @@ fn main() {
     cc_video.include("deps/dist/include");
     #[cfg(target_os = "linux")]
     cc_video.define("HAS_NVENC", None);
+    cc_video.define("HAS_VAAPI", None);
     cc_video.compile("video");
     println!("cargo:rustc-link-lib=static=avcodec");
     println!("cargo:rustc-link-lib=static=avdevice");
