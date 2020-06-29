@@ -114,7 +114,7 @@ void open_video(VideoContext* ctx, Error* err)
 	int using_hw = 0;
 
 #ifdef HAS_VAAPI
-	char* vaapi_device = getenv("VAAPI_DEVICE");
+	char* vaapi_device = getenv("WEYLUS_VAAPI_DEVICE");
 
 	if (av_hwdevice_ctx_create(
 			&ctx->hw_device_ctx, AV_HWDEVICE_TYPE_VAAPI, vaapi_device, NULL, 0) == 0)
@@ -125,12 +125,28 @@ void open_video(VideoContext* ctx, Error* err)
 			ctx->c = avcodec_alloc_context3(codec);
 			if (ctx->c)
 			{
+				AVHWFramesConstraints* cst;
+				cst = av_hwdevice_get_hwframe_constraints(ctx->hw_device_ctx, NULL);
 				ctx->c->pix_fmt = AV_PIX_FMT_VAAPI;
 				av_opt_set(ctx->c->priv_data, "quality", "7", 0);
 				av_opt_set(ctx->c->priv_data, "qp", "23", 0);
 				set_codec_params(ctx);
 				Error err = {0};
 				set_hwframe_ctx(ctx, &err);
+
+				// If bgr0 is supported choose it as this avoids the overhead of calling sws_scale
+				// otherwise choose the first supported format.
+				int has_bgr0 = 0;
+				for (enum AVPixelFormat* fmt = cst->valid_sw_formats; *fmt != AV_PIX_FMT_NONE;
+					 ++fmt)
+					if (*fmt == AV_PIX_FMT_BGR0)
+					{
+						has_bgr0 = 1;
+						break;
+					}
+				ctx->sw_pix_fmt = has_bgr0 ? AV_PIX_FMT_BGR0 : cst->valid_sw_formats[0];
+
+				av_hwframe_constraints_free(&cst);
 				if (err.code == 0 && avcodec_open2(ctx->c, codec, NULL) == 0)
 				{
 					using_hw = 1;
@@ -157,7 +173,7 @@ void open_video(VideoContext* ctx, Error* err)
 			ctx->c = avcodec_alloc_context3(codec);
 			if (ctx->c)
 			{
-				ctx->c->pix_fmt = AV_PIX_FMT_BGR0;
+				ctx->sw_pix_fmt = ctx->c->pix_fmt = AV_PIX_FMT_BGR0;
 				av_opt_set(ctx->c->priv_data, "preset", "llhq", 0);
 				av_opt_set(ctx->c->priv_data, "zerolatency", "1", 0);
 				av_opt_set(ctx->c->priv_data, "rc", "vbr_hq", 0);
@@ -187,7 +203,7 @@ void open_video(VideoContext* ctx, Error* err)
 		{
 			ERROR(err, 1, "Could not allocate video codec context");
 		}
-		ctx->c->pix_fmt = AV_PIX_FMT_YUV420P;
+		ctx->sw_pix_fmt = ctx->c->pix_fmt = AV_PIX_FMT_YUV420P;
 		av_opt_set(ctx->c->priv_data, "preset", "ultrafast", 0);
 		av_opt_set(ctx->c->priv_data, "tune", "zerolatency", 0);
 		av_opt_set(ctx->c->priv_data, "crf", "23", 0);
@@ -199,10 +215,6 @@ void open_video(VideoContext* ctx, Error* err)
 			ERROR(err, 1, "Could not open codec: %s", av_err2str(ret));
 		}
 	}
-
-	ctx->sw_pix_fmt = ctx->c->pix_fmt;
-	if (ctx->using_vaapi)
-		ctx->sw_pix_fmt = AV_PIX_FMT_BGR0;
 
 	ctx->st = avformat_new_stream(ctx->oc, NULL);
 	avcodec_parameters_from_context(ctx->st->codecpar, ctx->c);
