@@ -125,8 +125,6 @@ void open_video(VideoContext* ctx, Error* err)
 			ctx->c = avcodec_alloc_context3(codec);
 			if (ctx->c)
 			{
-				AVHWFramesConstraints* cst;
-				cst = av_hwdevice_get_hwframe_constraints(ctx->hw_device_ctx, NULL);
 				ctx->c->pix_fmt = AV_PIX_FMT_VAAPI;
 				av_opt_set(ctx->c->priv_data, "quality", "7", 0);
 				av_opt_set(ctx->c->priv_data, "qp", "23", 0);
@@ -134,19 +132,26 @@ void open_video(VideoContext* ctx, Error* err)
 				Error err = {0};
 				set_hwframe_ctx(ctx, &err);
 
-				// If bgr0 is supported choose it as this avoids the overhead of calling sws_scale
-				// otherwise choose the first supported format.
-				int has_bgr0 = 0;
-				for (enum AVPixelFormat* fmt = cst->valid_sw_formats; *fmt != AV_PIX_FMT_NONE;
-					 ++fmt)
-					if (*fmt == AV_PIX_FMT_BGR0)
-					{
-						has_bgr0 = 1;
-						break;
-					}
-				ctx->sw_pix_fmt = has_bgr0 ? AV_PIX_FMT_BGR0 : cst->valid_sw_formats[0];
+				AVHWFramesConstraints* cst;
+				cst = av_hwdevice_get_hwframe_constraints(ctx->hw_device_ctx, NULL);
+				if (cst)
+				{
+					// If bgr0 is supported choose it as this avoids the overhead of calling
+					// sws_scale otherwise choose the first supported format.
+					int has_bgr0 = 0;
+					for (enum AVPixelFormat* fmt = cst->valid_sw_formats; *fmt != AV_PIX_FMT_NONE;
+						 ++fmt)
+						if (*fmt == AV_PIX_FMT_BGR0)
+						{
+							has_bgr0 = 1;
+							break;
+						}
+					ctx->sw_pix_fmt = has_bgr0 ? AV_PIX_FMT_BGR0 : cst->valid_sw_formats[0];
+					av_hwframe_constraints_free(&cst);
+				}
+				else
+					ctx->sw_pix_fmt = AV_PIX_FMT_NV12;
 
-				av_hwframe_constraints_free(&cst);
 				if (err.code == 0 && avcodec_open2(ctx->c, codec, NULL) == 0)
 				{
 					using_hw = 1;
