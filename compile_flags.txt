@@ -4,3 +4,4 @@
 -Wextra
 -Ideps/dist/include
 -DHAS_NVENC
+-DHAS_VAAPI
