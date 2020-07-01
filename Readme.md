@@ -131,7 +131,8 @@ I am afraid but as of now Weylus has not been tested on Windows.
 
 ## Building
 To build Weylus you need to install Rust, Typescript, make, git, a C compiler, nasm and bash. `cargo
-build` builds the project. On Linux some additional dependencies are required to build Weylus. On
+build` builds the project. By default Weylus is build in debug mode, if you want a release build run
+`cargo build --release`. On Linux some additional dependencies are required to build Weylus. On
 Debian or Ubuntu they can be installed via:
 ```sh
 apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev
