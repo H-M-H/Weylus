@@ -17,4 +17,4 @@ RUN curl -LO "https://www.nasm.us/pub/nasm/releasebuilds/2.14.02/nasm-2.14.02.ta
 RUN apt-add-repository contrib
 RUN apt-add-repository non-free
 RUN apt-get update && apt-get install -y nvidia-cuda-dev pkg-config
-RUN apt-get install -y libva-dev autoconf libtool-bin libxv-dev
+RUN apt-get install -y autoconf libtool-bin libxv-dev
