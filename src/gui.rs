@@ -9,7 +9,7 @@ use tracing::{error, info};
 
 use fltk::{
     app::App,
-    button::Button,
+    button::{Button, CheckButton},
     frame::Frame,
     input::{Input, IntInput},
     output::Output,
@@ -22,7 +22,7 @@ use fltk::{
 use pnet::datalink;
 
 use crate::web::{Gui2WebMessage, Web2GuiMessage};
-use crate::websocket::Gui2WsMessage;
+use crate::websocket::{Gui2WsMessage, WsConfig};
 
 pub fn run(log_receiver: mpsc::Receiver<String>) {
     fltk::app::lock().unwrap();
@@ -60,9 +60,37 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
         .with_label("Websocket Port");
     input_ws_port.set_value("9001");
 
+    let mut label_hw_accel = Frame::default()
+        .with_size(width, height)
+        .below_of(&input_ws_port, padding)
+        .with_label("Try Hardware acceleration");
+    label_hw_accel.set_tooltip(
+        "On many systems video encoding can be done with hardware \
+        acceleration. By default this is disabled as the quality and stability of video encoding \
+        varies greatly among hardware and drivers. Currently this is only supported on Linux.",
+    );
+
+    let mut check_vaapi = CheckButton::default()
+        .with_size(70, height)
+        .below_of(&label_hw_accel, 0)
+        .with_label("VAAPI");
+    check_vaapi.set_tooltip("Try to use hardware acceleration through the Video Acceleration API.");
+
+    let mut check_nvenc = CheckButton::default()
+        .with_size(70, height)
+        .right_of(&check_vaapi, padding)
+        .with_label("NVENC");
+    check_nvenc.set_tooltip("Try to use Nvidia's NVENC to encode the video via GPU.");
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        check_vaapi.deactivate();
+        check_nvenc.deactivate();
+    }
+
     let but_toggle = Button::default()
         .with_size(width, height)
-        .below_of(&input_ws_port, 3 * padding)
+        .below_of(&check_vaapi, 2 * padding)
         .with_label("Start");
 
     let output_buf = TextBuffer::default();
@@ -125,7 +153,6 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                 let but_toggle_ref = but_toggle_ref.clone();
                 let mut but = but_toggle_ref.try_borrow_mut()?;
 
-
                 if !is_server_running {
                     let password_string = input_password.value();
                     let password = match password_string.as_str() {
@@ -138,12 +165,15 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
 
                     let (sender_gui2ws_tmp, receiver_gui2ws) = mpsc::channel();
                     sender_gui2ws = Some(sender_gui2ws_tmp);
-                    crate::websocket::run(
-                        sender_ws2gui.clone(),
-                        receiver_gui2ws,
-                        SocketAddr::new(bind_addr, ws_port),
-                        password,
-                    );
+                    let config = WsConfig {
+                        address: SocketAddr::new(bind_addr, ws_port),
+                        password: password.map(|s| s.into()),
+                        #[cfg(target_os = "linux")]
+                        try_vaapi: check_vaapi.is_checked(),
+                        #[cfg(target_os = "linux")]
+                        try_nvenc: check_nvenc.is_checked(),
+                    };
+                    crate::websocket::run(sender_ws2gui.clone(), receiver_gui2ws, config);
 
                     let (sender_gui2web_tmp, receiver_gui2web) = mpsc_tokio::channel(100);
                     sender_gui2web = Some(sender_gui2web_tmp);
