@@ -31,11 +31,20 @@ pub enum Gui2WsMessage {
     Shutdown,
 }
 
+#[derive(Clone)]
+pub struct WsConfig {
+    pub address: SocketAddr,
+    pub password: Option<String>,
+    #[cfg(target_os = "linux")]
+    pub try_vaapi: bool,
+    #[cfg(target_os = "linux")]
+    pub try_nvenc: bool,
+}
+
 pub fn run(
     sender: mpsc::Sender<Ws2GuiMessage>,
     receiver: mpsc::Receiver<Gui2WsMessage>,
-    ws_socket_addr: SocketAddr,
-    password: Option<&str>,
+    config: WsConfig,
 ) {
     let clients = Arc::new(Mutex::new(HashMap::<
         SocketAddr,
@@ -57,18 +66,16 @@ pub fn run(
             shutdown.store(true, Ordering::Relaxed);
         }
     });
-    let pass: Option<String> = password.map(|s| s.to_string());
-    spawn(move || listen_websocket(ws_socket_addr, pass, clients2, shutdown2, sender));
+    spawn(move || listen_websocket(config, clients2, shutdown2, sender));
 }
 
 fn listen_websocket(
-    addr: SocketAddr,
-    password: Option<String>,
+    config: WsConfig,
     clients: Arc<Mutex<HashMap<SocketAddr, Arc<Mutex<Writer<TcpStream>>>>>>,
     shutdown: Arc<AtomicBool>,
     _sender: mpsc::Sender<Ws2GuiMessage>,
 ) {
-    let server = Server::bind(addr);
+    let server = Server::bind(config.address);
     if let Err(err) = server {
         error!("Failed binding to socket: {}", err);
         return;
@@ -84,14 +91,14 @@ fn listen_websocket(
     loop {
         std::thread::sleep(std::time::Duration::from_millis(10));
         if shutdown.load(Ordering::Relaxed) {
-            info!("Shutting down websocket: {}", addr);
+            info!("Shutting down websocket: {}", config.address);
             return;
         }
-        let clients = clients.clone();
-        let password = password.clone();
         match server.accept() {
             Ok(request) => {
-                spawn(move || handle_connection(request, clients, password));
+                let clients = clients.clone();
+                let config = config.clone();
+                spawn(move || handle_connection(request, clients, config));
             }
             Err(_) => {
                 if shutdown.load(Ordering::Relaxed) {
@@ -105,7 +112,7 @@ fn listen_websocket(
 fn handle_connection(
     request: WsUpgrade<TcpStream, Option<WsBuffer>>,
     clients: Arc<Mutex<HashMap<SocketAddr, Arc<Mutex<Writer<TcpStream>>>>>>,
-    password: Option<String>,
+    config: WsConfig,
 ) {
     let client = request.accept();
     if let Err((_, err)) = client {
@@ -136,10 +143,10 @@ fn handle_connection(
         clients.insert(peer_addr, ws_sender.clone());
     }
 
-    let mut ws_handler = WsHandler::new(ws_sender, &peer_addr);
+    let mut ws_handler = WsHandler::new(ws_sender, &peer_addr, config.clone());
 
-    let mut authed = password.is_none();
-    let password = password.unwrap_or_else(|| "".into());
+    let mut authed = config.password.is_none();
+    let password = config.password.unwrap_or_else(|| "".into());
     for msg in ws_receiver.incoming_messages() {
         match msg {
             Ok(msg) => {
@@ -205,7 +212,7 @@ enum VideoCommands {
     TryGetFrame,
 }
 
-fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter) {
+fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, config: WsConfig) {
     let mut screen_capture: Option<Box<dyn ScreenCapture>> = None;
     let mut video_encoder: Option<Box<VideoEncoder>> = None;
 
@@ -251,23 +258,31 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter) {
                 {
                     send_msg(&sender, &MessageOutbound::NewVideo);
                     let sender = sender.clone();
-                    let res = VideoEncoder::new(width, height, move |data| {
-                        let msg = Message::binary(data);
-                        if let Err(err) = sender.lock().unwrap().send_message(&msg) {
-                            match err {
-                                WebSocketError::IoError(err) => {
-                                    // ignore broken pipe errors as those are caused by
-                                    // intentionally shutting down the websocket
-                                    if err.kind() == std::io::ErrorKind::BrokenPipe {
-                                        trace!("Error sending video: {}", err);
-                                    } else {
-                                        warn!("Error sending video: {}", err);
+                    let res = VideoEncoder::new(
+                        width,
+                        height,
+                        move |data| {
+                            let msg = Message::binary(data);
+                            if let Err(err) = sender.lock().unwrap().send_message(&msg) {
+                                match err {
+                                    WebSocketError::IoError(err) => {
+                                        // ignore broken pipe errors as those are caused by
+                                        // intentionally shutting down the websocket
+                                        if err.kind() == std::io::ErrorKind::BrokenPipe {
+                                            trace!("Error sending video: {}", err);
+                                        } else {
+                                            warn!("Error sending video: {}", err);
+                                        }
                                     }
+                                    _ => warn!("Error sending video: {}", err),
                                 }
-                                _ => warn!("Error sending video: {}", err),
                             }
-                        }
-                    });
+                        },
+                        #[cfg(target_os = "linux")]
+                        config.try_vaapi,
+                        #[cfg(target_os = "linux")]
+                        config.try_nvenc,
+                    );
                     if let Err(err) = res {
                         warn!("{}", err);
                         continue;
@@ -312,21 +327,21 @@ struct WsHandler {
 }
 
 impl WsHandler {
-    fn new(sender: WsWriter, client_addr: &SocketAddr) -> Self {
+    fn new(sender: WsWriter, client_addr: &SocketAddr, config: WsConfig) -> Self {
         let (video_sender, video_receiver) = mpsc::channel::<VideoCommands>();
         {
             let sender = sender.clone();
-            spawn(move || handle_video(video_receiver, sender));
+            let config = config.clone();
+            spawn(move || handle_video(video_receiver, sender, config));
         }
 
         #[cfg(target_os = "linux")]
         let mut x11ctx = X11Context::new();
 
         #[cfg(target_os = "linux")]
-        let capturables = x11ctx.as_mut().map_or_else(
-            Vec::new,
-            |ctx| ctx.capturables().unwrap_or_else(|_| Vec::new()),
-        );
+        let capturables = x11ctx.as_mut().map_or_else(Vec::new, |ctx| {
+            ctx.capturables().unwrap_or_else(|_| Vec::new())
+        });
 
         Self {
             sender,

@@ -42,6 +42,8 @@ typedef struct VideoContext
 	int frame_allocated;
 	int frame_hw_allocated;
 	int using_vaapi;
+	int try_vaapi;
+	int try_nvenc;
 } VideoContext;
 
 int write_video_packet(void* rust_ctx, uint8_t* buf, int buf_size);
@@ -116,7 +118,8 @@ void open_video(VideoContext* ctx, Error* err)
 #ifdef HAS_VAAPI
 	char* vaapi_device = getenv("WEYLUS_VAAPI_DEVICE");
 
-	if (av_hwdevice_ctx_create(
+	if (ctx->try_vaapi &&
+		av_hwdevice_ctx_create(
 			&ctx->hw_device_ctx, AV_HWDEVICE_TYPE_VAAPI, vaapi_device, NULL, 0) == 0)
 	{
 		codec = avcodec_find_encoder_by_name("h264_vaapi");
@@ -170,7 +173,7 @@ void open_video(VideoContext* ctx, Error* err)
 #endif
 
 #ifdef HAS_NVENC
-	if (!using_hw)
+	if (ctx->try_nvenc && !using_hw)
 	{
 		codec = avcodec_find_encoder_by_name("h264_nvenc");
 		if (codec)
@@ -330,7 +333,8 @@ void encode_video_frame(VideoContext* ctx, int micros, Error* err)
 	}
 }
 
-VideoContext* init_video_encoder(void* rust_ctx, int width, int height)
+VideoContext*
+init_video_encoder(void* rust_ctx, int width, int height, int try_vaapi, int try_nvenc)
 {
 	VideoContext* ctx = malloc(sizeof(VideoContext));
 	ctx->rust_ctx = rust_ctx;
@@ -343,6 +347,8 @@ VideoContext* init_video_encoder(void* rust_ctx, int width, int height)
 	ctx->frame_allocated = 0;
 	ctx->frame_hw_allocated = 0;
 	ctx->using_vaapi = 0;
+	ctx->try_vaapi = try_vaapi;
+	ctx->try_nvenc = try_nvenc;
 	return ctx;
 }
 

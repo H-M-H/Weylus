@@ -6,7 +6,13 @@ use tracing::warn;
 use crate::cerror::CError;
 
 extern "C" {
-    fn init_video_encoder(rust_ctx: *mut c_void, width: c_int, height: c_int) -> *mut c_void;
+    fn init_video_encoder(
+        rust_ctx: *mut c_void,
+        width: c_int,
+        height: c_int,
+        try_vaapi: c_int,
+        try_nvenc: c_int,
+    ) -> *mut c_void;
     fn open_video(handle: *mut c_void, err: *mut CError);
     fn destroy_video_encoder(handle: *mut c_void);
     fn encode_video_frame(handle: *mut c_void, micros: c_int, err: *mut CError);
@@ -44,6 +50,8 @@ impl VideoEncoder {
         width: usize,
         height: usize,
         write_data: impl Fn(&[u8]) + 'static,
+        #[cfg(target_os = "linux")] try_vaapi: bool,
+        #[cfg(target_os = "linux")] try_nvenc: bool,
     ) -> Result<Box<Self>, CError> {
         let width = width;
         let height = height;
@@ -59,6 +67,14 @@ impl VideoEncoder {
                 video_encoder.as_mut() as *mut _ as *mut c_void,
                 width as c_int,
                 height as c_int,
+                #[cfg(target_os = "linux")]
+                try_vaapi.into(),
+                #[cfg(target_os = "linux")]
+                try_nvenc.into(),
+                #[cfg(not(target_os = "linux"))]
+                0,
+                #[cfg(not(target_os = "linux"))]
+                0,
             )
         };
         video_encoder.handle = handle;
@@ -79,18 +95,10 @@ impl VideoEncoder {
                 return;
             }
             PixelProvider::BGR0(bgra) => unsafe {
-                fill_bgra(
-                    self.handle,
-                    bgra.as_ptr(),
-                    &mut err,
-                );
+                fill_bgra(self.handle, bgra.as_ptr(), &mut err);
             },
             PixelProvider::RGB(rgb) => unsafe {
-                fill_rgb(
-                    self.handle,
-                    rgb.as_ptr(),
-                    &mut err,
-                );
+                fill_rgb(self.handle, rgb.as_ptr(), &mut err);
             },
         }
         if err.is_err() {
