@@ -13,7 +13,6 @@ sed -i -e 's/-lva-\${display}$/-lva-\${display} -ldrm/' pkgconfig/libva-drm.pc.i
     --enable-static=yes \
     --enable-drm \
     --enable-x11 \
-    --enable-wayland \
     --enable-glx \
     --enable-shared=no \
     --with-drivers-path="/usr/lib/dri"
