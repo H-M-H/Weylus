@@ -217,7 +217,11 @@ class PointerHandler {
 }
 
 function frame_timer(webSocket: WebSocket) {
-    webSocket.send('"TryGetFrame"');
+    if (webSocket.readyState > webSocket.OPEN)  // Closing or closed, so no more frames
+        return;
+
+    if (webSocket.readyState === webSocket.OPEN)
+        webSocket.send('"TryGetFrame"');
     let upd_limit = settings.frame_update_limit();
     if (upd_limit > 0)
         setTimeout(() => frame_timer(webSocket), upd_limit);
