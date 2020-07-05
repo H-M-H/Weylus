@@ -1,27 +1,39 @@
 @media (prefers-color-scheme: dark) {
     body, html {
-        background: #202020;
+        background: url(background_paper_invert.png) repeat;
     }
-    #settings {
+    #settings, #handle {
         color: #ddd;
-        background: #303030;
-    }
-    #handle {
-        background: #303030;
-        color: #ddd;
+        background: #303030f0;
     }
 }
 @media (prefers-color-scheme: light) {
     body, html {
-        background: #fff;
+        background: url(background_paper.png) repeat;
     }
-    #settings {
+    #settings, #handle {
         color: #111;
-        background: #eee;
+        background: #e8e8e8;
     }
-    #handle {
-        background: #eee;
-        color: #111;
+    #settings::before, #handle::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: -1;
+        box-shadow: 0 0 1em 0 #000a;
+    }
+    #handle::before {
+        border-radius: 0 0 0 0.25em;
+    }
+    .lefty #handle::before {
+        border-radius: 0 0 0.25em 0;
+    }
+    #settings.hide::before, #settings.vanish::before,
+    #settings.hide #handle::before, #settings.vanish #handle::before {
+        box-shadow: none;
     }
 }
 body, html {
@@ -29,6 +41,7 @@ body, html {
     height: 100%;
     margin: 0;
     padding: 0;
+    z-index: -2;  /* For correct ordering of drop shadows */
     overflow: hidden;
     display: flex;
     touch-action: none;
@@ -46,6 +59,7 @@ video {
     height: auto;
     display: block;
     margin: auto auto;
+    z-index: -2;  /* For correct ordering of drop shadows */
 }
 #settings_scroll {
     overflow: auto;
@@ -61,7 +75,7 @@ video {
     transform: none;
     padding: 1em;
     font-family: sans-serif;
-    transition: transform 0.5s, opacity 0.5s;
+    transition: transform 0.5s, opacity 0.5s, box-shadow 0.5s;
 }
 #settings.lefty {
     left: 0;

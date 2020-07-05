@@ -24,6 +24,14 @@ fn response_from_str(s: &str, content_type: &str) -> Response<Body> {
         .unwrap()
 }
 
+fn response_from_bytes(b: &'static [u8], content_type: &str) -> Response<Body> {
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", content_type)
+        .body(b.into())
+        .unwrap()
+}
+
 fn response_not_found() -> Response<Body> {
     Response::builder()
         .status(StatusCode::NOT_FOUND)
@@ -87,6 +95,14 @@ async fn serve<'a>(
         "/lib.js" => Ok(response_from_str(
             std::include_str!("../www/static/lib.js"),
             "text/javascript; charset=utf-8",
+        )),
+        "/background_paper.png" => Ok(response_from_bytes(
+            std::include_bytes!("../www/static/background_paper.png"),
+            "image/png",
+        )),
+        "/background_paper_invert.png" => Ok(response_from_bytes(
+            std::include_bytes!("../www/static/background_paper_invert.png"),
+            "image/png",
         )),
         _ => Ok(response_not_found()),
     }
