@@ -243,7 +243,15 @@ function handle_messages(
         if (sourceBuffer == null)
             return;
         if (!sourceBuffer.updating && queue.length > 0 && mediaSource.readyState == "open") {
-            sourceBuffer.appendBuffer(queue.shift());
+            try {
+                sourceBuffer.appendBuffer(queue.shift());
+            } catch (err) {
+                console.log("Error appending to sourceBuffer:", err);
+                // Drop everything, and try to pick up the stream again
+                if (sourceBuffer.updating)
+                    sourceBuffer.abort();
+                sourceBuffer.remove(0, Infinity);
+            }
         }
     }
     webSocket.onmessage = (event: MessageEvent) => {
