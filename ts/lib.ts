@@ -137,13 +137,22 @@ class Settings {
     }
 
     onCapturableList(window_names: string[]) {
+        let current_selection = this.capturable_select.selectedOptions[0]?.textContent;
+        let new_index;
         this.capturable_select.innerText = "";
         window_names.forEach((name, i) => {
             let option = document.createElement("option");
             option.value = String(i);
             option.innerText = name;
             this.capturable_select.appendChild(option);
+            if (name === current_selection)
+                new_index = i;
         });
+        if (new_index !== undefined)
+            this.capturable_select.value = String(new_index);
+        else if (current_selection)
+            // Can't find the window, so don't select anything
+            this.capturable_select.value = "";
     }
 }
 
