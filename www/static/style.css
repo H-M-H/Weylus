@@ -118,6 +118,9 @@ select {
 #displayoptions label {
     flex-grow: 1;
 }
+label input:disabled + span {
+    color: #888;
+}
 #lefty {
     display: none;
 }
