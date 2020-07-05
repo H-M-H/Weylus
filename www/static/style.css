@@ -105,6 +105,9 @@ video {
     display: block;
     margin-top: 0.5em;
 }
+#settings section label.hide {
+    display: none;
+}
 select {
     width: 15em;
 }

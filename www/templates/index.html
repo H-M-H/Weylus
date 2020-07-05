@@ -36,10 +36,18 @@
                     <label><input type="checkbox" id="enable_touch" checked /> <span>Enable Touch</span></label>
                 </section>
                 <section>
-                    <label>The below only works on Linux</label>
-                    <label><input type="checkbox" id="stylus_support" checked /> <span>Produce Touch Events</span></label>
-                    <label><input type="checkbox" id="faster_capture" checked /> <span>Faster Capture</span></label>
-                    <label><input type="checkbox" id="capture_cursor" /> <span>Capture Cursor</span></label>
+                    <label {{#if (not stylus_support_enabled)}}class="hide"{{/if}}>
+                        <input type="checkbox" id="stylus_support" checked />
+                        <span>Produce Touch Events</span>
+                    </label>
+                    <label {{#if (not faster_capture_enabled)}}class="hide"{{/if}}>
+                        <input type="checkbox" id="faster_capture" checked />
+                        <span>Faster Capture</span>
+                    </label>
+                    <label {{#if (not capture_cursor_enabled)}}class="hide"{{/if}}>
+                        <input type="checkbox" id="capture_cursor" />
+                        <span>Capture Cursor</span>
+                    </label>
                 </section>
                 <section id="displayoptions">
                     <label id="leftylabel"><input type="checkbox" id="lefty" checked />Swap</label>
