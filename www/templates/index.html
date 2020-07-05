@@ -22,13 +22,12 @@
             <div id="settings_scroll">
                 <h2>Settings</h2>
                 <section>
-                    <label for="window">Capture window:</label>
+                    <label for="window">Capture Window:</label>
                     <select id="window"></select>
-                    <button id="refresh">Refresh</button>
+                    <button id="refresh">Refresh List</button>
                 </section>
                 <section>
-                    <label for="frame_update_limit">Limit video update interval (milliseconds):</label>
-                    <input type="number" min="0" id="frame_update_limit" value="0" />
+                    <label>Frame Interval: <input type="number" min="0" id="frame_update_limit" value="0" /> ms</label>
                     <label><input type="checkbox" id="stretch" checked /> <span>Stretch Video</span></label>
                 </section>
                 <section>
@@ -38,13 +37,13 @@
                 </section>
                 <section>
                     <label>The below only works on Linux</label>
-                    <label><input type="checkbox" id="stylus_support" checked /> <span>Stylus and Touch Support</span></label>
+                    <label><input type="checkbox" id="stylus_support" checked /> <span>Produce Touch Events</span></label>
                     <label><input type="checkbox" id="faster_capture" checked /> <span>Faster Capture</span></label>
                     <label><input type="checkbox" id="capture_cursor" /> <span>Capture Cursor</span></label>
                 </section>
                 <section id="displayoptions">
                     <label id="leftylabel"><input type="checkbox" id="lefty" checked />Swap</label>
-                    <label id="vanish">Vanish until page reload</label>
+                    <label id="vanish">Hide until Reload</label>
                 </section>
             </div>
         </div>

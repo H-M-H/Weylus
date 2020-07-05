@@ -121,6 +121,9 @@ select {
 label input:disabled + span {
     color: #888;
 }
+#frame_update_limit {
+    width: 3em;
+}
 #lefty {
     display: none;
 }
