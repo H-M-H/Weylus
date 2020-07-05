@@ -102,7 +102,7 @@ class Settings {
             }
             this.capturable_select.disabled = !this.checks.get("faster_capture").checked;
             this.checks.get("capture_cursor").disabled = !this.checks.get("faster_capture").checked;
-            this.frame_update_limit_input.value = settings["frame_update_limit"];
+            this.frame_update_limit_input.value = settings["frame_update_limit"] ?? 0;
             if (this.checks.get("lefty").checked) {
                 this.settings.classList.add("lefty");
             }
