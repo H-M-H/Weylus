@@ -239,18 +239,29 @@ function handle_messages(
     let mediaSource: MediaSource = null;
     let sourceBuffer: SourceBuffer = null;
     let queue = [];
+    const BUFFER_LENGTH = 10;  // In seconds
     function upd_buf() {
         if (sourceBuffer == null)
             return;
         if (!sourceBuffer.updating && queue.length > 0 && mediaSource.readyState == "open") {
-            try {
-                sourceBuffer.appendBuffer(queue.shift());
-            } catch (err) {
-                console.log("Error appending to sourceBuffer:", err);
-                // Drop everything, and try to pick up the stream again
-                if (sourceBuffer.updating)
-                    sourceBuffer.abort();
-                sourceBuffer.remove(0, Infinity);
+            let buffer_length = 0;
+            if (sourceBuffer.buffered.length) {
+                // Assume only one time range...
+                buffer_length = sourceBuffer.buffered.end(0) - sourceBuffer.buffered.start(0);
+            }
+            if (buffer_length > 2 * BUFFER_LENGTH) {
+                sourceBuffer.remove(0, sourceBuffer.buffered.end(0) - BUFFER_LENGTH);
+                // This will trigger updateend when finished
+            } else {
+                try {
+                    sourceBuffer.appendBuffer(queue.shift());
+                } catch (err) {
+                    console.log("Error appending to sourceBuffer:", err);
+                    // Drop everything, and try to pick up the stream again
+                    if (sourceBuffer.updating)
+                        sourceBuffer.abort();
+                    sourceBuffer.remove(0, Infinity);
+                }
             }
         }
     }
