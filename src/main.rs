@@ -9,6 +9,9 @@ use std::io::Write;
 use std::sync::mpsc;
 use tracing_subscriber::layer::SubscriberExt;
 
+use config::get_config;
+
+mod config;
 mod cerror;
 mod gui;
 mod input;
@@ -76,7 +79,10 @@ fn main() {
                 .with_writer(GuiTracingWriterFactory { sender }),
         );
     tracing::subscriber::set_global_default(logger).expect("Failed to setup logger!");
-    gui::run(receiver);
+
+    let mut conf = get_config();
+    gui::run(&mut conf, receiver);
+
 }
 
 #[cfg(feature = "bench")]

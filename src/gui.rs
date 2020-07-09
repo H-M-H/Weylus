@@ -21,17 +21,18 @@ use fltk::{
 #[cfg(not(target_os = "windows"))]
 use pnet::datalink;
 
+use crate::config::{write_config, Config};
 use crate::web::{Gui2WebMessage, Web2GuiMessage};
 use crate::websocket::{Gui2WsMessage, WsConfig};
 
-pub fn run(log_receiver: mpsc::Receiver<String>) {
+pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     fltk::app::lock().unwrap();
     fltk::app::unlock();
     let width = 200;
     let height = 30;
     let padding = 10;
 
-    let app = App::default().set_scheme(fltk::app::AppScheme::Gtk);
+    let app = App::default().with_scheme(fltk::app::AppScheme::Gtk);
     let mut wind = Window::default()
         .with_size(660, 600)
         .center_screen()
@@ -41,24 +42,27 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
         .with_pos(130, 30)
         .with_size(width, height)
         .with_label("Password");
+    if let Some(pw) = config.password.as_ref() {
+        input_password.set_value(pw);
+    }
 
     let input_bind_addr = Input::default()
         .with_size(width, height)
         .below_of(&input_password, padding)
         .with_label("Bind Address");
-    input_bind_addr.set_value("0.0.0.0");
+    input_bind_addr.set_value(&config.bind_address.to_string());
 
     let input_port = IntInput::default()
         .with_size(width, height)
         .below_of(&input_bind_addr, padding)
         .with_label("Port");
-    input_port.set_value("1701");
+    input_port.set_value(&config.web_port.to_string());
 
     let input_ws_port = IntInput::default()
         .with_size(width, height)
         .below_of(&input_port, padding)
         .with_label("Websocket Port");
-    input_ws_port.set_value("9001");
+    input_ws_port.set_value(&config.websocket_port.to_string());
 
     let mut label_hw_accel = Frame::default()
         .with_size(width, height)
@@ -76,11 +80,21 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
         .with_label("VAAPI");
     check_vaapi.set_tooltip("Try to use hardware acceleration through the Video Acceleration API.");
 
+    #[cfg(target_os = "linux")]
+    if config.try_vaapi {
+        check_vaapi.set_checked(true);
+    }
+
     let mut check_nvenc = CheckButton::default()
         .with_size(70, height)
         .right_of(&check_vaapi, padding)
         .with_label("NVENC");
     check_nvenc.set_tooltip("Try to use Nvidia's NVENC to encode the video via GPU.");
+
+    #[cfg(target_os = "linux")]
+    if config.try_nvenc {
+        check_nvenc.set_checked(true);
+    }
 
     #[cfg(not(target_os = "linux"))]
     {
@@ -94,9 +108,11 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
         .with_label("Start");
 
     let output_buf = TextBuffer::default();
-    let _output = TextDisplay::default(output_buf)
+    let mut output = TextDisplay::default()
         .with_size(600, 6 * height)
         .with_pos(30, 600 - 30 - 6 * height);
+    output.set_buffer(Some(output_buf));
+    let output_buf = output.buffer().unwrap();
 
     let mut output_server_addr = Output::default()
         .with_size(500, height)
@@ -165,7 +181,7 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
 
                     let (sender_gui2ws_tmp, receiver_gui2ws) = mpsc::channel();
                     sender_gui2ws = Some(sender_gui2ws_tmp);
-                    let config = WsConfig {
+                    let ws_config = WsConfig {
                         address: SocketAddr::new(bind_addr, ws_port),
                         password: password.map(|s| s.into()),
                         #[cfg(target_os = "linux")]
@@ -173,7 +189,7 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                         #[cfg(target_os = "linux")]
                         try_nvenc: check_nvenc.is_checked(),
                     };
-                    crate::websocket::run(sender_ws2gui.clone(), receiver_gui2ws, config);
+                    crate::websocket::run(sender_ws2gui.clone(), receiver_gui2ws, ws_config);
 
                     let (sender_gui2web_tmp, receiver_gui2web) = mpsc_tokio::channel(100);
                     sender_gui2web = Some(sender_gui2web_tmp);
@@ -193,18 +209,18 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                             let mut ips = Vec::<IpAddr>::new();
                             for iface in datalink::interfaces()
                                 .iter()
-                                .filter(|iface| iface.is_up() && !iface.is_loopback())
-                            {
-                                for ipnetw in &iface.ips {
-                                    if (ipnetw.is_ipv4() && web_sock.ip().is_ipv4())
-                                        || (ipnetw.is_ipv6() && web_sock.ip().is_ipv6())
+                                    .filter(|iface| iface.is_up() && !iface.is_loopback())
                                     {
-                                        // filtering ipv6 unicast requires nightly or more fiddling,
-                                        // lets wait for nightlies to stabilize...
-                                        ips.push(ipnetw.ip())
+                                        for ipnetw in &iface.ips {
+                                            if (ipnetw.is_ipv4() && web_sock.ip().is_ipv4())
+                                                || (ipnetw.is_ipv6() && web_sock.ip().is_ipv6())
+                                            {
+                                                // filtering ipv6 unicast requires nightly or more fiddling,
+                                                // lets wait for nightlies to stabilize...
+                                                ips.push(ipnetw.ip())
+                                            }
+                                        }
                                     }
-                                }
-                            }
                             if !ips.is_empty() {
                                 web_sock.set_ip(ips[0]);
                             }
@@ -252,7 +268,7 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                             .unwrap();
                         let png = fltk::image::PngImage::from_data(&buf).unwrap();
 
-                        qr_frame.set_image(&png);
+                        qr_frame.set_image(Some(png));
                         qr_frame.show();
                     }
                     #[cfg(target_os = "windows")]
@@ -266,6 +282,17 @@ pub fn run(log_receiver: mpsc::Receiver<String>) {
                     }
                     output_server_addr.show();
                     but.set_label("Stop");
+                    let config = Config {
+                        password: password.map(|pw| pw.to_string()),
+                        web_port,
+                        websocket_port : ws_port,
+                        bind_address : bind_addr,
+                        #[cfg(target_os = "linux")]
+                        try_vaapi: check_vaapi.is_checked(),
+                        #[cfg(target_os = "linux")]
+                        try_nvenc : check_nvenc.is_checked(),
+                    };
+                    write_config(&config);
                 } else {
                     if let Some(mut sender_gui2web) = sender_gui2web.clone() {
                         sender_gui2web.try_send(Gui2WebMessage::Shutdown)?;
