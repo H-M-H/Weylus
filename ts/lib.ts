@@ -239,7 +239,7 @@ function handle_messages(
     let mediaSource: MediaSource = null;
     let sourceBuffer: SourceBuffer = null;
     let queue = [];
-    const BUFFER_LENGTH = 10;  // In seconds
+    const MAX_BUFFER_LENGTH = 20;  // In seconds
     function upd_buf() {
         if (sourceBuffer == null)
             return;
@@ -249,8 +249,8 @@ function handle_messages(
                 // Assume only one time range...
                 buffer_length = sourceBuffer.buffered.end(0) - sourceBuffer.buffered.start(0);
             }
-            if (buffer_length > 2 * BUFFER_LENGTH) {
-                sourceBuffer.remove(0, sourceBuffer.buffered.end(0) - BUFFER_LENGTH);
+            if (buffer_length > MAX_BUFFER_LENGTH) {
+                sourceBuffer.remove(0, sourceBuffer.buffered.end(0) - MAX_BUFFER_LENGTH / 2);
                 // This will trigger updateend when finished
             } else {
                 try {
