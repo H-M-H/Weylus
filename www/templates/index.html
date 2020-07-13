@@ -22,29 +22,36 @@
             <div id="settings_scroll">
                 <h2>Settings</h2>
                 <section>
-                    <label for="window">Capture window:</label>
+                    <label for="window">Capture:</label>
                     <select id="window"></select>
-                    <button id="refresh">Refresh</button>
+                    <button id="refresh">Refresh List</button>
                 </section>
                 <section>
-                    <label for="frame_update_limit">Limit video update interval (milliseconds):</label>
-                    <input type="number" min="0" id="frame_update_limit" value="0" />
-                    <label><input type="checkbox" id="stretch" checked /> Stretch Video</label>
+                    <label>Frame Interval: <input type="number" min="0" id="frame_update_limit" value="0" /> ms</label>
+                    <label><input type="checkbox" id="stretch" checked /> <span>Stretch Video</span></label>
                 </section>
                 <section>
-                    <label><input type="checkbox" id="enable_mouse" checked /> Enable Mouse</label>
-                    <label><input type="checkbox" id="enable_stylus" checked /> Enable Stylus</label>
-                    <label><input type="checkbox" id="enable_touch" checked /> Enable Touch</label>
+                    <label><input type="checkbox" id="enable_mouse" checked /> <span>Enable Mouse</span></label>
+                    <label><input type="checkbox" id="enable_stylus" checked /> <span>Enable Stylus</span></label>
+                    <label><input type="checkbox" id="enable_touch" checked /> <span>Enable Touch</span></label>
                 </section>
                 <section>
-                    <label>The below only works on Linux</label>
-                    <label><input type="checkbox" id="stylus_support" checked />Stylus and Touch Support</label>
-                    <label><input type="checkbox" id="faster_capture" checked />Faster Capture</label>
-                    <label><input type="checkbox" id="capture_cursor" />Capture Cursor</label>
+                    <label {{#if (not stylus_support_enabled)}}class="hide"{{/if}}>
+                        <input type="checkbox" id="stylus_support" checked />
+                        <span>Produce Touch Events</span>
+                    </label>
+                    <label {{#if (not faster_capture_enabled)}}class="hide"{{/if}}>
+                        <input type="checkbox" id="faster_capture" checked />
+                        <span>Faster Capture</span>
+                    </label>
+                    <label {{#if (not capture_cursor_enabled)}}class="hide"{{/if}}>
+                        <input type="checkbox" id="capture_cursor" />
+                        <span>Capture Cursor</span>
+                    </label>
                 </section>
                 <section id="displayoptions">
-                    <label id="leftylabel"><input type="checkbox" id="lefty" checked />Swap</label>
-                    <label id="vanish">Vanish until page reload</label>
+                    <label id="leftylabel"><input type="checkbox" id="lefty" />Swap</label>
+                    <label id="vanish">Hide until Reload</label>
                 </section>
             </div>
         </div>

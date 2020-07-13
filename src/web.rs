@@ -14,6 +14,9 @@ use tracing::{error, info, warn};
 struct WebConfig {
     password: Option<String>,
     websocket_port: u16,
+    stylus_support_enabled: bool,
+    faster_capture_enabled: bool,
+    capture_cursor_enabled: bool,
 }
 
 fn response_from_str(s: &str, content_type: &str) -> Response<Body> {
@@ -73,6 +76,9 @@ async fn serve<'a>(
             let config = WebConfig {
                 password: context.password.clone(),
                 websocket_port: context.ws_port,
+                stylus_support_enabled: cfg!(target_os = "linux"),
+                faster_capture_enabled: cfg!(target_os = "linux"),
+                capture_cursor_enabled: cfg!(target_os = "linux"),
             };
 
             Ok(response_from_str(
