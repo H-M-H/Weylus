@@ -217,7 +217,11 @@ class PointerHandler {
 }
 
 function frame_timer(webSocket: WebSocket) {
-    webSocket.send('"TryGetFrame"');
+    if (webSocket.readyState > webSocket.OPEN)  // Closing or closed, so no more frames
+        return;
+
+    if (webSocket.readyState === webSocket.OPEN)
+        webSocket.send('"TryGetFrame"');
     let upd_limit = settings.frame_update_limit();
     if (upd_limit > 0)
         setTimeout(() => frame_timer(webSocket), upd_limit);
@@ -235,11 +239,30 @@ function handle_messages(
     let mediaSource: MediaSource = null;
     let sourceBuffer: SourceBuffer = null;
     let queue = [];
+    const MAX_BUFFER_LENGTH = 20;  // In seconds
     function upd_buf() {
         if (sourceBuffer == null)
             return;
         if (!sourceBuffer.updating && queue.length > 0 && mediaSource.readyState == "open") {
-            sourceBuffer.appendBuffer(queue.shift());
+            let buffer_length = 0;
+            if (sourceBuffer.buffered.length) {
+                // Assume only one time range...
+                buffer_length = sourceBuffer.buffered.end(0) - sourceBuffer.buffered.start(0);
+            }
+            if (buffer_length > MAX_BUFFER_LENGTH) {
+                sourceBuffer.remove(0, sourceBuffer.buffered.end(0) - MAX_BUFFER_LENGTH / 2);
+                // This will trigger updateend when finished
+            } else {
+                try {
+                    sourceBuffer.appendBuffer(queue.shift());
+                } catch (err) {
+                    console.log("Error appending to sourceBuffer:", err);
+                    // Drop everything, and try to pick up the stream again
+                    if (sourceBuffer.updating)
+                        sourceBuffer.abort();
+                    sourceBuffer.remove(0, Infinity);
+                }
+            }
         }
     }
     webSocket.onmessage = (event: MessageEvent) => {
