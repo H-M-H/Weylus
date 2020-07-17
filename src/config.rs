@@ -8,19 +8,22 @@ use tracing::warn;
 #[derive(Serialize, Deserialize, StructOpt, Debug)]
 #[structopt(name = "weylus")]
 pub struct Config {
-    #[structopt(long)]
+    #[structopt(long, help = "Password")]
     pub password: Option<String>,
-    #[structopt(long, default_value = "0.0.0.0")]
+    #[structopt(long, default_value = "0.0.0.0", help = "Bind address")]
     pub bind_address: IpAddr,
-    #[structopt(long, default_value = "1701")]
+    #[structopt(long, default_value = "1701", help = "Web port")]
     pub web_port: u16,
-    #[structopt(long, default_value = "9001")]
+    #[structopt(long, default_value = "9001", help = "Websocket port")]
     pub websocket_port: u16,
     #[cfg(target_os = "linux")]
-    #[structopt(long)]
+    #[structopt(
+        long,
+        help = "Try to use hardware acceleration through the Video Acceleration API."
+    )]
     pub try_vaapi: bool,
     #[cfg(target_os = "linux")]
-    #[structopt(long)]
+    #[structopt(long, help = "Try to use Nvidia's NVENC to encode the video via GPU.")]
     pub try_nvenc: bool,
 }
 
@@ -72,7 +75,12 @@ pub fn write_config(conf: &Config) {
 }
 
 pub fn get_config() -> Config {
+    // TODO: once https://github.com/clap-rs/clap/issues/748 is resolved use
+    // the configfile to provide default values that override hardcoded defaults
+
+    // read config from file if no args are specified
     if std::env::args().len() == 1 {
+        // (ab)use parsing an empty args array to provide a default config
         read_config().unwrap_or_else(|| crate::config::Config::from_args())
     } else {
         crate::config::Config::from_args()
