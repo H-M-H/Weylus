@@ -11,15 +11,16 @@ Weylus in action with [Xournal++](https://github.com/xournalpp/xournalpp):
 * [Features](#features)
 * [Installation](#installation)
 * [Running](#running)
-    * [Linux](#linux)
-        * [Weylus as Second Screen](#weylus-as-second-screen)
-    * [macOS](#macos)
-    * [Windows](#windows)
+	* [Linux](#linux)
+		* [Hardware Acceleration](#hardware-acceleration)
+		* [Weylus as Second Screen](#weylus-as-second-screen)
+	* [macOS](#macos)
+	* [Windows](#windows)
 * [Building](#building)
-    * [Docker](#docker)
+	* [Docker](#docker)
 * [How does this work?](#how-does-this-work)
-    * [Stylus/Touch](#stylustouch)
-    * [Screen mirroring & window capturing](#screen-mirroring--window-capturing)
+	* [Stylus/Touch](#stylustouch)
+	* [Screen mirroring & window capturing](#screen-mirroring--window-capturing)
 
 ## Features
 - Control your mouse with your tablet
@@ -31,6 +32,7 @@ features on Linux are:
 - Multi-touch: Try it with software that supports multi-touch, like Krita, and see for yourself!
 - Capturing specific windows and only drawing to them
 - Faster screen mirroring
+- Hardware accelerated video encoding
 - Tablet as second screen
 
 ## Installation
@@ -72,6 +74,20 @@ sudo rm /etc/udev/rules.d/60-weylus.rules
 
 This allows your user to synthesize input events system-wide, even when another user is logged in.
 Therefore, untrusted users should not be added to the uinput group.
+
+#### Hardware Acceleration
+On Linux Weylus supports hardware accelerated video encoding through the Video Acceleration API
+(VAAPI) or Nvidia's NVENC. By default hardware acceleration is disabled as quality and stability of
+the hardware encoded video stream varies widely among different hardware and sufficient quality can
+not be guaranteed. If VAAPI is used it is possible to select a specific driver by setting the
+environment variable `LIBVA_DRIVER_NAME`. You can find possible values with the command
+`ls /usr/lib/dri/ | sed -n 's/^\(\S*\)_drv_video.so$/\1/p'`. Additionally you can specify the VAAPI
+device to use by setting `WEYLUS_VAAPI_DEVICE`; by default devices can be found in `/dev/dri`. Note
+that you may need to install the driver(s) first.
+
+Nvidias NVENC is very fast but delivers a video stream of noticeably lower quality (at least on my
+GeForce GTX 1050 Mobile GPU) but more recent GPUs should provide higher quality. For this to work
+nvidia drivers need to be installed.
 
 #### Weylus as Second Screen
 On Linux Weylus can be used to turn your tablet into a second screen if your hardware supports it.
