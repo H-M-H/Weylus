@@ -332,6 +332,8 @@ impl WsHandler {
         {
             let sender = sender.clone();
             let config = config.clone();
+            // offload creating the videostream to another thread to avoid blocking the thread that
+            // is receiving messages from the websocket
             spawn(move || handle_video(video_receiver, sender, config));
         }
 
@@ -359,7 +361,11 @@ impl WsHandler {
         send_msg(&self.sender, msg)
     }
 
-    fn send_video_frame(&mut self) {
+    // Enqueue a request to send a new video frame.
+    //
+    // This does not do any further work in order not to block receiving messages. `handle_video`
+    // is resposible to do the actual work.
+    fn queue_try_send_video_frame(&mut self) {
         self.video_sender.send(VideoCommands::TryGetFrame).unwrap();
     }
 
@@ -461,7 +467,7 @@ impl WsHandler {
                         MessageInbound::PointerEvent(event) => {
                             self.process_pointer_event(&event);
                         }
-                        MessageInbound::TryGetFrame => self.send_video_frame(),
+                        MessageInbound::TryGetFrame => self.queue_try_send_video_frame(),
                         MessageInbound::GetCapturableList => self.send_capturable_list(),
                         MessageInbound::Config(config) => self.setup(config),
                     },

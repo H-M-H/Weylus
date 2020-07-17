@@ -21,6 +21,7 @@ extern "C" {
     fn fill_bgra(ctx: *mut c_void, data: *const u8, err: *mut CError);
 }
 
+// this is used as callback in lib/encode_video.c via ffmpegs AVIOContext
 #[no_mangle]
 fn write_video_packet(video_encoder: *mut c_void, buf: *const c_uchar, buf_size: c_int) -> c_int {
     let video_encoder = unsafe { (video_encoder as *mut VideoEncoder).as_mut().unwrap() };

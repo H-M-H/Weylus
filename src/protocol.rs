@@ -11,6 +11,9 @@ pub struct ClientConfiguration {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum MessageInbound {
     PointerEvent(PointerEvent),
+    // request a video frame from the server
+    // like this the client can partially control the framerate by sending requests at some given
+    // rate. However, the server may drop a request if encoding is too slow.
     TryGetFrame,
     GetCapturableList,
     Config(ClientConfiguration),

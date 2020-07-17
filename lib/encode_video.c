@@ -46,6 +46,7 @@ typedef struct VideoContext
 	int try_nvenc;
 } VideoContext;
 
+// this is a rust function and lives in src/video.rs
 int write_video_packet(void* rust_ctx, uint8_t* buf, int buf_size);
 
 void set_codec_params(VideoContext* ctx)

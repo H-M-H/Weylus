@@ -26,6 +26,7 @@ use crate::web::{Gui2WebMessage, Web2GuiMessage};
 use crate::websocket::{Gui2WsMessage, WsConfig};
 
 pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
+    // this makes sure XInitThreads is called before any threading is done
     fltk::app::lock().unwrap();
     fltk::app::unlock();
     let width = 200;
