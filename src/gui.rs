@@ -125,6 +125,8 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         .with_size(240, 240)
         .right_of(&input_password, padding);
 
+    qr_frame.hide();
+
     wind.make_resizable(true);
     wind.end();
     wind.show();
