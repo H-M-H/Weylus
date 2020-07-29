@@ -8,8 +8,8 @@ use tracing::warn;
 #[derive(Serialize, Deserialize, StructOpt, Debug)]
 #[structopt(name = "weylus")]
 pub struct Config {
-    #[structopt(long, help = "Password")]
-    pub password: Option<String>,
+    #[structopt(long, help = "Access code")]
+    pub access_code: Option<String>,
     #[structopt(long, default_value = "0.0.0.0", help = "Bind address")]
     pub bind_address: IpAddr,
     #[structopt(long, default_value = "1701", help = "Web port")]

@@ -12,7 +12,7 @@ use tracing::{error, info, warn};
 
 #[derive(Serialize)]
 struct WebConfig {
-    password: Option<String>,
+    access_code: Option<String>,
     websocket_port: u16,
     stylus_support_enabled: bool,
     faster_capture_enabled: bool,
@@ -43,15 +43,15 @@ async fn serve<'a>(
 ) -> Result<Response<Body>, hyper::Error> {
     let context = &*context;
     let mut authed = false;
-    if let Some(password) = &context.password {
+    if let Some(access_code) = &context.access_code {
         if req.method() == Method::GET && req.uri().path() == "/" {
             use url::form_urlencoded;
             if let Some(query) = req.uri().query() {
                 let params = form_urlencoded::parse(query.as_bytes())
                     .into_owned()
                     .collect::<HashMap<String, String>>();
-                if let Some(pass) = params.get("password") {
-                    if pass == password {
+                if let Some(code) = params.get("access_code") {
+                    if code == access_code {
                         authed = true;
                         info!("Client authenticated: {}.", &addr);
                     }
@@ -68,13 +68,13 @@ async fn serve<'a>(
         "/" => {
             if !authed {
                 return Ok(response_from_str(
-                    std::include_str!("../www/static/password.html"),
+                    std::include_str!("../www/static/access_code.html"),
                     "text/html; charset=utf-8",
                 ));
             }
             info!("Client connected: {}", &addr);
             let config = WebConfig {
-                password: context.password.clone(),
+                access_code: context.access_code.clone(),
                 websocket_port: context.ws_port,
                 stylus_support_enabled: cfg!(target_os = "linux"),
                 faster_capture_enabled: cfg!(target_os = "linux"),
@@ -115,7 +115,7 @@ fn log_gui_send_error<T>(res: Result<(), SendError<T>>) {
 struct Context<'a> {
     bind_addr: SocketAddr,
     ws_port: u16,
-    password: Option<String>,
+    access_code: Option<String>,
     templates: Handlebars<'a>,
 }
 
@@ -124,22 +124,22 @@ pub fn run(
     receiver: mpsc_tokio::Receiver<Gui2WebMessage>,
     bind_addr: &SocketAddr,
     ws_port: u16,
-    password: Option<&str>,
+    access_code: Option<&str>,
 ) {
     let mut templates = Handlebars::new();
     templates
         .register_template_string("index", std::include_str!("../www/templates/index.html"))
         .unwrap();
 
-    let password = match password {
-        Some(password) => Some(password.to_string()),
+    let access_code = match access_code {
+        Some(access_code) => Some(access_code.to_string()),
         None => None,
     };
 
     let context = Context {
         bind_addr: *bind_addr,
         ws_port,
-        password,
+        access_code,
         templates,
     };
     std::thread::spawn(move || run_server(context, sender, receiver));

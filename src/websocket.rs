@@ -34,7 +34,7 @@ pub enum Gui2WsMessage {
 #[derive(Clone)]
 pub struct WsConfig {
     pub address: SocketAddr,
-    pub password: Option<String>,
+    pub access_code: Option<String>,
     #[cfg(target_os = "linux")]
     pub try_vaapi: bool,
     #[cfg(target_os = "linux")]
@@ -145,18 +145,18 @@ fn handle_connection(
 
     let mut ws_handler = WsHandler::new(ws_sender, &peer_addr, config.clone());
 
-    let mut authed = config.password.is_none();
-    let password = config.password.unwrap_or_else(|| "".into());
+    let mut authed = config.access_code.is_none();
+    let access_code = config.access_code.unwrap_or_else(|| "".into());
     for msg in ws_receiver.incoming_messages() {
         match msg {
             Ok(msg) => {
                 if !authed {
                     if let OwnedMessage::Text(pw) = &msg {
-                        if pw == &password {
+                        if pw == &access_code {
                             authed = true;
                         } else {
                             warn!(
-                                "Authentication failed: {} sent wrong password: '{}'",
+                                "Authentication failed: {} sent wrong access code: '{}'",
                                 peer_addr, pw
                             );
                             let mut clients = clients.lock().unwrap();

@@ -11,16 +11,17 @@ Weylus in action with [Xournal++](https://github.com/xournalpp/xournalpp):
 * [Features](#features)
 * [Installation](#installation)
 * [Running](#running)
-	* [Linux](#linux)
-		* [Hardware Acceleration](#hardware-acceleration)
-		* [Weylus as Second Screen](#weylus-as-second-screen)
-	* [macOS](#macos)
-	* [Windows](#windows)
+    * [Fullscreen](#fullscreen)
+    * [Linux](#linux)
+        * [Hardware Acceleration](#hardware-acceleration)
+        * [Weylus as Second Screen](#weylus-as-second-screen)
+    * [macOS](#macos)
+    * [Windows](#windows)
 * [Building](#building)
-	* [Docker](#docker)
+    * [Docker](#docker)
 * [How does this work?](#how-does-this-work)
-	* [Stylus/Touch](#stylustouch)
-	* [Screen mirroring & window capturing](#screen-mirroring--window-capturing)
+    * [Stylus/Touch](#stylustouch)
+    * [Screen mirroring & window capturing](#screen-mirroring--window-capturing)
 
 ## Features
 - Control your mouse with your tablet
@@ -41,12 +42,15 @@ Just grab the latest release for your OS from the
 except a modern browser are required on your tablet.
 
 ## Running
-Start Weylus, preferably set a password in the password box and press the Start button. This will
-start a webserver running on your computer. To control your computer with your tablet you need to
-open the url `http://<address of your computer>:<port set in the menu, default is 1701>`, if
-possible Weylus will display to you the url you need to open. Optionally Weylus can show a QR code
-with the encoded address. You may want to add a bookmark to your home screen on your tablet as this
-enables running Weylus in full screen mode (on iOS/iPadOS this needs to be done with Safari).
+Start Weylus, preferably set an access code in the access code box and press the Start button. This
+will start a webserver running on your computer. To control your computer with your tablet you need
+to open the url `http://<address of your computer>:<port set in the menu, default is 1701>`, if
+possible Weylus will display to you the url you need to open and show a QR code with the encoded
+address.
+
+### Fullscreen
+You may want to add a bookmark to your home screen on your tablet as this enables running Weylus in
+full screen mode (on iOS/iPadOS this needs to be done with Safari).
 
 ### Linux
 Weylus uses the `uinput` interface to simulate input events on Linux. **To enable stylus and

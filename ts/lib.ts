@@ -1,5 +1,5 @@
-function run(password: string, websocket_port: number) {
-    window.onload = () => { init(password, websocket_port) };
+function run(access_code: string, websocket_port: number) {
+    window.onload = () => { init(access_code, websocket_port) };
 }
 
 class Settings {
@@ -316,7 +316,7 @@ function handle_messages(
     }
 }
 
-function init(password: string, websocket_port: number) {
+function init(access_code: string, websocket_port: number) {
 
     let webSocket = new WebSocket("ws://" + window.location.hostname + ":" + websocket_port);
     webSocket.binaryType = "arraybuffer";
@@ -346,8 +346,8 @@ function init(password: string, websocket_port: number) {
     );
     window.onunload = () => { webSocket.close(); }
     webSocket.onopen = function(event) {
-        if (password)
-            webSocket.send(password);
+        if (access_code)
+            webSocket.send(access_code);
         webSocket.send('"GetCapturableList"');
         settings.send_server_config();
     }

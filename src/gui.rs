@@ -39,17 +39,23 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         .center_screen()
         .with_label(&format!("Weylus - {}", env!("CARGO_PKG_VERSION")));
 
-    let input_password = Input::default()
+    let mut input_access_code = Input::default()
         .with_pos(130, 30)
         .with_size(width, height)
-        .with_label("Password");
-    if let Some(pw) = config.password.as_ref() {
-        input_password.set_value(pw);
+        .with_label("Access code");
+    input_access_code.set_tooltip(
+        "Restrict who can control your computer with an access code. Note that this does NOT do \
+        any kind of encryption and it is advised to only run Weylus inside trusted networks! Do \
+        NOT reuse any of your passwords! If left blank, no code is required to access Weylus \
+        remotely."
+    );
+    if let Some(code) = config.access_code.as_ref() {
+        input_access_code.set_value(code);
     }
 
     let input_bind_addr = Input::default()
         .with_size(width, height)
-        .below_of(&input_password, padding)
+        .below_of(&input_access_code, padding)
         .with_label("Bind Address");
     input_bind_addr.set_value(&config.bind_address.to_string());
 
@@ -123,7 +129,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
 
     let mut qr_frame = Frame::default()
         .with_size(240, 240)
-        .right_of(&input_password, padding);
+        .right_of(&input_access_code, padding);
 
     qr_frame.hide();
 
@@ -173,10 +179,10 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                 let mut but = but_toggle_ref.try_borrow_mut()?;
 
                 if !is_server_running {
-                    let password_string = input_password.value();
-                    let password = match password_string.as_str() {
+                    let access_code_string = input_access_code.value();
+                    let access_code = match access_code_string.as_str() {
                         "" => None,
-                        pw => Some(pw),
+                        code => Some(code),
                     };
                     let bind_addr: IpAddr = input_bind_addr.value().parse()?;
                     let web_port: u16 = input_port.value().parse()?;
@@ -186,7 +192,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     sender_gui2ws = Some(sender_gui2ws_tmp);
                     let ws_config = WsConfig {
                         address: SocketAddr::new(bind_addr, ws_port),
-                        password: password.map(|s| s.into()),
+                        access_code: access_code.map(|s| s.into()),
                         #[cfg(target_os = "linux")]
                         try_vaapi: check_vaapi.is_checked(),
                         #[cfg(target_os = "linux")]
@@ -202,7 +208,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                         receiver_gui2web,
                         &web_sock,
                         ws_port,
-                        password,
+                        access_code,
                     );
 
                     #[cfg(not(target_os = "windows"))]
@@ -244,13 +250,13 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                         use qrcode::QrCode;
                         let addr_string = format!("http://{}", web_sock.to_string());
                         output_server_addr.set_value(&addr_string);
-                        let password = password.map(|pw| pw.to_string());
+                        let access_code = access_code.map(|s| s.to_string());
                         let mut url_string = addr_string;
-                        if let Some(password) = &password {
-                            url_string.push_str("?password=");
+                        if let Some(access_code) = &access_code {
+                            url_string.push_str("?access_code=");
                             url_string.push_str(
                                 &percent_encoding::utf8_percent_encode(
-                                    &password,
+                                    &access_code,
                                     percent_encoding::NON_ALPHANUMERIC,
                                 )
                                 .to_string(),
@@ -286,7 +292,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     output_server_addr.show();
                     but.set_label("Stop");
                     let config = Config {
-                        password: password.map(|pw| pw.to_string()),
+                        access_code: access_code.map(|s| s.to_string()),
                         web_port,
                         websocket_port : ws_port,
                         bind_address : bind_addr,
