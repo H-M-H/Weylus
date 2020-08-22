@@ -36,6 +36,7 @@ pnet = "0.25"
 
 [features]
 bench = []
+ffmpeg-system = []
 
 [package.metadata.bundle]
 name = "Weylus"

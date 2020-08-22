@@ -1,3 +1,4 @@
+use std::env;
 use std::path::Path;
 use std::process::Command;
 
@@ -25,7 +26,9 @@ fn build_ffmpeg() {
 }
 
 fn main() {
-    build_ffmpeg();
+    if env::var("CARGO_FEATURE_FFMPEG_SYSTEM").is_err() {
+        build_ffmpeg();
+    }
 
     println!("cargo:rerun-if-changed=ts/lib.ts");
 
@@ -63,25 +66,33 @@ fn main() {
     cc_video.include("deps/dist/include");
     #[cfg(target_os = "linux")]
     cc_video.define("HAS_NVENC", None);
+    #[cfg(target_os = "linux")]
     cc_video.define("HAS_VAAPI", None);
     cc_video.compile("video");
-    println!("cargo:rustc-link-lib=static=avcodec");
-    println!("cargo:rustc-link-lib=static=avdevice");
-    println!("cargo:rustc-link-lib=static=avfilter");
-    println!("cargo:rustc-link-lib=static=avformat");
-    println!("cargo:rustc-link-lib=static=avutil");
-    println!("cargo:rustc-link-lib=static=postproc");
-    println!("cargo:rustc-link-lib=static=swresample");
-    println!("cargo:rustc-link-lib=static=swscale");
-    println!("cargo:rustc-link-lib=static=x264");
-    println!("cargo:rustc-link-search=deps/dist/lib");
+    let ffmpeg_link_kind = if env::var("CARGO_FEATURE_FFMPEG_SYSTEM").is_ok() {
+        "dylib"
+    } else {
+        "static"
+    };
+    println!("cargo:rustc-link-lib={}=avcodec", ffmpeg_link_kind);
+    println!("cargo:rustc-link-lib={}=avdevice", ffmpeg_link_kind);
+    println!("cargo:rustc-link-lib={}=avfilter", ffmpeg_link_kind);
+    println!("cargo:rustc-link-lib={}=avformat", ffmpeg_link_kind);
+    println!("cargo:rustc-link-lib={}=avutil", ffmpeg_link_kind);
+    println!("cargo:rustc-link-lib={}=postproc", ffmpeg_link_kind);
+    println!("cargo:rustc-link-lib={}=swresample", ffmpeg_link_kind);
+    println!("cargo:rustc-link-lib={}=swscale", ffmpeg_link_kind);
+    println!("cargo:rustc-link-lib={}=x264", ffmpeg_link_kind);
+    if env::var("CARGO_FEATURE_FFMPEG_SYSTEM").is_err() {
+        println!("cargo:rustc-link-search=deps/dist/lib");
+    }
 
     #[cfg(target_os = "linux")]
-    linux();
+    linux(ffmpeg_link_kind);
 }
 
 #[cfg(target_os = "linux")]
-fn linux() {
+fn linux(ffmpeg_link_kind: &str) {
     println!("cargo:rerun-if-changed=lib/linux/uniput.c");
     println!("cargo:rerun-if-changed=lib/linux/xcapture.c");
     println!("cargo:rerun-if-changed=lib/linux/xhelper.c");
@@ -97,9 +108,9 @@ fn linux() {
     println!("cargo:rustc-link-lib=Xfixes");
     println!("cargo:rustc-link-lib=Xcomposite");
     println!("cargo:rustc-link-lib=Xi");
-    println!("cargo:rustc-link-lib=static=va");
-    println!("cargo:rustc-link-lib=static=va-drm");
-    println!("cargo:rustc-link-lib=static=va-glx");
-    println!("cargo:rustc-link-lib=static=va-x11");
+    println!("cargo:rustc-link-lib={}=va", ffmpeg_link_kind);
+    println!("cargo:rustc-link-lib={}=va-drm", ffmpeg_link_kind);
+    println!("cargo:rustc-link-lib={}=va-glx", ffmpeg_link_kind);
+    println!("cargo:rustc-link-lib={}=va-x11", ffmpeg_link_kind);
     println!("cargo:rustc-link-lib=drm");
 }
