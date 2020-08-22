@@ -18,7 +18,7 @@ jobs:
         os: [ubuntu-latest]
         include:
         - os: ubuntu-latest
-          build-cmd: cargo deb
+          build-cmd: cargo deb && dpkg -i target/debian/Weylus*.deb
           package-files: |
             target/release/linux.zip
             target/debian/Weylus*.deb
