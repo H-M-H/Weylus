@@ -13,7 +13,7 @@ RUN curl -sL https://deb.nodesource.com/setup_14.x | bash - && \
     npm install -g typescript
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
     sh -s -- -y --default-toolchain stable-x86_64-unknown-linux-gnu
-RUN cargo install cargo-deb
+RUN cargo install --git https://github.com/mmstick/cargo-deb --branch master cargo-deb
 RUN curl -LO "https://www.nasm.us/pub/nasm/releasebuilds/2.14.02/nasm-2.14.02.tar.xz" && \
     tar xf "nasm-2.14.02.tar.xz" && cd "nasm-2.14.02" && \
     ./configure --prefix=/usr && make -j$(nproc) && make install && cd .. && rm -rf "nasm-2.14.02*"
