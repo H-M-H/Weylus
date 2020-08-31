@@ -1,5 +1,15 @@
 function run(access_code: string, websocket_port: number) {
-    window.onload = () => { init(access_code, websocket_port) };
+    window.onload = () => {
+        let p = document.getElementById("debug");
+        if (p) {
+            p.textContent = "";
+            window.addEventListener("error", (e: ErrorEvent) => {
+                p.textContent += e.filename + ":L" + e.lineno + ":" + e.colno + ": " + e.message + "\n";
+                return false;
+            }, true)
+        }
+        init(access_code, websocket_port)
+    };
 }
 
 class Settings {

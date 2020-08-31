@@ -261,7 +261,6 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                                 )
                                 .to_string(),
                             );
-                            info!("{}", &url_string);
                         }
                         let code = QrCode::new(&url_string).unwrap();
                         let img_buf = code.render::<Luma<u8>>().build();

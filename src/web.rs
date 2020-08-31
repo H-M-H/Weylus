@@ -8,7 +8,7 @@ use std::sync::mpsc;
 use std::sync::mpsc::SendError;
 use std::sync::Arc;
 use tokio::sync::mpsc as mpsc_tokio;
-use tracing::{error, info, warn};
+use tracing::{error, info, warn, debug};
 
 #[derive(Serialize)]
 struct WebConfig {
@@ -17,6 +17,7 @@ struct WebConfig {
     stylus_support_enabled: bool,
     faster_capture_enabled: bool,
     capture_cursor_enabled: bool,
+    debug: bool,
 }
 
 fn response_from_str(s: &str, content_type: &str) -> Response<Body> {
@@ -41,6 +42,7 @@ async fn serve<'a>(
     context: Arc<Context<'a>>,
     _sender: mpsc::Sender<Web2GuiMessage>,
 ) -> Result<Response<Body>, hyper::Error> {
+    debug!("Got request: {:?}", req);
     let context = &*context;
     let mut authed = false;
     if let Some(access_code) = &context.access_code {
@@ -53,7 +55,7 @@ async fn serve<'a>(
                 if let Some(code) = params.get("access_code") {
                     if code == access_code {
                         authed = true;
-                        info!("Client authenticated: {}.", &addr);
+                        info!("Web-Client authenticated: {}.", &addr);
                     }
                 }
             }
@@ -79,6 +81,7 @@ async fn serve<'a>(
                 stylus_support_enabled: cfg!(target_os = "linux"),
                 faster_capture_enabled: cfg!(target_os = "linux"),
                 capture_cursor_enabled: cfg!(target_os = "linux"),
+                debug: crate::log::get_log_level() >= tracing::Level::DEBUG,
             };
 
             Ok(response_from_str(

@@ -5,7 +5,7 @@ use std::sync::{
     mpsc, Arc, Mutex,
 };
 use std::thread::spawn;
-use tracing::{error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use websocket::sender::Writer;
 use websocket::server::upgrade::{sync::Buffer as WsBuffer, WsUpgrade};
@@ -154,6 +154,7 @@ fn handle_connection(
                     if let OwnedMessage::Text(pw) = &msg {
                         if pw == &access_code {
                             authed = true;
+                            info!("WS-Client authenticated: {}!", peer_addr);
                         } else {
                             warn!(
                                 "Authentication failed: {} sent wrong access code: '{}'",
@@ -269,7 +270,7 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, confi
                                         // ignore broken pipe errors as those are caused by
                                         // intentionally shutting down the websocket
                                         if err.kind() == std::io::ErrorKind::BrokenPipe {
-                                            trace!("Error sending video: {}", err);
+                                            debug!("Error sending video: {}", err);
                                         } else {
                                             warn!("Error sending video: {}", err);
                                         }
@@ -465,11 +466,18 @@ impl WsHandler {
                 match message {
                     Ok(message) => match message {
                         MessageInbound::PointerEvent(event) => {
+                            trace!("Got: {:?}", &event);
                             self.process_pointer_event(&event);
                         }
                         MessageInbound::TryGetFrame => self.queue_try_send_video_frame(),
-                        MessageInbound::GetCapturableList => self.send_capturable_list(),
-                        MessageInbound::Config(config) => self.setup(config),
+                        MessageInbound::GetCapturableList => {
+                            trace!("Got: GetCapturableList");
+                            self.send_capturable_list()
+                        }
+                        MessageInbound::Config(config) => {
+                            trace!("Got: {:?}", &config);
+                            self.setup(config)
+                        }
                     },
                     Err(err) => {
                         warn!("Unable to parse message: {} ({})", s, err);

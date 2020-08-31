@@ -148,3 +148,14 @@ label input:disabled + span {
 .lefty #vanish {
     text-align: left;
 }
+#debug {
+    max-width: 15em;
+    overflow-x: auto;
+    touch-action: auto;
+    user-select: text;
+    -webkit-touch-callout: default;
+    -webkit-user-select: text;
+    -khtml-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+}

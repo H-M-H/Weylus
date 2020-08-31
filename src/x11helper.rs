@@ -3,7 +3,7 @@ use std::fmt;
 use std::os::raw::{c_char, c_float, c_int, c_void};
 use std::sync::Arc;
 
-use tracing::{debug, trace};
+use tracing::debug;
 
 use crate::cerror::CError;
 
@@ -213,7 +213,7 @@ impl X11Context {
         };
         fltk::app::unlock();
         if err.is_err() {
-            trace!("Failed to map input device to screen: {}", &err);
+            debug!("Failed to map input device to screen: {}", &err);
         }
         err
     }
