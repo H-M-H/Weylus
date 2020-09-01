@@ -321,8 +321,8 @@ function handle_messages(
         // not a string -> got a video frame
         queue.push(event.data);
         upd_buf();
-        if (video.seekable.length > 0 && video.seekable.end(0) - video.currentTime > 0.01)
-            video.currentTime = video.seekable.end(0)
+        if (video.buffered.length > 0 && video.buffered.end(video.buffered.length - 1) - video.currentTime > 0.01)
+            video.currentTime = video.buffered.end(video.buffered.length - 1)
     }
 }
 
