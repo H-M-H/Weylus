@@ -46,7 +46,8 @@ Start Weylus, preferably set an access code in the access code box and press the
 will start a webserver running on your computer. To control your computer with your tablet you need
 to open the url `http://<address of your computer>:<port set in the menu, default is 1701>`, if
 possible Weylus will display to you the url you need to open and show a QR code with the encoded
-address.
+address. If you have a firewall running make sure to open a TCP port for the webserver (1701 by
+default) and the websocket connection (9001 by default).
 
 ### Fullscreen
 You may want to add a bookmark to your home screen on your tablet as this enables running Weylus in
