@@ -4,7 +4,7 @@ RUN apt-get update && \
    apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev \
    libxrender-dev libxfixes-dev libgl1-mesa-dev libglu1-mesa-dev libxtst-dev cmake git curl \
    software-properties-common zip libssl-dev libxrandr-dev libxcomposite-dev libxi-dev \
-   gcc g++ autoconf libtool-bin libxv-dev libdrm-dev pkg-config
+   gcc g++ autoconf libtool-bin libxv-dev libdrm-dev libpango1.0-dev pkg-config
 RUN apt-add-repository contrib
 RUN apt-add-repository non-free
 RUN apt-get update && apt-get install -y nvidia-cuda-dev
