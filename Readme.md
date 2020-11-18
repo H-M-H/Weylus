@@ -9,6 +9,7 @@ Weylus in action with [Xournal++](https://github.com/xournalpp/xournalpp):
 
 ## Table of Contents
 * [Features](#features)
+* [Step by step instructions](#step-by-step-instructions)
 * [Installation](#installation)
 * [Running](#running)
     * [Fullscreen](#fullscreen)
@@ -36,11 +37,31 @@ features on Linux are:
 - Hardware accelerated video encoding
 - Tablet as second screen
 
+## Step by step instructions
+- Follow instructions for [Installation](#installation)
+- Before you start Weylus, follow instructions for setting it up in [Linux](#linux) or [MacOS](#macos)
+- If you are behind the firewall (many distributions turn on firewall by default), enter the commands
+  ```
+  sudo ufw allow 1701/tcp
+  sudo ufw allow 9001/tcp
+  ```
+  so that these ports are opened by TCP. These are the default ports used by Weylus.
+  If you want to use a different port, you can change the commands appropriately.
+- Start Weylus from Terminal
+   ```
+   weylus
+   ```
+- Enter an access code (which you will have to enter later from your mobile device)
+- Click on the start button.
+- The Weylus window will show you an web address. Ensure that your mobile device is connected to the same network,
+   and open this link in it. Then enter the access code you had set.
+   
+   **Note**: You will need a recent version of Firefox (80+) or Chrome on your mobile device.
 ## Installation
 Just grab the latest release for your OS from the
-[releases page](https://github.com/H-M-H/Weylus/releases) and install it on your computer. No apps
-except a modern browser are required on your tablet.
-
+[releases page](https://github.com/H-M-H/Weylus/releases) and install it on your computer.
+An [AUR package](https://aur.archlinux.org/packages/weylus-bin/) is available for Arch Linux and derivatives.
+No apps except a modern browser are required on your tablet.
 ## Running
 Start Weylus, preferably set an access code in the access code box and press the Start button. This
 will start a webserver running on your computer. To control your computer with your tablet you need
