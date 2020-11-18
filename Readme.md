@@ -22,6 +22,7 @@ Weylus in action with [Xournal++](https://github.com/xournalpp/xournalpp):
 * [How does this work?](#how-does-this-work)
     * [Stylus/Touch](#stylustouch)
     * [Screen mirroring & window capturing](#screen-mirroring--window-capturing)
+* [FAQ](#faq)
 
 ## Features
 - Control your mouse with your tablet
@@ -39,7 +40,13 @@ features on Linux are:
 ## Installation
 Just grab the latest release for your OS from the
 [releases page](https://github.com/H-M-H/Weylus/releases) and install it on your computer. No apps
-except a modern browser are required on your tablet.
+except a modern browser are required on your tablet. **If you run Linux make sure to follow the
+instructions described [here](#linux) to enable uinput for features like pressure sensitivity and
+multitouch!**
+
+### Packages
+An AUR package [weylus-bin](https://aur.archlinux.org/packages/weylus-bin/) is available for Arch
+Linux and derivatives.
 
 ## Running
 Start Weylus, preferably set an access code in the access code box and press the Start button. This
@@ -48,6 +55,15 @@ to open the url `http://<address of your computer>:<port set in the menu, defaul
 possible Weylus will display to you the url you need to open and show a QR code with the encoded
 address. If you have a firewall running make sure to open a TCP port for the webserver (1701 by
 default) and the websocket connection (9001 by default).
+
+On many Linux distributions this is done with ufw:
+```
+sudo ufw allow 1701/tcp
+sudo ufw allow 9001/tcp
+```
+
+Currently there is no .desktop file included with Weylus, so you need to start it from the
+terminal by running `weylus`.
 
 ### Fullscreen
 You may want to add a bookmark to your home screen on your tablet as this enables running Weylus in
@@ -86,7 +102,11 @@ On Linux Weylus supports hardware accelerated video encoding through the Video A
 the hardware encoded video stream varies widely among different hardware and sufficient quality can
 not be guaranteed. If VAAPI is used it is possible to select a specific driver by setting the
 environment variable `LIBVA_DRIVER_NAME`. You can find possible values with the command
-`ls /usr/lib/dri/ | sed -n 's/^\(\S*\)_drv_video.so$/\1/p'`. Additionally you can specify the VAAPI
+`ls /usr/lib/dri/ | sed -n 's/^\(\S*\)_drv_video.so$/\1/p'`. On some distributions the drivers may
+not reside in `/usr/lib/dri` but for example in `/usr/lib/x86_64-linux-gnu/dri` and may not be found
+by Weylus. To force Weylus to search another directory for drivers, the environment variable
+`LIBVA_DRIVERS_PATH` can be set.
+Additionally you can specify the VAAPI
 device to use by setting `WEYLUS_VAAPI_DEVICE`; by default devices can be found in `/dev/dri`. Note
 that you may need to install the driver(s) first.
 
@@ -218,6 +238,38 @@ captured are then encoded to a video stream using ffmpeg. Fragmented MP4 is used
 to enable browsers to play the stream via the Media Source Extensions API. The video codec used is
 H.264 as this is widely supported and allows very fast encoding as opposed to formats like AV1. To
 minimize dependencies ffmpeg is statically linked into Weylus.
+
+## FAQ
+Q: Why does the page not load on my tablet and instead I get a timeout?<br>
+A: There probably is some kind of firewall running, make sure the ports Weylus uses are opened.
+
+Q: Why do I get the error `ERROR Failed to create uinput device: CError: code...`?<br>
+A: uinput is probably misconfigured, have you made sure to follow all instructions and logged out
+and in again? You may also be running a very old kernel that does not support the required features.
+In that case try to upgrade your system or use a newer one.
+
+Q: Why is the "Capture" drop down empty and the screen not mirrored?<br>
+A: It is possible that only the port for the webserver but not the websocket has been opened, check
+that both ports have been opened.
+
+Q: Why can I not select any windows in the "Capture" drop down and only see the whole screen.<br>
+A: If you are running Weylus on MacOS or Windows this feature is unfortunately not implemented. On
+Linux it is possible that your window manager does not support
+[Extended Window Manager Hints](https://specifications.freedesktop.org/wm-spec/latest/) or that you
+need to activate them first, like for XMonad.
+
+Q: Do I have to follow the instructions to setup Weylus as second screen too?<br>
+A: No this is strictly optional.
+
+Q: Why am I unable to connect my tablet to the URL displayed by Weylus?<br>
+A: It is possible that your computer and WiFi connected tablet are on different networks, make sure
+they are on the same network.
+
+Q: Why does this not run on Firefox for Android?<br>
+A: Actually it does, just make sure Firefox version 80+ is installed.
+
+Q: Why does this not run under Chrome on my iPad?<br>
+A: Chrome lacks some features for video streaming on iPadOS/iOS, try Firefox or Safari.
 
 ---
 
