@@ -69,11 +69,15 @@ fn main() {
     #[cfg(target_os = "linux")]
     cc_video.define("HAS_VAAPI", None);
     cc_video.compile("video");
-    let ffmpeg_link_kind = if env::var("CARGO_FEATURE_FFMPEG_SYSTEM").is_ok() {
-        "dylib"
-    } else {
-        "static"
-    };
+    let ffmpeg_link_kind =
+        // https://github.com/rust-lang/rust/pull/72785
+        // https://users.rust-lang.org/t/linking-on-windows-without-wholearchive/49846/3
+        if cfg!(target_os = "windows") ||
+            env::var("CARGO_FEATURE_FFMPEG_SYSTEM").is_ok() {
+            "dylib"
+        } else {
+            "static"
+        };
     println!("cargo:rustc-link-lib={}=avcodec", ffmpeg_link_kind);
     println!("cargo:rustc-link-lib={}=avdevice", ffmpeg_link_kind);
     println!("cargo:rustc-link-lib={}=avfilter", ffmpeg_link_kind);
