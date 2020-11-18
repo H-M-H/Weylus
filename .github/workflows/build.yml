@@ -31,14 +31,14 @@ jobs:
     - uses: actions/cache@v2
       with:
         path: deps/dist
-        key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}
+        key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}-6
     - uses: actions/cache@v2
       with:
         path: |
           ~/.cargo/registry
           ~/.cargo/git
           target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}-6
     - name: Build
       run: ${{ matrix.build-cmd }}
       shell: bash
@@ -101,14 +101,14 @@ jobs:
     - uses: actions/cache@v2
       with:
         path: deps/dist
-        key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}
+        key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}-6
     - uses: actions/cache@v2
       with:
         path: |
           ~/.cargo/registry
           ~/.cargo/git
           target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}-6
     - name: Download deps
       run: ${{ matrix.install-deps }}
       shell: bash
