@@ -103,6 +103,7 @@ jobs:
         path: deps/dist
         key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}-6
     - uses: actions/cache@v2
+      if: ${{ !contains(matrix.os, 'macOS') }}
       with:
         path: |
           ~/.cargo/registry
