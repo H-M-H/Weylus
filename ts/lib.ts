@@ -342,8 +342,14 @@ function handle_messages(
         // not a string -> got a video frame
         queue.push(event.data);
         upd_buf();
-        if (video.buffered.length > 0 && video.buffered.end(video.buffered.length - 1) - video.currentTime > 0.01)
-            video.currentTime = video.buffered.end(video.buffered.length - 1)
+        if (video.seekable.length > 0 &&
+            // only seek if there is data available, some browsers choke otherwise
+            (video.readyState >= 3 ||
+                // seek to end if we are more than a second off, this may happen if a tab is moved
+                // to the background
+                video.seekable.end(video.seekable.length - 1) - video.currentTime > 1)) {
+            video.currentTime = video.seekable.end(video.seekable.length - 1);
+        }
     }
 }
 
