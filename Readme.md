@@ -271,6 +271,12 @@ A: Actually it does, just make sure Firefox version 80+ is installed.
 Q: Why does this not run under Chrome on my iPad?<br>
 A: Chrome lacks some features for video streaming on iPadOS/iOS, try Firefox or Safari.
 
+Q: Can I use Weylus even if there is no WiFi?<br>
+A: Probably yes! Most tablets permit setting up a WiFi hotspot that can be used to connect your
+computer and tablet. Alternatively there is USB tethering too, which can be used to setup a peer to
+peer connection between your tablet and computer over USB. Weylus only requires that your devices
+are connected via the Internet Protocol and that doesn't necessarily imply WiFi.
+
 ---
 
 [![Packaging status](
