@@ -17,7 +17,7 @@ struct WebConfig {
     stylus_support_enabled: bool,
     faster_capture_enabled: bool,
     capture_cursor_enabled: bool,
-    debug: bool,
+    log_level: String,
 }
 
 fn response_from_str(s: &str, content_type: &str) -> Response<Body> {
@@ -81,7 +81,7 @@ async fn serve<'a>(
                 stylus_support_enabled: cfg!(target_os = "linux"),
                 faster_capture_enabled: cfg!(target_os = "linux"),
                 capture_cursor_enabled: cfg!(target_os = "linux"),
-                debug: crate::log::get_log_level() >= tracing::Level::DEBUG,
+                log_level: crate::log::get_log_level().to_string(),
             };
 
             Ok(response_from_str(

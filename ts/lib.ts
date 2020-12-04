@@ -1,15 +1,36 @@
-function run(access_code: string, websocket_port: number) {
+enum LogLevel {
+    ERROR = 0,
+    WARN,
+    INFO,
+    DEBUG,
+    TRACE,
+}
+
+let log_pre: HTMLPreElement;
+let log_level: LogLevel = LogLevel.ERROR;
+let no_log_messages: boolean = true;
+
+function run(access_code: string, websocket_port: number, level: string) {
     window.onload = () => {
-        let p = document.getElementById("debug");
-        if (p) {
-            p.textContent = "";
-            window.addEventListener("error", (e: ErrorEvent) => {
-                p.textContent += e.filename + ":L" + e.lineno + ":" + e.colno + ": " + e.message + "\n";
-                return false;
-            }, true)
-        }
+        log_pre = document.getElementById("log") as HTMLPreElement;
+        log_pre.textContent = "";
+        log_level = LogLevel[level];
+        window.addEventListener("error", (e: ErrorEvent) => {
+            log(LogLevel.ERROR, e.filename + ":L" + e.lineno + ":" + e.colno + ": " + e.message);
+            return false;
+        }, true)
         init(access_code, websocket_port)
     };
+}
+
+function log(level: LogLevel, msg: string) {
+    if (level > log_level)
+        return;
+    if (no_log_messages) {
+        no_log_messages = false;
+        document.getElementById("log_section").classList.remove("hide");
+    }
+    log_pre.textContent += msg + "\n";
 }
 
 class Settings {
@@ -275,7 +296,7 @@ function handle_messages(
                 try {
                     sourceBuffer.appendBuffer(queue.shift());
                 } catch (err) {
-                    console.log("Error appending to sourceBuffer:", err);
+                    log(LogLevel.DEBUG, "Error appending to sourceBuffer:" + err);
                     // Drop everything, and try to pick up the stream again
                     if (sourceBuffer.updating)
                         sourceBuffer.abort();
