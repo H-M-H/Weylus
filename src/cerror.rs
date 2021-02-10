@@ -10,6 +10,12 @@ pub struct CError {
     error_str: [c_char; 1024],
 }
 
+pub enum CErrorCode {
+    NoError,
+    GenericError,
+    UInputNotAccessible,
+}
+
 impl CError {
     pub fn new() -> Self {
         Self {
@@ -24,6 +30,14 @@ impl CError {
 
     pub fn code(&self) -> i32 {
         self.code as i32
+    }
+
+    pub fn to_enum(&self) -> CErrorCode {
+        match self.code {
+            0 => CErrorCode::NoError,
+            101 => CErrorCode::UInputNotAccessible,
+            _ => CErrorCode::GenericError,
+        }
     }
 }
 

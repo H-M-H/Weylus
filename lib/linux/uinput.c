@@ -196,7 +196,7 @@ int init_uinput_stylus(const char* name, Error* err)
 	int device;
 
 	if ((device = open("/dev/uinput", O_WRONLY | O_NONBLOCK)) < 0)
-		fill_error(err, 1, "error: failed to open /dev/uinput");
+		fill_error(err, 101, "error: failed to open /dev/uinput");
 	else
 	{
 		init_stylus(device, name, err);
@@ -209,7 +209,7 @@ int init_uinput_mouse(const char* name, Error* err)
 	int device;
 
 	if ((device = open("/dev/uinput", O_WRONLY | O_NONBLOCK)) < 0)
-		fill_error(err, 1, "error: failed to open /dev/uinput");
+		fill_error(err, 101, "error: failed to open /dev/uinput");
 	else
 	{
 		init_mouse(device, name, err);
@@ -222,7 +222,7 @@ int init_uinput_touch(const char* name, Error* err)
 	int device;
 
 	if ((device = open("/dev/uinput", O_WRONLY | O_NONBLOCK)) < 0)
-		fill_error(err, 1, "error: failed to open /dev/uinput");
+		fill_error(err, 101, "error: failed to open /dev/uinput");
 	else
 	{
 		init_touch(device, name, err);

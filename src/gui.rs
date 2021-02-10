@@ -23,7 +23,7 @@ use pnet::datalink;
 
 use crate::config::{write_config, Config};
 use crate::web::{Gui2WebMessage, Web2GuiMessage};
-use crate::websocket::{Gui2WsMessage, WsConfig};
+use crate::websocket::{Gui2WsMessage, Ws2GuiMessage, WsConfig};
 
 pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     // this makes sure XInitThreads is called before any threading is done
@@ -47,7 +47,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         "Restrict who can control your computer with an access code. Note that this does NOT do \
         any kind of encryption and it is advised to only run Weylus inside trusted networks! Do \
         NOT reuse any of your passwords! If left blank, no code is required to access Weylus \
-        remotely."
+        remotely.",
     );
     if let Some(code) = config.access_code.as_ref() {
         input_access_code.set_value(code);
@@ -118,7 +118,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     let mut output = TextDisplay::default()
         .with_size(600, 6 * height)
         .with_pos(30, 600 - 30 - 6 * height);
-    output.set_buffer(Some(output_buf));
+    output.set_buffer(output_buf);
     let output_buf = output.buffer().unwrap();
 
     let mut output_server_addr = Output::default()
@@ -141,7 +141,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     let output_server_addr = Arc::new(Mutex::new(output_server_addr));
     let output_buf = Arc::new(Mutex::new(output_buf));
 
-    let (sender_ws2gui, _receiver_ws2gui) = mpsc::channel();
+    let (sender_ws2gui, receiver_ws2gui) = mpsc::channel();
     let (sender_web2gui, receiver_web2gui) = mpsc::channel();
 
     std::thread::spawn(move || {
@@ -159,6 +159,36 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     Web2GuiMessage::Shutdown => {
                         let mut output_server_addr = output_server_addr.lock().unwrap();
                         output_server_addr.hide();
+                    }
+                }
+            }
+        });
+    }
+
+    {
+        std::thread::spawn(move || {
+            while let Ok(message) = receiver_ws2gui.recv() {
+                match message {
+                    Ws2GuiMessage::UInputInaccessible => {
+                        let w = 500;
+                        let h = 300;
+                        let mut pop_up = Window::default()
+                            .with_size(w, h)
+                            .center_screen()
+                            .with_label("Weylus - UInput inaccessible!");
+
+                        let buf = TextBuffer::default();
+                        let mut pop_up_text = TextDisplay::default().with_size(w, h);
+                        pop_up_text.set_buffer(buf);
+                        pop_up_text.wrap_mode(fltk::text::WrapMode::AtBounds, 5);
+                        let mut buf = pop_up_text.buffer().unwrap();
+                        buf.set_text(
+                            std::include_str!("uinput_error.txt")
+                        );
+
+                        pop_up.end();
+                        pop_up.make_modal(true);
+                        pop_up.show();
                     }
                 }
             }
@@ -218,18 +248,18 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                             let mut ips = Vec::<IpAddr>::new();
                             for iface in datalink::interfaces()
                                 .iter()
-                                    .filter(|iface| iface.is_up() && !iface.is_loopback())
+                                .filter(|iface| iface.is_up() && !iface.is_loopback())
+                            {
+                                for ipnetw in &iface.ips {
+                                    if (ipnetw.is_ipv4() && web_sock.ip().is_ipv4())
+                                        || (ipnetw.is_ipv6() && web_sock.ip().is_ipv6())
                                     {
-                                        for ipnetw in &iface.ips {
-                                            if (ipnetw.is_ipv4() && web_sock.ip().is_ipv4())
-                                                || (ipnetw.is_ipv6() && web_sock.ip().is_ipv6())
-                                            {
-                                                // filtering ipv6 unicast requires nightly or more fiddling,
-                                                // lets wait for nightlies to stabilize...
-                                                ips.push(ipnetw.ip())
-                                            }
-                                        }
+                                        // filtering ipv6 unicast requires nightly or more fiddling,
+                                        // lets wait for nightlies to stabilize...
+                                        ips.push(ipnetw.ip())
                                     }
+                                }
+                            }
                             if !ips.is_empty() {
                                 web_sock.set_ip(ips[0]);
                             }
@@ -293,12 +323,12 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     let config = Config {
                         access_code: access_code.map(|s| s.to_string()),
                         web_port,
-                        websocket_port : ws_port,
-                        bind_address : bind_addr,
+                        websocket_port: ws_port,
+                        bind_address: bind_addr,
                         #[cfg(target_os = "linux")]
                         try_vaapi: check_vaapi.is_checked(),
                         #[cfg(target_os = "linux")]
-                        try_nvenc : check_nvenc.is_checked(),
+                        try_nvenc: check_nvenc.is_checked(),
                     };
                     write_config(&config);
                 } else {

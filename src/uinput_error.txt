@@ -1,0 +1,8 @@
+Weylus uses the uinput interface to simulate input events on Linux. To enable stylus and multi-touch support /dev/uinput needs to be writable by Weylus. To make /dev/uinput permanently writable by your user, run the following inside a terminal:
+
+sudo groupadd -r uinput
+sudo usermod -aG uinput $USER
+echo 'KERNEL=="uinput", MODE="0660", GROUP="uinput", OPTIONS+="static_node=uinput"' | sudo tee /etc/udev/rules.d/60-weylus.rules
+
+
+If you do not want to make use of this feature uncheck "Produce Touch Events" in your browser. Like this Weylus will only simulate a mouse.

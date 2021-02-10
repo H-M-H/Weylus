@@ -21,11 +21,14 @@ use crate::screen_capture::ScreenCapture;
 #[cfg(target_os = "linux")]
 use crate::x11helper::{Capturable, X11Context};
 
+use crate::cerror::CErrorCode;
 use crate::video::VideoEncoder;
 
 type WsWriter = Arc<Mutex<websocket::sender::Writer<std::net::TcpStream>>>;
 
-pub enum Ws2GuiMessage {}
+pub enum Ws2GuiMessage {
+    UInputInaccessible,
+}
 
 pub enum Gui2WsMessage {
     Shutdown,
@@ -73,7 +76,7 @@ fn listen_websocket(
     config: WsConfig,
     clients: Arc<Mutex<HashMap<SocketAddr, Arc<Mutex<Writer<TcpStream>>>>>>,
     shutdown: Arc<AtomicBool>,
-    _sender: mpsc::Sender<Ws2GuiMessage>,
+    sender: mpsc::Sender<Ws2GuiMessage>,
 ) {
     let server = Server::bind(config.address);
     if let Err(err) = server {
@@ -98,7 +101,8 @@ fn listen_websocket(
             Ok(request) => {
                 let clients = clients.clone();
                 let config = config.clone();
-                spawn(move || handle_connection(request, clients, config));
+                let sender = sender.clone();
+                spawn(move || handle_connection(request, clients, config, sender));
             }
             Err(_) => {
                 if shutdown.load(Ordering::Relaxed) {
@@ -113,6 +117,7 @@ fn handle_connection(
     request: WsUpgrade<TcpStream, Option<WsBuffer>>,
     clients: Arc<Mutex<HashMap<SocketAddr, Arc<Mutex<Writer<TcpStream>>>>>>,
     config: WsConfig,
+    gui_sender: mpsc::Sender<Ws2GuiMessage>,
 ) {
     let client = request.accept();
     if let Err((_, err)) = client {
@@ -143,7 +148,7 @@ fn handle_connection(
         clients.insert(peer_addr, ws_sender.clone());
     }
 
-    let mut ws_handler = WsHandler::new(ws_sender, &peer_addr, config.clone());
+    let mut ws_handler = WsHandler::new(ws_sender, &peer_addr, config.clone(), gui_sender);
 
     let mut authed = config.access_code.is_none();
     let access_code = config.access_code.unwrap_or_else(|| "".into());
@@ -258,7 +263,8 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, confi
                 }
                 let screen_capture = screen_capture.as_ref().unwrap();
                 let (width_in, height_in) = screen_capture.size();
-                let scale = (max_width as f64 / width_in as f64).min(max_height as f64 / height_in as f64);
+                let scale =
+                    (max_width as f64 / width_in as f64).min(max_height as f64 / height_in as f64);
                 let mut width_out = width_in;
                 let mut height_out = height_in;
                 if scale < 1.0 {
@@ -344,10 +350,16 @@ struct WsHandler {
     x11ctx: Option<X11Context>,
     #[cfg(target_os = "linux")]
     capturables: Vec<Capturable>,
+    gui_sender: mpsc::Sender<Ws2GuiMessage>,
 }
 
 impl WsHandler {
-    fn new(sender: WsWriter, client_addr: &SocketAddr, config: WsConfig) -> Self {
+    fn new(
+        sender: WsWriter,
+        client_addr: &SocketAddr,
+        config: WsConfig,
+        gui_sender: mpsc::Sender<Ws2GuiMessage>,
+    ) -> Self {
         let (video_sender, video_receiver) = mpsc::channel::<VideoCommands>();
         {
             let sender = sender.clone();
@@ -374,6 +386,7 @@ impl WsHandler {
             x11ctx,
             #[cfg(target_os = "linux")]
             capturables,
+            gui_sender,
         }
     }
 
@@ -442,6 +455,13 @@ impl WsHandler {
                     );
                     if let Err(err) = device {
                         error!("Failed to create uinput device: {}", err);
+                        if let CErrorCode::UInputNotAccessible = err.to_enum() {
+                            if let Err(err) =
+                                self.gui_sender.send(Ws2GuiMessage::UInputInaccessible)
+                            {
+                                warn!("Failed to send message to gui thread: {}!", err);
+                            }
+                        }
                         self.send_msg(&MessageOutbound::ConfigError(
                             "Failed to create uinput device!".to_string(),
                         ));
