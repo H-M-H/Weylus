@@ -6,6 +6,8 @@ pub struct ClientConfiguration {
     pub faster_capture: bool,
     pub capturable_id: usize,
     pub capture_cursor: bool,
+    pub max_width: usize,
+    pub max_height: usize,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

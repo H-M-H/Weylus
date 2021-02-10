@@ -28,10 +28,10 @@ typedef struct VideoContext
 	AVStream* st;
 	AVBufferRef* hw_device_ctx;
 	enum AVPixelFormat sw_pix_fmt;
-	int width;
-	int height;
-	int width_orig;
-	int height_orig;
+	int width_out;
+	int height_out;
+	int width_in;
+	int height_in;
 	size_t buf_size;
 	void* buf;
 	void* rust_ctx;
@@ -52,8 +52,8 @@ int write_video_packet(void* rust_ctx, uint8_t* buf, int buf_size);
 void set_codec_params(VideoContext* ctx)
 {
 	/* resolution must be a multiple of two */
-	ctx->c->width = ctx->width;
-	ctx->c->height = ctx->height;
+	ctx->c->width = ctx->width_out;
+	ctx->c->height = ctx->height_out;
 	ctx->c->time_base = (AVRational){1, 1000};
 	ctx->c->framerate = (AVRational){0, 1};
 
@@ -73,8 +73,8 @@ void set_hwframe_ctx(VideoContext* ctx, Error* err)
 	frames_ctx = (AVHWFramesContext*)(hw_frames_ref->data);
 	frames_ctx->format = AV_PIX_FMT_VAAPI;
 	frames_ctx->sw_format = AV_PIX_FMT_NV12;
-	frames_ctx->width = ctx->width;
-	frames_ctx->height = ctx->height;
+	frames_ctx->width = ctx->width_out;
+	frames_ctx->height = ctx->height_out;
 	frames_ctx->initial_pool_size = 20;
 	int ret;
 	if ((ret = av_hwframe_ctx_init(hw_frames_ref)) < 0)
@@ -102,8 +102,13 @@ void set_frame_params(VideoContext* ctx)
 
 void open_video(VideoContext* ctx, Error* err)
 {
-	if (ctx->width <= 1 || ctx->height <= 1)
-		ERROR(err, 1, "Invalid size for video: width = %d, height = %d", ctx->width, ctx->height);
+	if (ctx->width_out <= 1 || ctx->height_out <= 1)
+		ERROR(
+			err,
+			1,
+			"Invalid size for video: width = %d, height = %d",
+			ctx->width_out,
+			ctx->height_out);
 
 	const AVCodec* codec;
 	int ret;
@@ -257,11 +262,11 @@ void open_video(VideoContext* ctx, Error* err)
 	av_dict_free(&opt);
 
 	ctx->sws_rgb = sws_getContext(
-		ctx->width_orig,
-		ctx->height_orig,
+		ctx->width_in,
+		ctx->height_in,
 		AV_PIX_FMT_RGB24,
-		ctx->width,  // note that this is != width_orig, this is in purpose as this allows proper
-		ctx->height, // rescaling if dimensions of provided image data are not even
+		ctx->width_out,
+		ctx->height_out,
 		ctx->sw_pix_fmt,
 		SWS_FAST_BILINEAR,
 		NULL,
@@ -269,11 +274,11 @@ void open_video(VideoContext* ctx, Error* err)
 		NULL);
 
 	ctx->sws_bgra = sws_getContext(
-		ctx->width_orig,
-		ctx->height_orig,
+		ctx->width_in,
+		ctx->height_in,
 		AV_PIX_FMT_BGRA,
-		ctx->width,  // note that this is != width_orig, this is in purpose as this allows proper
-		ctx->height, // rescaling if dimensions of provided image data are not even
+		ctx->width_out,
+		ctx->height_out,
 		ctx->sw_pix_fmt,
 		SWS_FAST_BILINEAR,
 		NULL,
@@ -334,15 +339,21 @@ void encode_video_frame(VideoContext* ctx, int micros, Error* err)
 	}
 }
 
-VideoContext*
-init_video_encoder(void* rust_ctx, int width, int height, int try_vaapi, int try_nvenc)
+VideoContext* init_video_encoder(
+	void* rust_ctx,
+	int width_in,
+	int height_in,
+	int width_out,
+	int height_out,
+	int try_vaapi,
+	int try_nvenc)
 {
 	VideoContext* ctx = malloc(sizeof(VideoContext));
 	ctx->rust_ctx = rust_ctx;
-	ctx->width = width - width % 2;
-	ctx->height = height - height % 2;
-	ctx->width_orig = width;
-	ctx->height_orig = height;
+	ctx->width_out = width_out - width_out % 2;
+	ctx->height_out = height_out - height_out % 2;
+	ctx->width_in = width_in;
+	ctx->height_in = height_in;
 	ctx->pts = 0;
 	ctx->initialized = 0;
 	ctx->frame_allocated = 0;
@@ -380,18 +391,19 @@ void alloc_frame_buffer_hw(VideoContext* ctx, Error* err)
 
 void fill_bgra(VideoContext* ctx, const void* data, Error* err)
 {
-	if (ctx->frame->format == AV_PIX_FMT_BGR0)
+	if (ctx->frame->format == AV_PIX_FMT_BGR0 && ctx->width_in == ctx->width_out &&
+		ctx->height_in == ctx->width_out)
 	{
 		if (ctx->frame_allocated)
 			dealloc_frame_buffer(ctx);
 		ctx->frame->data[0] = (uint8_t*)data;
-		ctx->frame->linesize[0] = ctx->width_orig * 4;
+		ctx->frame->linesize[0] = ctx->width_in * 4;
 	}
 	else
 	{
 		const uint8_t* const* src = (const uint8_t* const*)&data;
 		// 4 colors per pixel
-		const int src_stride[] = {ctx->width_orig * 4, 0, 0, 0};
+		const int src_stride[] = {ctx->width_in * 4, 0, 0, 0};
 		if (!ctx->frame_allocated)
 		{
 			alloc_frame_buffer(ctx, err);
@@ -403,7 +415,7 @@ void fill_bgra(VideoContext* ctx, const void* data, Error* err)
 			src,
 			src_stride,
 			0,
-			ctx->height_orig,
+			ctx->height_in,
 			ctx->frame->data,
 			ctx->frame->linesize);
 	}
@@ -425,7 +437,7 @@ void fill_rgb(VideoContext* ctx, const void* data, Error* err)
 {
 	const uint8_t* const* src = (const uint8_t* const*)&data;
 	// 3 colors per pixel
-	const int src_stride[] = {ctx->width_orig * 3, 0, 0, 0};
+	const int src_stride[] = {ctx->width_in * 3, 0, 0, 0};
 	if (!ctx->frame_allocated)
 	{
 		alloc_frame_buffer(ctx, err);
@@ -433,7 +445,7 @@ void fill_rgb(VideoContext* ctx, const void* data, Error* err)
 	}
 	av_frame_make_writable(ctx->frame);
 	sws_scale(
-		ctx->sws_rgb, src, src_stride, 0, ctx->height_orig, ctx->frame->data, ctx->frame->linesize);
+		ctx->sws_rgb, src, src_stride, 0, ctx->height_in, ctx->frame->data, ctx->frame->linesize);
 	if (ctx->using_vaapi)
 	{
 		if (!ctx->frame_hw_allocated)

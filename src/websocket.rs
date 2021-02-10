@@ -206,6 +206,8 @@ struct VideoConfig {
     capture_cursor: bool,
     #[cfg(target_os = "linux")]
     x11_capture: bool,
+    max_width: usize,
+    max_height: usize,
 }
 
 enum VideoCommands {
@@ -216,6 +218,9 @@ enum VideoCommands {
 fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, config: WsConfig) {
     let mut screen_capture: Option<Box<dyn ScreenCapture>> = None;
     let mut video_encoder: Option<Box<VideoEncoder>> = None;
+
+    let mut max_width = 1920;
+    let mut max_height = 1080;
 
     loop {
         let msg = receiver.recv();
@@ -252,16 +257,28 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, confi
                     continue;
                 }
                 let screen_capture = screen_capture.as_ref().unwrap();
-                let (width, height) = screen_capture.size();
+                let (width_in, height_in) = screen_capture.size();
+                let scale = (max_width as f64 / width_in as f64).min(max_height as f64 / height_in as f64);
+                let mut width_out = width_in;
+                let mut height_out = height_in;
+                if scale < 1.0 {
+                    width_out = (width_out as f64 * scale) as usize;
+                    height_out = (height_out as f64 * scale) as usize;
+                }
                 // video encoder is not setup or setup for encoding the wrong size: restart it
                 if video_encoder.is_none()
-                    || !video_encoder.as_ref().unwrap().check_size(width, height)
+                    || !video_encoder
+                        .as_ref()
+                        .unwrap()
+                        .check_size(width_in, height_in, width_out, height_out)
                 {
                     send_msg(&sender, &MessageOutbound::NewVideo);
                     let sender = sender.clone();
                     let res = VideoEncoder::new(
-                        width,
-                        height,
+                        width_in,
+                        height_in,
+                        width_out,
+                        height_out,
                         move |data| {
                             let msg = Message::binary(data);
                             if let Err(err) = sender.lock().unwrap().send_message(&msg) {
@@ -310,6 +327,8 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, confi
                 {
                     screen_capture = Some(Box::new(ScreenCaptureGeneric::new()));
                 }
+                max_width = config.max_width;
+                max_height = config.max_height;
                 send_msg(&sender, &MessageOutbound::ConfigOk);
             }
         }
@@ -440,6 +459,8 @@ impl WsHandler {
                         capturable,
                         capture_cursor: config.capture_cursor,
                         x11_capture: config.faster_capture,
+                        max_width: config.max_width,
+                        max_height: config.max_height,
                     }))
                     .unwrap();
             } else {
@@ -454,7 +475,10 @@ impl WsHandler {
         {
             self.input_device = Some(Box::new(crate::input::mouse_device::Mouse::new()));
             self.video_sender
-                .send(VideoCommands::Start(VideoConfig {}))
+                .send(VideoCommands::Start(VideoConfig {
+                    max_width: config.max_width,
+                    max_height: config.max_height,
+                }))
                 .unwrap();
         }
     }

@@ -8,8 +8,10 @@ use crate::cerror::CError;
 extern "C" {
     fn init_video_encoder(
         rust_ctx: *mut c_void,
-        width: c_int,
-        height: c_int,
+        width_in: c_int,
+        height_in: c_int,
+        width_out: c_int,
+        height_out: c_int,
         try_vaapi: c_int,
         try_nvenc: c_int,
     ) -> *mut c_void;
@@ -40,34 +42,40 @@ pub enum PixelProvider<'a> {
 
 pub struct VideoEncoder {
     handle: *mut c_void,
-    width: usize,
-    height: usize,
+    width_in: usize,
+    height_in: usize,
+    width_out: usize,
+    height_out: usize,
     write_data: Box<dyn Fn(&[u8])>,
     start_time: Instant,
 }
 
 impl VideoEncoder {
     pub fn new(
-        width: usize,
-        height: usize,
+        width_in: usize,
+        height_in: usize,
+        width_out: usize,
+        height_out: usize,
         write_data: impl Fn(&[u8]) + 'static,
         #[cfg(target_os = "linux")] try_vaapi: bool,
         #[cfg(target_os = "linux")] try_nvenc: bool,
     ) -> Result<Box<Self>, CError> {
-        let width = width;
-        let height = height;
         let mut video_encoder = Box::new(Self {
             handle: std::ptr::null_mut(),
-            width,
-            height,
+            width_in,
+            height_in,
+            width_out,
+            height_out,
             write_data: Box::new(move |data| write_data(data)),
             start_time: Instant::now(),
         });
         let handle = unsafe {
             init_video_encoder(
                 video_encoder.as_mut() as *mut _ as *mut c_void,
-                width as c_int,
-                height as c_int,
+                width_in as c_int,
+                height_in as c_int,
+                width_out as c_int,
+                height_out as c_int,
                 #[cfg(target_os = "linux")]
                 try_vaapi.into(),
                 #[cfg(target_os = "linux")]
@@ -119,8 +127,17 @@ impl VideoEncoder {
         }
     }
 
-    pub fn check_size(&self, width: usize, height: usize) -> bool {
-        (self.width == width) && (self.height == height)
+    pub fn check_size(
+        &self,
+        width_in: usize,
+        height_in: usize,
+        width_out: usize,
+        height_out: usize,
+    ) -> bool {
+        (self.width_in == width_in)
+            && (self.height_in == height_in)
+            && (self.width_out == width_out)
+            && (self.height_out == height_out)
     }
 }
 

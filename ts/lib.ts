@@ -110,6 +110,8 @@ class Settings {
             "faster_capture",
             "capture_cursor"])
             config[key] = this.checks.get(key).checked
+        config["max_width"] = Math.round(window.screen.availWidth * window.devicePixelRatio);
+        config["max_height"] = Math.round(window.screen.availHeight * window.devicePixelRatio);
         this.webSocket.send(JSON.stringify({ "Config": config }));
     }
 
@@ -345,9 +347,9 @@ function handle_messages(
         if (video.seekable.length > 0 &&
             // only seek if there is data available, some browsers choke otherwise
             (video.readyState >= 3 ||
-                // seek to end if we are more than a second off, this may happen if a tab is moved
-                // to the background
-                video.seekable.end(video.seekable.length - 1) - video.currentTime > 1)) {
+                // seek to end if we are more than half a second off, this may happen if a tab is
+                // moved to the background
+                video.seekable.end(video.seekable.length - 1) - video.currentTime > 0.5)) {
             video.currentTime = video.seekable.end(video.seekable.length - 1);
         }
     }
@@ -355,6 +357,7 @@ function handle_messages(
 
 function init(access_code: string, websocket_port: number) {
 
+    let authed = false;
     let webSocket = new WebSocket("ws://" + window.location.hostname + ":" + websocket_port);
     webSocket.binaryType = "arraybuffer";
 
@@ -371,7 +374,11 @@ function init(access_code: string, websocket_port: number) {
     }
     webSocket.onerror = () => handle_disconnect("Lost connection.");
     webSocket.onclose = () => handle_disconnect("Connection closed.");
-    window.onresize = () => stretch_video();
+    window.onresize = () => {
+        stretch_video();
+        if (authed)
+            settings.send_server_config();
+    }
     video.controls = false;
     video.onloadeddata = () => stretch_video();
     handle_messages(webSocket, video, () => {
@@ -385,6 +392,7 @@ function init(access_code: string, websocket_port: number) {
     webSocket.onopen = function(event) {
         if (access_code)
             webSocket.send(access_code);
+        authed = true;
         webSocket.send('"GetCapturableList"');
         settings.send_server_config();
     }
