@@ -429,7 +429,7 @@ void fill_bgra(VideoContext* ctx, const void* data, Error* err)
 		av_frame_make_writable(ctx->frame_hw);
 		int ret = av_hwframe_transfer_data(ctx->frame_hw, ctx->frame, 0);
 		if (ret < 0)
-			ERROR(err, 1, "Could upload video frame to hardware: %s", av_err2str(ret));
+			ERROR(err, 1, "Could not upload video frame to hardware: %s", av_err2str(ret));
 	}
 }
 
@@ -456,6 +456,6 @@ void fill_rgb(VideoContext* ctx, const void* data, Error* err)
 		av_frame_make_writable(ctx->frame_hw);
 		int ret = av_hwframe_transfer_data(ctx->frame_hw, ctx->frame, 0);
 		if (ret < 0)
-			ERROR(err, 1, "Could upload video frame to hardware: %s", av_err2str(ret));
+			ERROR(err, 1, "Could not upload video frame to hardware: %s", av_err2str(ret));
 	}
 }

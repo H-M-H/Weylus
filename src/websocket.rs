@@ -25,6 +25,7 @@ use crate::cerror::CErrorCode;
 use crate::video::VideoEncoder;
 
 type WsWriter = Arc<Mutex<websocket::sender::Writer<std::net::TcpStream>>>;
+type WsClients = Arc<Mutex<HashMap<SocketAddr, Arc<Mutex<Writer<TcpStream>>>>>>;
 
 pub enum Ws2GuiMessage {
     UInputInaccessible,
@@ -74,7 +75,7 @@ pub fn run(
 
 fn listen_websocket(
     config: WsConfig,
-    clients: Arc<Mutex<HashMap<SocketAddr, Arc<Mutex<Writer<TcpStream>>>>>>,
+    clients: WsClients,
     shutdown: Arc<AtomicBool>,
     sender: mpsc::Sender<Ws2GuiMessage>,
 ) {
@@ -115,7 +116,7 @@ fn listen_websocket(
 
 fn handle_connection(
     request: WsUpgrade<TcpStream, Option<WsBuffer>>,
-    clients: Arc<Mutex<HashMap<SocketAddr, Arc<Mutex<Writer<TcpStream>>>>>>,
+    clients: WsClients,
     config: WsConfig,
     gui_sender: mpsc::Sender<Ws2GuiMessage>,
 ) {
@@ -363,7 +364,6 @@ impl WsHandler {
         let (video_sender, video_receiver) = mpsc::channel::<VideoCommands>();
         {
             let sender = sender.clone();
-            let config = config.clone();
             // offload creating the videostream to another thread to avoid blocking the thread that
             // is receiving messages from the websocket
             spawn(move || handle_video(video_receiver, sender, config));

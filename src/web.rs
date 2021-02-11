@@ -36,10 +36,10 @@ fn response_not_found() -> Response<Body> {
         .unwrap()
 }
 
-async fn serve<'a>(
+async fn serve(
     addr: SocketAddr,
     req: Request<Body>,
-    context: Arc<Context<'a>>,
+    context: Arc<Context<'_>>,
     _sender: mpsc::Sender<Web2GuiMessage>,
 ) -> Result<Response<Body>, hyper::Error> {
     debug!("Got request: {:?}", req);
@@ -173,8 +173,8 @@ async fn run_server(
     let server = Server::bind(&addr).serve(service);
     let server = server.with_graceful_shutdown(async move {
         match receiver.recv().await {
-            Some(Gui2WebMessage::Shutdown) => return,
-            None => return,
+            Some(Gui2WebMessage::Shutdown) => {},
+            None => {},
         }
     });
     info!("Webserver listening at {}...", addr);

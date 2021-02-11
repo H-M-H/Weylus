@@ -161,12 +161,9 @@ pub struct X11Context {
 
 impl X11Context {
     pub fn new() -> Option<Self> {
-        let disp = XDisplay::new();
-        if disp.is_none() {
-            return None;
-        }
+        let disp = XDisplay::new()?;
         Some(Self {
-            disp: Arc::new(disp.unwrap()),
+            disp: Arc::new(disp),
         })
     }
 

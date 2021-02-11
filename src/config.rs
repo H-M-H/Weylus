@@ -42,7 +42,7 @@ pub fn read_config() -> Option<Config> {
             }
             Err(err) => {
                 warn!("Failed to read configuration file: {}", err);
-                return None;
+                None
             }
         }
     } else {
@@ -81,7 +81,7 @@ pub fn get_config() -> Config {
     // read config from file if no args are specified
     if std::env::args().len() == 1 {
         // (ab)use parsing an empty args array to provide a default config
-        read_config().unwrap_or_else(|| crate::config::Config::from_args())
+        read_config().unwrap_or_else(crate::config::Config::from_args)
     } else {
         crate::config::Config::from_args()
     }
