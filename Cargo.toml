@@ -45,8 +45,13 @@ identifier = "io.github.h-m-h.weylus"
 [package.metadata.deb]
 name = "Weylus"
 depends = "$auto"
-section = "utility"
+section = "graphics"
 priority = "optional"
+assets = [
+    ["target/release/weylus", "usr/bin/", "755"],
+    ["weylus.desktop", "usr/share/applications", "755"],
+    ["Readme.md", "usr/share/doc/weylus/README", "644"],
+]
 
 [profile.release]
 lto = true

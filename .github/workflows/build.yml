@@ -24,7 +24,7 @@ jobs:
             target/debian/Weylus*.deb
           exec-file: target/release/weylus
           deb-file: target/debian/Weylus*.deb
-          pkg-cmd: cd target/release/ && zip linux.zip weylus
+          pkg-cmd: cd target/release/ && zip linux.zip weylus weylus.desktop
 
     steps:
     - uses: actions/checkout@v2
