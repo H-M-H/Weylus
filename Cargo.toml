@@ -48,8 +48,8 @@ depends = "$auto"
 section = "graphics"
 priority = "optional"
 assets = [
-    ["target/release/weylus", "usr/bin/", "755"],
-    ["weylus.desktop", "usr/share/applications", "755"],
+    ["target/release/weylus", "usr/bin/weylus", "755"],
+    ["weylus.desktop", "usr/share/applications/weylus.desktop", "755"],
     ["Readme.md", "usr/share/doc/weylus/README", "644"],
 ]
 
