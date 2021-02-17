@@ -392,7 +392,7 @@ void alloc_frame_buffer_hw(VideoContext* ctx, Error* err)
 void fill_bgra(VideoContext* ctx, const void* data, Error* err)
 {
 	if (ctx->frame->format == AV_PIX_FMT_BGR0 && ctx->width_in == ctx->width_out &&
-		ctx->height_in == ctx->width_out)
+		ctx->height_in == ctx->height_out)
 	{
 		if (ctx->frame_allocated)
 			dealloc_frame_buffer(ctx);
