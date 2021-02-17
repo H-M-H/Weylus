@@ -2,14 +2,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <va/va.h>
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavformat/avio.h>
 #include <libavutil/dict.h>
 #include <libavutil/frame.h>
 #include <libavutil/hwcontext.h>
-#include <libavutil/hwcontext_vaapi.h>
 #include <libavutil/mem.h>
 #include <libavutil/pixfmt.h>
 
@@ -21,6 +19,11 @@
 #include "error.h"
 #include "libavutil/buffer.h"
 #include "libavutil/error.h"
+
+#ifdef HAS_VAAPI
+#include <libavutil/hwcontext_vaapi.h>
+#include <va/va.h>
+#endif
 
 typedef struct VideoContext
 {
@@ -149,7 +152,9 @@ void open_video(VideoContext* ctx, Error* err)
 				// not supported. Using these formats leads to a crash and that's why the following
 				// workaround detects the drivers mentioned and if it finds them forces the pixel
 				// format to NV12 as this seems to work so far.
-				VADisplay dpy = ((AVVAAPIDeviceContext*)((AVHWDeviceContext*)ctx->hw_device_ctx->data)->hwctx)->display;
+				VADisplay dpy =
+					((AVVAAPIDeviceContext*)((AVHWDeviceContext*)ctx->hw_device_ctx->data)->hwctx)
+						->display;
 				const char* vendor_string = vaQueryVendorString(dpy);
 				// currently only some Radeon drivers seem to be affected, this list may need to be
 				// refined in the future
@@ -162,7 +167,8 @@ void open_video(VideoContext* ctx, Error* err)
 						break;
 					}
 
-				AVHWFramesConstraints* cst = av_hwdevice_get_hwframe_constraints(ctx->hw_device_ctx, NULL);
+				AVHWFramesConstraints* cst =
+					av_hwdevice_get_hwframe_constraints(ctx->hw_device_ctx, NULL);
 				if (!force_nv12 && cst)
 				{
 					// If bgr0 is supported choose it as this avoids the overhead of calling
