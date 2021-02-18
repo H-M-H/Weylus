@@ -265,7 +265,7 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, confi
                 let screen_capture = screen_capture.as_ref().unwrap();
                 let (width_in, height_in) = screen_capture.size();
                 let scale =
-                    (max_width as f64 / width_in as f64).min(max_height as f64 / height_in as f64);
+                    (max_width as f64 / width_in as f64).max(max_height as f64 / height_in as f64);
                 let mut width_out = width_in;
                 let mut height_out = height_in;
                 if scale < 1.0 {
