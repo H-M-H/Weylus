@@ -148,7 +148,7 @@ label input:disabled + span {
 .lefty #vanish {
     text-align: left;
 }
-#debug {
+#log {
     max-width: 15em;
     overflow-x: auto;
     touch-action: auto;

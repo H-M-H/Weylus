@@ -15,8 +15,21 @@ function run(access_code: string, websocket_port: number, level: string) {
         log_pre = document.getElementById("log") as HTMLPreElement;
         log_pre.textContent = "";
         log_level = LogLevel[level];
-        window.addEventListener("error", (e: ErrorEvent) => {
-            log(LogLevel.ERROR, e.filename + ":L" + e.lineno + ":" + e.colno + ": " + e.message);
+        window.addEventListener("error", (e: ErrorEvent | Event | UIEvent) => {
+            if ((e as ErrorEvent).error) {
+                let err = e as ErrorEvent;
+                log(LogLevel.ERROR, err.filename + ":L" + err.lineno + ":" + err.colno + ": " + err.message + " Error object: " + JSON.stringify(err.error));
+            } else if ((e as UIEvent).detail) {
+                let ev = e as UIEvent;
+                let src = (e.target as any).src;
+                log(LogLevel.ERROR, "Failed to obtain resource, target: " + ev.target + " type: " + ev.type + " src: " + src + " Error object: " + JSON.stringify(ev));
+            } else if ((e as Event).target) {
+                let ev = e as Event;
+                let src = (e.target as any).src;
+                log(LogLevel.ERROR, "Failed to obtain resource, target: " + ev.target + " type: " + ev.type + " src: " + src + " Error object: " + JSON.stringify(ev));
+            } else {
+                log(LogLevel.WARN, "Got unknown event: " + JSON.stringify(e));
+            }
             return false;
         }, true)
         init(access_code, websocket_port)
@@ -30,7 +43,7 @@ function log(level: LogLevel, msg: string) {
         no_log_messages = false;
         document.getElementById("log_section").classList.remove("hide");
     }
-    log_pre.textContent += msg + "\n";
+    log_pre.textContent += LogLevel[level] + ": " + msg + "\n";
 }
 
 class Settings {
