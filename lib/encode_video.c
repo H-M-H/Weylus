@@ -5,20 +5,22 @@
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavformat/avio.h>
+
+#include <libavutil/buffer.h>
 #include <libavutil/dict.h>
+#include <libavutil/error.h>
 #include <libavutil/frame.h>
 #include <libavutil/hwcontext.h>
-#include <libavutil/mem.h>
-#include <libavutil/pixfmt.h>
-
 #include <libavutil/imgutils.h>
+#include <libavutil/mem.h>
 #include <libavutil/opt.h>
+#include <libavutil/pixdesc.h>
+#include <libavutil/pixfmt.h>
 
 #include <libswscale/swscale.h>
 
 #include "error.h"
-#include "libavutil/buffer.h"
-#include "libavutil/error.h"
+#include "log.h"
 
 #ifdef HAS_VAAPI
 #include <libavutil/hwcontext_vaapi.h>
@@ -156,6 +158,7 @@ void open_video(VideoContext* ctx, Error* err)
 					((AVVAAPIDeviceContext*)((AVHWDeviceContext*)ctx->hw_device_ctx->data)->hwctx)
 						->display;
 				const char* vendor_string = vaQueryVendorString(dpy);
+				log_debug("VA-API vendor: %s", vendor_string);
 				// currently only some Radeon drivers seem to be affected, this list may need to be
 				// refined in the future
 				const char* drivers_force_nv12[] = {"Radeon", NULL};
@@ -164,6 +167,7 @@ void open_video(VideoContext* ctx, Error* err)
 					if (strstr(vendor_string, *pattern) != NULL)
 					{
 						force_nv12 = 1;
+						log_debug("%s is blacklisted and NV12 is forced as pixel format.");
 						break;
 					}
 
@@ -287,6 +291,8 @@ void open_video(VideoContext* ctx, Error* err)
 	// enable writing fragmented mp4
 	av_dict_set(&opt, "movflags", "frag_custom+empty_moov+default_base_moof", 0);
 	ret = avformat_write_header(ctx->oc, &opt);
+	if (ret < 0)
+		log_warn("Video: failed to write header!");
 	av_dict_free(&opt);
 
 	ctx->sws_rgb = sws_getContext(
@@ -314,6 +320,12 @@ void open_video(VideoContext* ctx, Error* err)
 		NULL);
 
 	ctx->initialized = 1;
+	log_info(
+		"Video: %dx%d@%s pix_fmt: %s",
+		ctx->width_out,
+		ctx->height_out,
+		ctx->c->codec->name,
+		av_get_pix_fmt_name(ctx->sw_pix_fmt));
 }
 
 void destroy_video_encoder(VideoContext* ctx)

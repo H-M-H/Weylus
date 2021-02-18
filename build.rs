@@ -58,7 +58,10 @@ fn main() {
 
     println!("cargo:rerun-if-changed=lib/error.h");
     println!("cargo:rerun-if-changed=lib/error.c");
+    println!("cargo:rerun-if-changed=lib/log.h");
+    println!("cargo:rerun-if-changed=lib/log.c");
     cc::Build::new().file("lib/error.c").compile("error");
+    cc::Build::new().file("lib/log.c").compile("log");
 
     println!("cargo:rerun-if-changed=lib/encode_video.c");
     let mut cc_video = cc::Build::new();

@@ -1,5 +1,8 @@
-use std::sync::mpsc;
+use std::ffi::CStr;
 use std::io::Write;
+use std::os::raw::c_char;
+use std::sync::mpsc;
+use tracing::{debug, info, trace, warn};
 use tracing_subscriber::layer::SubscriberExt;
 
 struct GuiTracingWriter {
@@ -60,4 +63,28 @@ pub fn setup_logging(sender: mpsc::SyncSender<String>) {
                 .with_writer(GuiTracingWriterFactory { sender }),
         );
     tracing::subscriber::set_global_default(logger).expect("Failed to setup logger!");
+}
+
+#[no_mangle]
+fn log_debug_rust(msg: *const c_char) {
+    let msg = unsafe { CStr::from_ptr(msg) }.to_string_lossy();
+    debug!("{}", msg);
+}
+
+#[no_mangle]
+fn log_info_rust(msg: *const c_char) {
+    let msg = unsafe { CStr::from_ptr(msg) }.to_string_lossy();
+    info!("{}", msg);
+}
+
+#[no_mangle]
+fn log_trace_rust(msg: *const c_char) {
+    let msg = unsafe { CStr::from_ptr(msg) }.to_string_lossy();
+    trace!("{}", msg);
+}
+
+#[no_mangle]
+fn log_warn_rust(msg: *const c_char) {
+    let msg = unsafe { CStr::from_ptr(msg) }.to_string_lossy();
+    warn!("{}", msg);
 }
