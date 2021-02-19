@@ -18,13 +18,13 @@ jobs:
         os: [ubuntu-latest]
         include:
         - os: ubuntu-latest
-          build-cmd: cargo deb && dpkg -i target/debian/Weylus*.deb
+          build-cmd: cargo build --release --features=va-dynamic && mv target/release/weylus target/release/weylus_va_dynamic && cargo deb && dpkg -i target/debian/Weylus*.deb
           package-files: |
             target/release/linux.zip
             target/debian/Weylus*.deb
-          exec-file: target/release/weylus
+          exec-file: target/release/linux.zip
           deb-file: target/debian/Weylus*.deb
-          pkg-cmd: cp weylus.desktop target/release/ && cd target/release/ && zip linux.zip weylus weylus.desktop
+          pkg-cmd: cp weylus.desktop target/release/ && cd target/release/ && zip linux.zip weylus weylus_va_dynamic weylus.desktop
 
     steps:
     - uses: actions/checkout@v2
