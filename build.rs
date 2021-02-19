@@ -95,11 +95,11 @@ fn main() {
     }
 
     #[cfg(target_os = "linux")]
-    linux(ffmpeg_link_kind);
+    linux();
 }
 
 #[cfg(target_os = "linux")]
-fn linux(ffmpeg_link_kind: &str) {
+fn linux() {
     println!("cargo:rerun-if-changed=lib/linux/uniput.c");
     println!("cargo:rerun-if-changed=lib/linux/xcapture.c");
     println!("cargo:rerun-if-changed=lib/linux/xhelper.c");
@@ -115,9 +115,14 @@ fn linux(ffmpeg_link_kind: &str) {
     println!("cargo:rustc-link-lib=Xfixes");
     println!("cargo:rustc-link-lib=Xcomposite");
     println!("cargo:rustc-link-lib=Xi");
-    println!("cargo:rustc-link-lib={}=va", ffmpeg_link_kind);
-    println!("cargo:rustc-link-lib={}=va-drm", ffmpeg_link_kind);
-    println!("cargo:rustc-link-lib={}=va-glx", ffmpeg_link_kind);
-    println!("cargo:rustc-link-lib={}=va-x11", ffmpeg_link_kind);
+    let va_link_kind = if env::var("CARGO_FEATURE_VA_DYNAMIC").is_ok() {
+        "dylib"
+    } else {
+        "static"
+    };
+    println!("cargo:rustc-link-lib={}=va", va_link_kind);
+    println!("cargo:rustc-link-lib={}=va-drm", va_link_kind);
+    println!("cargo:rustc-link-lib={}=va-glx", va_link_kind);
+    println!("cargo:rustc-link-lib={}=va-x11", va_link_kind);
     println!("cargo:rustc-link-lib=drm");
 }

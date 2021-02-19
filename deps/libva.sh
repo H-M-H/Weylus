@@ -11,10 +11,10 @@ sed -i -e 's/-lva-\${display}$/-lva-\${display} -ldrm/' pkgconfig/libva-drm.pc.i
 
 ./autogen.sh --prefix=$(readlink -f ../dist) \
     --enable-static=yes \
+    --enable-shared=yes \
     --enable-drm \
     --enable-x11 \
     --enable-glx \
-    --enable-shared=no \
     --with-drivers-path="/usr/lib/dri"
 
 make -j$(nproc)
