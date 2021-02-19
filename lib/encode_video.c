@@ -159,9 +159,9 @@ void open_video(VideoContext* ctx, Error* err)
 						->display;
 				const char* vendor_string = vaQueryVendorString(dpy);
 				log_debug("VA-API vendor: %s", vendor_string);
-				// currently only some Radeon drivers seem to be affected, this list may need to be
-				// refined in the future
-				const char* drivers_force_nv12[] = {"Radeon", NULL};
+				// currently only some AMD drivers/hardware seem to be affected, this list may need
+				// to be refined in the future
+				const char* drivers_force_nv12[] = {"Radeon", "AMD RAVEN", NULL};
 				int force_nv12 = 0;
 				for (const char** pattern = drivers_force_nv12; *pattern; pattern++)
 					if (strstr(vendor_string, *pattern) != NULL)
