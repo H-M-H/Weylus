@@ -115,10 +115,10 @@ fn linux() {
     println!("cargo:rustc-link-lib=Xfixes");
     println!("cargo:rustc-link-lib=Xcomposite");
     println!("cargo:rustc-link-lib=Xi");
-    let va_link_kind = if env::var("CARGO_FEATURE_VA_DYNAMIC").is_ok() {
-        "dylib"
-    } else {
+    let va_link_kind = if env::var("CARGO_FEATURE_VA_STATIC").is_ok() {
         "static"
+    } else {
+        "dylib"
     };
     println!("cargo:rustc-link-lib={}=va", va_link_kind);
     println!("cargo:rustc-link-lib={}=va-drm", va_link_kind);

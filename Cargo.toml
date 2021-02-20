@@ -37,7 +37,7 @@ pnet = "^0.26"
 [features]
 bench = []
 ffmpeg-system = []
-va-dynamic = []
+va-static = []
 
 [package.metadata.bundle]
 name = "Weylus"
