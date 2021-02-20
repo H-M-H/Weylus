@@ -4,5 +4,15 @@ sudo groupadd -r uinput
 sudo usermod -aG uinput $USER
 echo 'KERNEL=="uinput", MODE="0660", GROUP="uinput", OPTIONS+="static_node=uinput"' | sudo tee /etc/udev/rules.d/60-weylus.rules
 
+Then, either reboot, or run
+
+sudo udevadm control --reload
+sudo udevadm trigger
+
+then log out and log in again. To undo this, run:
+
+sudo rm /etc/udev/rules.d/60-weylus.rules
+
+This allows your user to synthesize input events system-wide, even when another user is logged in. Therefore, untrusted users should not be added to the uinput group.
 
 If you do not want to make use of this feature uncheck "Produce Touch Events" in your browser. Like this Weylus will only simulate a mouse.

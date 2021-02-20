@@ -183,7 +183,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                         pop_up_text.wrap_mode(fltk::text::WrapMode::AtBounds, 5);
                         let mut buf = pop_up_text.buffer().unwrap();
                         buf.set_text(
-                            std::include_str!("uinput_error.txt")
+                            std::include_str!("strings/uinput_error.txt")
                         );
 
                         pop_up.end();
