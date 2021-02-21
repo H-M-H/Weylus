@@ -31,6 +31,7 @@ struct CaptureContext
 	XShmSegmentInfo shminfo;
 	int has_xfixes;
 	int has_offscreen;
+	int wayland;
 	Bool last_img_return;
 };
 
@@ -67,6 +68,11 @@ void* start_capture(Capturable* cap, CaptureContext* ctx, Error* err)
 			if (ctx->has_offscreen)
 				XCompositeRedirectWindow(cap->disp, cap->c.winfo.win, False);
 		}
+		const char* session_type = getenv("XDG_SESSION_TYPE");
+		if (session_type && strcmp(session_type, "wayland") == 0)
+			ctx->wayland = 1;
+		else
+			ctx->wayland = 0;
 	}
 	ctx->cap = *cap;
 	ctx->last_img_return = True;
@@ -160,10 +166,11 @@ void capture_sceen(CaptureContext* ctx, struct Image* img, int capture_cursor, E
 
 		active_window =
 			(Window*)get_property(ctx->cap.disp, root, XA_WINDOW, "_NET_ACTIVE_WINDOW", &size, err);
-		if (*active_window == ctx->cap.c.winfo.win && !is_offscreen)
+		if (!ctx->wayland && *active_window == ctx->cap.c.winfo.win && !is_offscreen)
 		{
 			// cap window within its root so menus are visible as strictly speaking menus do not
 			// belong to the window itself ...
+			// But don't do this on (X)Wayland as the root window is just black in that case.
 			get_img_ret = XShmGetImage(ctx->cap.disp, root, ctx->ximg, x, y, 0x00ffffff);
 		}
 		else
