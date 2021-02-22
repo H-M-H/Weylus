@@ -167,7 +167,7 @@ void open_video(VideoContext* ctx, Error* err)
 					if (strstr(vendor_string, *pattern) != NULL)
 					{
 						force_nv12 = 1;
-						log_debug("%s is blacklisted and NV12 is forced as pixel format.");
+						log_debug("'%s' is blacklisted and NV12 is forced as pixel format.", vendor_string);
 						break;
 					}
 

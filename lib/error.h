@@ -11,6 +11,9 @@ struct Error
 
 typedef struct Error Error;
 
+#if defined(__clang__) || defined(__GNUC__)
+__attribute__((__format__ (__printf__, 3, 4)))
+#endif
 void fill_error(Error* err, int code, const char* fmt, ...);
 
 #define ERROR(err, code, fmt, ...)                                                                 \
