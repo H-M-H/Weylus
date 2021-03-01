@@ -372,7 +372,20 @@ function handle_messages(
     }
 }
 
+function check_apis() {
+    let apis = {
+        "MediaSource": "This browser doesn't support MSE required to playback video stream, try upgrading!",
+        "PointerEvent": "This browser doesn't support PointerEvents, input will not work, try upgrading!",
+    };
+    for (let n in apis) {
+        if (!(n in window)) {
+            log(LogLevel.ERROR, apis[n]);
+        }
+    }
+}
+
 function init(access_code: string, websocket_port: number) {
+    check_apis();
 
     let authed = false;
     let webSocket = new WebSocket("ws://" + window.location.hostname + ":" + websocket_port);
