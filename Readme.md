@@ -45,8 +45,9 @@ instructions described [here](#linux) to enable uinput for features like pressur
 multitouch!**
 
 ### Packages
-An AUR package [weylus-bin](https://aur.archlinux.org/packages/weylus-bin/) is available for Arch
-Linux and derivatives.
+AUR packages for Weylus are available here:
+- From source: [weylus](https://aur.archlinux.org/packages/weylus/)
+- Prebuilt binary: [weylus-bin](https://aur.archlinux.org/packages/weylus-bin/)
 
 ## Running
 Start Weylus, preferably set an access code in the access code box and press the Start button. This
