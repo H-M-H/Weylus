@@ -99,6 +99,10 @@ void init_stylus(int fd, const char* name, Error* err)
 		ERROR(err, 1, "error: ioctl UI_SET_EVBIT EV_KEY");
 	if (ioctl(fd, UI_SET_KEYBIT, BTN_TOOL_PEN) < 0)
 		ERROR(err, 1, "error: ioctl UI_SET_KEYBIT BTN_TOOL_PEN");
+	if (ioctl(fd, UI_SET_KEYBIT, BTN_TOOL_RUBBER) < 0)
+		ERROR(err, 1, "error: ioctl UI_SET_KEYBIT BTN_TOOL_RUBBER");
+	if (ioctl(fd, UI_SET_KEYBIT, BTN_TOUCH) < 0)
+		ERROR(err, 1, "error: ioctl UI_SET_KEYBIT BTN_TOUCH");
 
 	// setup sending timestamps
 	if (ioctl(fd, UI_SET_EVBIT, EV_MSC) < 0)

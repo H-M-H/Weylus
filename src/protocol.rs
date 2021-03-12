@@ -63,6 +63,7 @@ bitflags! {
         const AUXILARY = 0b0000_0100;
         const FOURTH = 0b0000_1000;
         const FIFTH = 0b0001_0000;
+        const ERASER = 0b0010_0000;
     }
 }
 

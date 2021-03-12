@@ -29,6 +29,7 @@ pub struct GraphicTablet {
     mouse_fd: c_int,
     touch_fd: c_int,
     touches: [Option<MultiTouch>; 5],
+    tool_pen_active: bool,
     capture: Capturable,
     x: f64,
     y: f64,
@@ -73,6 +74,7 @@ impl GraphicTablet {
             mouse_fd,
             touch_fd,
             touches: Default::default(),
+            tool_pen_active: false,
             capture,
             x: 0.0,
             y: 0.0,
@@ -158,6 +160,7 @@ const EC_KEY_MOUSE_LEFT: c_int = 0x110;
 const EC_KEY_MOUSE_RIGHT: c_int = 0x111;
 const EC_KEY_MOUSE_MIDDLE: c_int = 0x112;
 const EC_KEY_TOOL_PEN: c_int = 0x140;
+const EC_KEY_TOOL_RUBBER: c_int = 0x141;
 const EC_KEY_TOUCH: c_int = 0x14a;
 const EC_KEY_TOOL_FINGER: c_int = 0x145;
 const EC_KEY_TOOL_DOUBLETAP: c_int = 0x14d;
@@ -372,7 +375,17 @@ impl InputDevice for GraphicTablet {
                 match event.event_type {
                     PointerEventType::DOWN | PointerEventType::MOVE => {
                         if let PointerEventType::DOWN = event.event_type {
+                            self.send(self.stylus_fd, ET_KEY, EC_KEY_TOUCH, 1);
+                        }
+                        if !self.tool_pen_active && !event.buttons.contains(Button::ERASER) {
                             self.send(self.stylus_fd, ET_KEY, EC_KEY_TOOL_PEN, 1);
+                            self.send(self.stylus_fd, ET_KEY, EC_KEY_TOOL_RUBBER, 0);
+                            self.tool_pen_active = true;
+                        }
+                        if let Button::ERASER = event.button {
+                            self.send(self.stylus_fd, ET_KEY, EC_KEY_TOOL_PEN, 0);
+                            self.send(self.stylus_fd, ET_KEY, EC_KEY_TOOL_RUBBER, 1);
+                            self.tool_pen_active = false;
                         }
                         self.send(
                             self.stylus_fd,
@@ -406,7 +419,10 @@ impl InputDevice for GraphicTablet {
                         );
                     }
                     PointerEventType::UP | PointerEventType::CANCEL => {
+                        self.send(self.stylus_fd, ET_KEY, EC_KEY_TOUCH, 0);
                         self.send(self.stylus_fd, ET_KEY, EC_KEY_TOOL_PEN, 0);
+                        self.send(self.stylus_fd, ET_KEY, EC_KEY_TOOL_RUBBER, 0);
+                        self.tool_pen_active = false;
                     }
                 }
                 self.send(
