@@ -397,6 +397,12 @@ function init(access_code: string, websocket_port: number) {
 
     let video = document.getElementById("video") as HTMLVideoElement;
 
+    video.oncontextmenu = function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        return false;
+    };
+
     let handle_disconnect = (msg: string) => {
         document.body.onclick = video.onclick = (e) => {
             e.stopPropagation();
