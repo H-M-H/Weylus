@@ -69,7 +69,10 @@ bitflags! {
 
 fn from_str<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Button, D::Error> {
     let bits: u8 = Deserialize::deserialize(deserializer)?;
-    Ok(Button::from_bits_truncate(bits))
+    Button::from_bits(bits).map_or(
+        Err(serde::de::Error::custom("Failed to parse button code.")),
+        |b| Ok(b),
+    )
 }
 
 #[derive(Serialize, Deserialize, Debug)]
