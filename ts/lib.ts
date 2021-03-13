@@ -237,7 +237,14 @@ class PEvent {
         this.timestamp = Math.round(event.timeStamp * 1000);
         this.is_primary = event.isPrimary;
         this.pointer_type = event.pointerType;
-        this.button = event.button < 0 ? 0 : 1 << event.button;
+        let btn = event.button;
+        // for some reason the secondary and auxiliary buttons are ordered differently for
+        // the button and buttons properties
+        if (btn == 2)
+            btn = 1;
+        else if (btn == 1)
+            btn = 2;
+        this.button = (btn < 0 ? 0 : 1 << btn);
         this.buttons = event.buttons;
         this.x = (event.clientX - videoRect.left) / videoRect.width;
         this.y = (event.clientY - videoRect.top) / videoRect.height;
