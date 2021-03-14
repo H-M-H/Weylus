@@ -125,7 +125,7 @@ label input:disabled + span {
     color: #888;
 }
 #frame_update_limit {
-    width: 3em;
+    width: auto;
 }
 #lefty {
     display: none;

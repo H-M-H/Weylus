@@ -51,6 +51,7 @@ class Settings {
     checks: Map<string, HTMLInputElement>;
     capturable_select: HTMLSelectElement;
     frame_update_limit_input: HTMLInputElement;
+    frame_update_limit_output: HTMLOutputElement;
     visible: boolean;
     settings: HTMLElement;
 
@@ -59,6 +60,7 @@ class Settings {
         this.checks = new Map<string, HTMLInputElement>();
         this.capturable_select = document.getElementById("window") as HTMLSelectElement;
         this.frame_update_limit_input = document.getElementById("frame_update_limit") as HTMLInputElement;
+        this.frame_update_limit_output = this.frame_update_limit_input.nextElementSibling as HTMLOutputElement;
         this.visible = true;
 
         // Settings UI
@@ -153,6 +155,10 @@ class Settings {
                 this.frame_update_limit_input.value = upd_limit;
             else
                 this.frame_update_limit_input.value = "0";
+            this.frame_update_limit_output.value = this.frame_update_limit_input.value;
+            this.frame_update_limit_input.oninput = (e) => {
+                this.frame_update_limit_output.value = this.frame_update_limit_input.value;
+            }
             if (this.checks.get("lefty").checked) {
                 this.settings.classList.add("lefty");
             }
