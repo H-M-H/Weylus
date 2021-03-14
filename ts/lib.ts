@@ -61,6 +61,9 @@ class Settings {
         this.capturable_select = document.getElementById("window") as HTMLSelectElement;
         this.frame_update_limit_input = document.getElementById("frame_update_limit") as HTMLInputElement;
         this.frame_update_limit_output = this.frame_update_limit_input.nextElementSibling as HTMLOutputElement;
+        this.frame_update_limit_input.oninput = (e) => {
+            this.frame_update_limit_output.value = this.frame_update_limit_input.value;
+        }
         this.visible = true;
 
         // Settings UI
@@ -156,9 +159,6 @@ class Settings {
             else
                 this.frame_update_limit_input.value = "0";
             this.frame_update_limit_output.value = this.frame_update_limit_input.value;
-            this.frame_update_limit_input.oninput = (e) => {
-                this.frame_update_limit_output.value = this.frame_update_limit_input.value;
-            }
             if (this.checks.get("lefty").checked) {
                 this.settings.classList.add("lefty");
             }
