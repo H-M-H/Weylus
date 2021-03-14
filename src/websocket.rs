@@ -13,7 +13,9 @@ use websocket::sync::Server;
 use websocket::{Message, OwnedMessage, WebSocketError};
 
 use crate::input::device::InputDevice;
-use crate::protocol::{ClientConfiguration, MessageInbound, MessageOutbound, PointerEvent};
+use crate::protocol::{
+    ClientConfiguration, KeyboardEvent, MessageInbound, MessageOutbound, PointerEvent,
+};
 use crate::screen_capture::generic::ScreenCaptureGeneric;
 #[cfg(target_os = "linux")]
 use crate::screen_capture::linux::ScreenCaptureX11;
@@ -404,9 +406,23 @@ impl WsHandler {
 
     fn process_pointer_event(&mut self, event: &PointerEvent) {
         if self.input_device.is_some() {
-            self.input_device.as_mut().unwrap().send_event(&event)
+            self.input_device
+                .as_mut()
+                .unwrap()
+                .send_pointer_event(&event)
         } else {
-            warn!("Pointer device is not initalized, can not process PointerEvent!");
+            warn!("Input device is not initalized, can not process PointerEvent!");
+        }
+    }
+
+    fn process_keyboard_event(&mut self, event: &KeyboardEvent) {
+        if self.input_device.is_some() {
+            self.input_device
+                .as_mut()
+                .unwrap()
+                .send_keyboard_event(&event)
+        } else {
+            warn!("Input device is not initalized, can not process PointerEvent!");
         }
     }
 
@@ -448,8 +464,8 @@ impl WsHandler {
                     0
                 }]
                 .clone();
-                if config.stylus_support {
-                    let device = crate::input::uinput_device::GraphicTablet::new(
+                if config.uinput_support {
+                    let device = crate::input::uinput_device::UInputDevice::new(
                         capturable.clone(),
                         self.client_addr.to_string(),
                     );
@@ -469,9 +485,9 @@ impl WsHandler {
                     }
                     self.input_device = Some(Box::new(device.unwrap()))
                 } else {
-                    self.input_device = Some(Box::new(crate::input::mouse_device::Mouse::new(
-                        capturable.clone(),
-                    )))
+                    self.input_device = Some(Box::new(
+                        crate::input::autopilot_device::AutoPilotDevice::new(capturable.clone()),
+                    ))
                 }
 
                 self.video_sender
@@ -493,7 +509,7 @@ impl WsHandler {
 
         #[cfg(not(target_os = "linux"))]
         {
-            self.input_device = Some(Box::new(crate::input::mouse_device::Mouse::new()));
+            self.input_device = Some(Box::new(crate::input::autopilot_device::AutoPilotDevice::new()));
             self.video_sender
                 .send(VideoCommands::Start(VideoConfig {
                     max_width: config.max_width,
@@ -512,6 +528,10 @@ impl WsHandler {
                         MessageInbound::PointerEvent(event) => {
                             trace!("Got: {:?}", &event);
                             self.process_pointer_event(&event);
+                        }
+                        MessageInbound::KeyboardEvent(event) => {
+                            trace!("Got: {:?}", &event);
+                            self.process_keyboard_event(&event);
                         }
                         MessageInbound::TryGetFrame => self.queue_try_send_video_frame(),
                         MessageInbound::GetCapturableList => {

@@ -2,10 +2,10 @@ use std::ffi::CString;
 use std::os::raw::{c_char, c_int};
 
 use crate::input::device::InputDevice;
-use crate::protocol::Button;
-use crate::protocol::PointerEvent;
-use crate::protocol::PointerEventType;
-use crate::protocol::PointerType;
+use crate::protocol::{
+    Button, KeyboardEvent, KeyboardEventType, KeyboardLocation, PointerEvent, PointerEventType,
+    PointerType,
+};
 use crate::x11helper::{Capturable, X11Context};
 
 use crate::cerror::CError;
@@ -13,6 +13,7 @@ use crate::cerror::CError;
 use tracing::warn;
 
 extern "C" {
+    fn init_uinput_keyboard(name: *const c_char, err: *mut CError) -> c_int;
     fn init_uinput_stylus(name: *const c_char, err: *mut CError) -> c_int;
     fn init_uinput_mouse(name: *const c_char, err: *mut CError) -> c_int;
     fn init_uinput_touch(name: *const c_char, err: *mut CError) -> c_int;
@@ -24,7 +25,8 @@ struct MultiTouch {
     id: i64,
 }
 
-pub struct GraphicTablet {
+pub struct UInputDevice {
+    keyboard_fd: c_int,
     stylus_fd: c_int,
     mouse_fd: c_int,
     touch_fd: c_int,
@@ -44,7 +46,7 @@ pub struct GraphicTablet {
     x11ctx: Option<X11Context>,
 }
 
-impl GraphicTablet {
+impl UInputDevice {
     pub fn new(capture: Capturable, id: String) -> Result<Self, CError> {
         let mut err = CError::new();
         let name_stylus = format!("Weylus Stylus - {}", id);
@@ -53,14 +55,15 @@ impl GraphicTablet {
         if err.is_err() {
             return Err(err);
         }
+
         let name_mouse = format!("Weylus Mouse - {}", id);
         let name_mouse_c_str = CString::new(name_mouse.as_bytes()).unwrap();
-
         let mouse_fd = unsafe { init_uinput_mouse(name_mouse_c_str.as_ptr(), &mut err) };
         if err.is_err() {
             unsafe { destroy_uinput_device(stylus_fd) };
             return Err(err);
         }
+
         let name_touch = format!("Weylus Touch - {}", id);
         let name_touch_c_str = CString::new(name_touch.as_bytes()).unwrap();
         let touch_fd = unsafe { init_uinput_touch(name_touch_c_str.as_ptr(), &mut err) };
@@ -69,7 +72,19 @@ impl GraphicTablet {
             unsafe { destroy_uinput_device(mouse_fd) };
             return Err(err);
         }
+
+        let name_keyboard = format!("Weylus Keyboard - {}", id);
+        let name_keyboard_c_str = CString::new(name_keyboard.as_bytes()).unwrap();
+        let keyboard_fd = unsafe { init_uinput_keyboard(name_keyboard_c_str.as_ptr(), &mut err) };
+        if err.is_err() {
+            unsafe { destroy_uinput_device(stylus_fd) };
+            unsafe { destroy_uinput_device(mouse_fd) };
+            unsafe { destroy_uinput_device(touch_fd) };
+            return Err(err);
+        }
+
         let tblt = Self {
+            keyboard_fd,
             stylus_fd,
             mouse_fd,
             touch_fd,
@@ -136,9 +151,10 @@ impl GraphicTablet {
     }
 }
 
-impl Drop for GraphicTablet {
+impl Drop for UInputDevice {
     fn drop(&mut self) {
         unsafe {
+            destroy_uinput_device(self.keyboard_fd);
             destroy_uinput_device(self.stylus_fd);
             destroy_uinput_device(self.mouse_fd);
             destroy_uinput_device(self.touch_fd);
@@ -207,8 +223,8 @@ const ABS_MAX: f64 = 65535.0;
 // has been choosen. If anyone knows a better solution: PLEASE FIX THIS!
 const MAX_SCREEN_MAPPING_TRIES: usize = 100;
 
-impl InputDevice for GraphicTablet {
-    fn send_event(&mut self, event: &PointerEvent) {
+impl InputDevice for UInputDevice {
+    fn send_pointer_event(&mut self, event: &PointerEvent) {
         if let Err(err) = self.capture.before_input() {
             warn!("Failed to activate window, sending no input ({})", err);
             return;
@@ -488,5 +504,121 @@ impl InputDevice for GraphicTablet {
                 self.send(self.mouse_fd, ET_SYNC, EC_SYNC_REPORT, 0);
             }
         }
+    }
+
+    fn send_keyboard_event(&mut self, event: &KeyboardEvent) {
+        use crate::input::uinput_keys::*;
+        let key_code: c_int = match (event.code.as_str(), &event.location) {
+            ("Escape", _) => KEY_ESC,
+            ("Digit0", KeyboardLocation::NUMPAD) => KEY_KP0,
+            ("Digit1", KeyboardLocation::NUMPAD) => KEY_KP1,
+            ("Digit2", KeyboardLocation::NUMPAD) => KEY_KP2,
+            ("Digit3", KeyboardLocation::NUMPAD) => KEY_KP3,
+            ("Digit4", KeyboardLocation::NUMPAD) => KEY_KP4,
+            ("Digit5", KeyboardLocation::NUMPAD) => KEY_KP5,
+            ("Digit6", KeyboardLocation::NUMPAD) => KEY_KP6,
+            ("Digit7", KeyboardLocation::NUMPAD) => KEY_KP7,
+            ("Digit8", KeyboardLocation::NUMPAD) => KEY_KP8,
+            ("Digit9", KeyboardLocation::NUMPAD) => KEY_KP9,
+            ("Minus", KeyboardLocation::NUMPAD) => KEY_KPMINUS,
+            ("Equal", KeyboardLocation::NUMPAD) => KEY_KPEQUAL,
+            ("Enter", KeyboardLocation::NUMPAD) => KEY_KPENTER,
+            ("Digit0", _) => KEY_0,
+            ("Digit1", _) => KEY_1,
+            ("Digit2", _) => KEY_2,
+            ("Digit3", _) => KEY_3,
+            ("Digit4", _) => KEY_4,
+            ("Digit5", _) => KEY_5,
+            ("Digit6", _) => KEY_6,
+            ("Digit7", _) => KEY_7,
+            ("Digit8", _) => KEY_8,
+            ("Digit9", _) => KEY_9,
+            ("Minus", _) => KEY_MINUS,
+            ("Equal", _) => KEY_EQUAL,
+            ("Enter", _) => KEY_ENTER,
+            ("Backspace", _) => KEY_BACKSPACE,
+            ("Tab", _) => KEY_TAB,
+            ("KeyA", _) => KEY_A,
+            ("KeyB", _) => KEY_B,
+            ("KeyC", _) => KEY_C,
+            ("KeyD", _) => KEY_D,
+            ("KeyE", _) => KEY_E,
+            ("KeyF", _) => KEY_F,
+            ("KeyG", _) => KEY_G,
+            ("KeyH", _) => KEY_H,
+            ("KeyI", _) => KEY_I,
+            ("KeyJ", _) => KEY_J,
+            ("KeyK", _) => KEY_K,
+            ("KeyL", _) => KEY_L,
+            ("KeyM", _) => KEY_M,
+            ("KeyN", _) => KEY_N,
+            ("KeyO", _) => KEY_O,
+            ("KeyP", _) => KEY_P,
+            ("KeyQ", _) => KEY_Q,
+            ("KeyR", _) => KEY_R,
+            ("KeyS", _) => KEY_S,
+            ("KeyT", _) => KEY_T,
+            ("KeyU", _) => KEY_U,
+            ("KeyV", _) => KEY_V,
+            ("KeyW", _) => KEY_W,
+            ("KeyX", _) => KEY_X,
+            ("KeyY", _) => KEY_Y,
+            ("KeyZ", _) => KEY_Z,
+            ("Comma", _) => KEY_COMMA,
+            ("Period", _) => KEY_DOT,
+            ("Slash", _) => KEY_SLASH,
+            ("Space", _) => KEY_SPACE,
+            ("F1", _) => KEY_F1,
+            ("F2", _) => KEY_F2,
+            ("F3", _) => KEY_F3,
+            ("F4", _) => KEY_F4,
+            ("F5", _) => KEY_F5,
+            ("F6", _) => KEY_F6,
+            ("F7", _) => KEY_F7,
+            ("F8", _) => KEY_F8,
+            ("F9", _) => KEY_F9,
+            ("F10", _) => KEY_F10,
+            ("F11", _) => KEY_F11,
+            ("F12", _) => KEY_F12,
+            ("F13", _) => KEY_F13,
+            ("F14", _) => KEY_F14,
+            ("F15", _) => KEY_F15,
+            ("F16", _) => KEY_F16,
+            ("F17", _) => KEY_F17,
+            ("F18", _) => KEY_F18,
+            ("F19", _) => KEY_F19,
+            ("F20", _) => KEY_F20,
+            ("F21", _) => KEY_F21,
+            ("F22", _) => KEY_F22,
+            ("F23", _) => KEY_F23,
+            ("F24", _) => KEY_F24,
+            ("Home", _) => KEY_HOME,
+            ("ArrowUp", _) => KEY_UP,
+            ("PageUp", _) => KEY_PAGEUP,
+            ("ArrowLeft", _) => KEY_LEFT,
+            ("ArrowRight", _) => KEY_RIGHT,
+            ("End", _) => KEY_END,
+            ("ArrowDown", _) => KEY_DOWN,
+            ("PageDown", _) => KEY_PAGEDOWN,
+            ("Insert", _) => KEY_INSERT,
+            ("Delete", _) => KEY_DELETE,
+            _ => KEY_UNKNOWN,
+        };
+        let state: c_int = match event.event_type {
+            KeyboardEventType::DOWN => 1,
+            KeyboardEventType::UP => 0,
+        };
+
+        if event.ctrl {
+            self.send(self.keyboard_fd, ET_KEY, KEY_LEFTCTRL, state);
+        }
+        if event.alt {
+            self.send(self.keyboard_fd, ET_KEY, KEY_LEFTALT, state);
+        }
+        if event.meta {
+            self.send(self.keyboard_fd, ET_KEY, KEY_LEFTMETA, state);
+        }
+
+        self.send(self.keyboard_fd, ET_KEY, key_code, state);
     }
 }
