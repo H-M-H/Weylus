@@ -320,15 +320,22 @@ class KeyboardHandler {
 
         window.onkeydown = (e) => {
             if (e.repeat)
-                this.onEvent(e, "repeat");
-            else
-                this.onEvent(e, "down");
+                return this.onEvent(e, "repeat");
+            return this.onEvent(e, "down");
         };
-        window.onkeyup = (e) => this.onEvent(e, "up");
+        window.onkeyup = (e) => { return this.onEvent(e, "up") };
+        window.onkeypress = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
     }
 
     onEvent(event: KeyboardEvent, event_type: string) {
         this.webSocket.send(JSON.stringify({ "KeyboardEvent": new KEvent(event_type, event) }));
+        event.preventDefault();
+        event.stopPropagation();
+        return false;
     }
 }
 
