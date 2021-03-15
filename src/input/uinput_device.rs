@@ -611,14 +611,18 @@ impl InputDevice for UInputDevice {
 
         if event.ctrl {
             self.send(self.keyboard_fd, ET_KEY, KEY_LEFTCTRL, state);
+            self.send(self.keyboard_fd, ET_SYNC, EC_SYNC_REPORT, 0);
         }
         if event.alt {
             self.send(self.keyboard_fd, ET_KEY, KEY_LEFTALT, state);
+            self.send(self.keyboard_fd, ET_SYNC, EC_SYNC_REPORT, 0);
         }
         if event.meta {
             self.send(self.keyboard_fd, ET_KEY, KEY_LEFTMETA, state);
+            self.send(self.keyboard_fd, ET_SYNC, EC_SYNC_REPORT, 0);
         }
 
         self.send(self.keyboard_fd, ET_KEY, key_code, state);
+        self.send(self.keyboard_fd, ET_SYNC, EC_SYNC_REPORT, 0);
     }
 }
