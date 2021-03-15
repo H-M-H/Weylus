@@ -605,8 +605,9 @@ impl InputDevice for UInputDevice {
             _ => KEY_UNKNOWN,
         };
         let state: c_int = match event.event_type {
-            KeyboardEventType::DOWN => 1,
             KeyboardEventType::UP => 0,
+            KeyboardEventType::DOWN => 1,
+            KeyboardEventType::REPEAT => 2,
         };
 
         if event.ctrl {

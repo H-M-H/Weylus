@@ -318,8 +318,13 @@ class KeyboardHandler {
     constructor(webSocket: WebSocket) {
         this.webSocket = webSocket;
 
-        window.onkeydown = (e) => this.onEvent(e, "down")
-        window.onkeyup = (e) => this.onEvent(e, "up")
+        window.onkeydown = (e) => {
+            if (e.repeat)
+                this.onEvent(e, "repeat");
+            else
+                this.onEvent(e, "down");
+        };
+        window.onkeyup = (e) => this.onEvent(e, "up");
     }
 
     onEvent(event: KeyboardEvent, event_type: string) {

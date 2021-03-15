@@ -61,6 +61,8 @@ pub enum KeyboardEventType {
     DOWN,
     #[serde(rename = "up")]
     UP,
+    #[serde(rename = "repeat")]
+    REPEAT,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
