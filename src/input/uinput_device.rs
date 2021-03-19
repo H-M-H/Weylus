@@ -673,6 +673,10 @@ impl InputDevice for UInputDevice {
             self.send(self.keyboard_fd, ET_KEY, KEY_LEFTMETA, state);
             self.send(self.keyboard_fd, ET_SYNC, EC_SYNC_REPORT, 0);
         }
+        if event.shift {
+            self.send(self.keyboard_fd, ET_KEY, KEY_LEFTSHIFT, state);
+            self.send(self.keyboard_fd, ET_SYNC, EC_SYNC_REPORT, 0);
+        }
 
         self.send(self.keyboard_fd, ET_KEY, key_code, state);
         self.send(self.keyboard_fd, ET_SYNC, EC_SYNC_REPORT, 0);
