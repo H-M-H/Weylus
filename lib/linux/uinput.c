@@ -62,7 +62,11 @@ void init_mouse(int fd, const char* name, Error* err)
 	if (ioctl(fd, UI_SET_EVBIT, EV_KEY) < 0)
 		ERROR(err, 1, "error: ioctl UI_SET_EVBIT EV_KEY");
 	if (ioctl(fd, UI_SET_KEYBIT, BTN_LEFT) < 0)
-		ERROR(err, 1, "error: ioctl UI_SET_KEYBIT BTN_STYLUS");
+		ERROR(err, 1, "error: ioctl UI_SET_KEYBIT BTN_LEFT");
+	if (ioctl(fd, UI_SET_KEYBIT, BTN_RIGHT) < 0)
+		ERROR(err, 1, "error: ioctl UI_SET_KEYBIT BTN_RIGHT");
+	if (ioctl(fd, UI_SET_KEYBIT, BTN_MIDDLE) < 0)
+		ERROR(err, 1, "error: ioctl UI_SET_KEYBIT BTN_MIDDLE");
 
 	// setup sending timestamps
 	if (ioctl(fd, UI_SET_EVBIT, EV_MSC) < 0)
