@@ -15,6 +15,13 @@
 
 #define ABS_MAXVAL 65535
 
+#ifndef REL_WHEEL_HI_RES
+#define REL_WHEEL_HI_RES	0x0b
+#endif
+#ifndef REL_HWHEEL_HI_RES
+#define REL_HWHEEL_HI_RES	0x0c
+#endif
+
 void setup_abs(int fd, int code, int minimum, int maximum, int resolution, Error* err)
 {
 	if (ioctl(fd, UI_SET_ABSBIT, code) < 0)
