@@ -10,7 +10,7 @@ use crate::x11helper::{Capturable, X11Context};
 
 use crate::cerror::CError;
 
-use tracing::warn;
+use tracing::{debug, warn};
 
 extern "C" {
     fn init_uinput_keyboard(name: *const c_char, err: *mut CError) -> c_int;
@@ -255,9 +255,9 @@ impl InputDevice for UInputDevice {
             self.mouse_fd,
             ET_RELATIVE,
             EC_REL_HWHEEL,
-            direction(event.dx),
+            direction(event.dy),
         );
-        self.send(self.mouse_fd, ET_RELATIVE, EC_REL_WHEEL_HI_RES, event.dy);
+        self.send(self.mouse_fd, ET_RELATIVE, EC_REL_WHEEL_HI_RES, event.dx);
         self.send(self.mouse_fd, ET_RELATIVE, EC_REL_HWHEEL_HI_RES, event.dx);
 
         self.send(
@@ -554,112 +554,163 @@ impl InputDevice for UInputDevice {
     }
 
     fn send_keyboard_event(&mut self, event: &KeyboardEvent) {
+        use crate::input::uinput_keys::*;
         if let Err(err) = self.capture.before_input() {
             warn!("Failed to activate window, sending no input ({})", err);
             return;
         }
-        use crate::input::uinput_keys::*;
-        let key_code: c_int = match (event.code.as_str(), &event.location) {
-            ("Escape", _) => KEY_ESC,
-            ("Digit0", KeyboardLocation::NUMPAD) => KEY_KP0,
-            ("Digit1", KeyboardLocation::NUMPAD) => KEY_KP1,
-            ("Digit2", KeyboardLocation::NUMPAD) => KEY_KP2,
-            ("Digit3", KeyboardLocation::NUMPAD) => KEY_KP3,
-            ("Digit4", KeyboardLocation::NUMPAD) => KEY_KP4,
-            ("Digit5", KeyboardLocation::NUMPAD) => KEY_KP5,
-            ("Digit6", KeyboardLocation::NUMPAD) => KEY_KP6,
-            ("Digit7", KeyboardLocation::NUMPAD) => KEY_KP7,
-            ("Digit8", KeyboardLocation::NUMPAD) => KEY_KP8,
-            ("Digit9", KeyboardLocation::NUMPAD) => KEY_KP9,
-            ("Minus", KeyboardLocation::NUMPAD) => KEY_KPMINUS,
-            ("Equal", KeyboardLocation::NUMPAD) => KEY_KPEQUAL,
-            ("Enter", KeyboardLocation::NUMPAD) => KEY_KPENTER,
-            ("Digit0", _) => KEY_0,
-            ("Digit1", _) => KEY_1,
-            ("Digit2", _) => KEY_2,
-            ("Digit3", _) => KEY_3,
-            ("Digit4", _) => KEY_4,
-            ("Digit5", _) => KEY_5,
-            ("Digit6", _) => KEY_6,
-            ("Digit7", _) => KEY_7,
-            ("Digit8", _) => KEY_8,
-            ("Digit9", _) => KEY_9,
-            ("Minus", _) => KEY_MINUS,
-            ("Equal", _) => KEY_EQUAL,
-            ("Enter", _) => KEY_ENTER,
-            ("Backspace", _) => KEY_BACKSPACE,
-            ("Tab", _) => KEY_TAB,
-            ("KeyA", _) => KEY_A,
-            ("KeyB", _) => KEY_B,
-            ("KeyC", _) => KEY_C,
-            ("KeyD", _) => KEY_D,
-            ("KeyE", _) => KEY_E,
-            ("KeyF", _) => KEY_F,
-            ("KeyG", _) => KEY_G,
-            ("KeyH", _) => KEY_H,
-            ("KeyI", _) => KEY_I,
-            ("KeyJ", _) => KEY_J,
-            ("KeyK", _) => KEY_K,
-            ("KeyL", _) => KEY_L,
-            ("KeyM", _) => KEY_M,
-            ("KeyN", _) => KEY_N,
-            ("KeyO", _) => KEY_O,
-            ("KeyP", _) => KEY_P,
-            ("KeyQ", _) => KEY_Q,
-            ("KeyR", _) => KEY_R,
-            ("KeyS", _) => KEY_S,
-            ("KeyT", _) => KEY_T,
-            ("KeyU", _) => KEY_U,
-            ("KeyV", _) => KEY_V,
-            ("KeyW", _) => KEY_W,
-            ("KeyX", _) => KEY_X,
-            ("KeyY", _) => KEY_Y,
-            ("KeyZ", _) => KEY_Z,
-            ("Comma", _) => KEY_COMMA,
-            ("Period", _) => KEY_DOT,
-            ("Slash", _) => KEY_SLASH,
-            ("Space", _) => KEY_SPACE,
-            ("F1", _) => KEY_F1,
-            ("F2", _) => KEY_F2,
-            ("F3", _) => KEY_F3,
-            ("F4", _) => KEY_F4,
-            ("F5", _) => KEY_F5,
-            ("F6", _) => KEY_F6,
-            ("F7", _) => KEY_F7,
-            ("F8", _) => KEY_F8,
-            ("F9", _) => KEY_F9,
-            ("F10", _) => KEY_F10,
-            ("F11", _) => KEY_F11,
-            ("F12", _) => KEY_F12,
-            ("F13", _) => KEY_F13,
-            ("F14", _) => KEY_F14,
-            ("F15", _) => KEY_F15,
-            ("F16", _) => KEY_F16,
-            ("F17", _) => KEY_F17,
-            ("F18", _) => KEY_F18,
-            ("F19", _) => KEY_F19,
-            ("F20", _) => KEY_F20,
-            ("F21", _) => KEY_F21,
-            ("F22", _) => KEY_F22,
-            ("F23", _) => KEY_F23,
-            ("F24", _) => KEY_F24,
-            ("Home", _) => KEY_HOME,
-            ("ArrowUp", _) => KEY_UP,
-            ("PageUp", _) => KEY_PAGEUP,
-            ("ArrowLeft", _) => KEY_LEFT,
-            ("ArrowRight", _) => KEY_RIGHT,
-            ("End", _) => KEY_END,
-            ("ArrowDown", _) => KEY_DOWN,
-            ("PageDown", _) => KEY_PAGEDOWN,
-            ("Insert", _) => KEY_INSERT,
-            ("Delete", _) => KEY_DELETE,
-            _ => KEY_UNKNOWN,
-        };
+        fn map_key(code: &str, location: &KeyboardLocation) -> c_int {
+            match (code, location) {
+                ("Escape", _) => KEY_ESC,
+                ("Digit0", KeyboardLocation::NUMPAD) => KEY_KP0,
+                ("Digit1", KeyboardLocation::NUMPAD) => KEY_KP1,
+                ("Digit2", KeyboardLocation::NUMPAD) => KEY_KP2,
+                ("Digit3", KeyboardLocation::NUMPAD) => KEY_KP3,
+                ("Digit4", KeyboardLocation::NUMPAD) => KEY_KP4,
+                ("Digit5", KeyboardLocation::NUMPAD) => KEY_KP5,
+                ("Digit6", KeyboardLocation::NUMPAD) => KEY_KP6,
+                ("Digit7", KeyboardLocation::NUMPAD) => KEY_KP7,
+                ("Digit8", KeyboardLocation::NUMPAD) => KEY_KP8,
+                ("Digit9", KeyboardLocation::NUMPAD) => KEY_KP9,
+                ("Minus", KeyboardLocation::NUMPAD) => KEY_KPMINUS,
+                ("Equal", KeyboardLocation::NUMPAD) => KEY_KPEQUAL,
+                ("Enter", KeyboardLocation::NUMPAD) => KEY_KPENTER,
+                ("Digit0", _) => KEY_0,
+                ("Digit1", _) => KEY_1,
+                ("Digit2", _) => KEY_2,
+                ("Digit3", _) => KEY_3,
+                ("Digit4", _) => KEY_4,
+                ("Digit5", _) => KEY_5,
+                ("Digit6", _) => KEY_6,
+                ("Digit7", _) => KEY_7,
+                ("Digit8", _) => KEY_8,
+                ("Digit9", _) => KEY_9,
+                ("Minus", _) => KEY_MINUS,
+                ("Equal", _) => KEY_EQUAL,
+                ("Enter", _) => KEY_ENTER,
+                ("Backspace", _) => KEY_BACKSPACE,
+                ("Tab", _) => KEY_TAB,
+                ("KeyA", _) => KEY_A,
+                ("KeyB", _) => KEY_B,
+                ("KeyC", _) => KEY_C,
+                ("KeyD", _) => KEY_D,
+                ("KeyE", _) => KEY_E,
+                ("KeyF", _) => KEY_F,
+                ("KeyG", _) => KEY_G,
+                ("KeyH", _) => KEY_H,
+                ("KeyI", _) => KEY_I,
+                ("KeyJ", _) => KEY_J,
+                ("KeyK", _) => KEY_K,
+                ("KeyL", _) => KEY_L,
+                ("KeyM", _) => KEY_M,
+                ("KeyN", _) => KEY_N,
+                ("KeyO", _) => KEY_O,
+                ("KeyP", _) => KEY_P,
+                ("KeyQ", _) => KEY_Q,
+                ("KeyR", _) => KEY_R,
+                ("KeyS", _) => KEY_S,
+                ("KeyT", _) => KEY_T,
+                ("KeyU", _) => KEY_U,
+                ("KeyV", _) => KEY_V,
+                ("KeyW", _) => KEY_W,
+                ("KeyX", _) => KEY_X,
+                ("KeyY", _) => KEY_Y,
+                ("KeyZ", _) => KEY_Z,
+                ("Comma", _) => KEY_COMMA,
+                ("Period", _) => KEY_DOT,
+                ("Slash", _) => KEY_SLASH,
+                ("Space", _) => KEY_SPACE,
+                ("F1", _) => KEY_F1,
+                ("F2", _) => KEY_F2,
+                ("F3", _) => KEY_F3,
+                ("F4", _) => KEY_F4,
+                ("F5", _) => KEY_F5,
+                ("F6", _) => KEY_F6,
+                ("F7", _) => KEY_F7,
+                ("F8", _) => KEY_F8,
+                ("F9", _) => KEY_F9,
+                ("F10", _) => KEY_F10,
+                ("F11", _) => KEY_F11,
+                ("F12", _) => KEY_F12,
+                ("F13", _) => KEY_F13,
+                ("F14", _) => KEY_F14,
+                ("F15", _) => KEY_F15,
+                ("F16", _) => KEY_F16,
+                ("F17", _) => KEY_F17,
+                ("F18", _) => KEY_F18,
+                ("F19", _) => KEY_F19,
+                ("F20", _) => KEY_F20,
+                ("F21", _) => KEY_F21,
+                ("F22", _) => KEY_F22,
+                ("F23", _) => KEY_F23,
+                ("F24", _) => KEY_F24,
+                ("Home", _) => KEY_HOME,
+                ("ArrowUp", _) => KEY_UP,
+                ("PageUp", _) => KEY_PAGEUP,
+                ("ArrowLeft", _) => KEY_LEFT,
+                ("ArrowRight", _) => KEY_RIGHT,
+                ("End", _) => KEY_END,
+                ("ArrowDown", _) => KEY_DOWN,
+                ("PageDown", _) => KEY_PAGEDOWN,
+                ("Insert", _) => KEY_INSERT,
+                ("Delete", _) => KEY_DELETE,
+                _ => KEY_UNKNOWN,
+            }
+        }
+        let key_code: c_int = map_key(&event.code, &event.location);
         let state: c_int = match event.event_type {
             KeyboardEventType::UP => 0,
             KeyboardEventType::DOWN => 1,
             KeyboardEventType::REPEAT => 2,
         };
+
+        if key_code == KEY_UNKNOWN {
+            if let KeyboardEventType::DOWN = event.event_type {
+                if !event.key.is_empty() {
+                    // If the key is unknow try inserting the unicode character directly
+                    // to do so use CTRL + SHIFT + U + UTF16 HEX of the unicode point.
+                    let unicode_keys = event
+                        .key
+                        .encode_utf16()
+                        .map(|b| format!("{:X}", b))
+                        .collect::<Vec<String>>()
+                        .concat();
+
+                    debug!(
+                        "Got unknown key: {} code: {}, trying to insert unicode using ctrl + \
+                        shift + u + {}!",
+                        event.code, event.key, unicode_keys
+                    );
+
+                    self.send(self.keyboard_fd, ET_KEY, KEY_LEFTCTRL, 1);
+                    self.send(self.keyboard_fd, ET_KEY, KEY_LEFTSHIFT, 1);
+                    self.send(self.keyboard_fd, ET_KEY, KEY_U, 1);
+                    self.send(self.keyboard_fd, ET_SYNC, EC_SYNC_REPORT, 0);
+                    for c in unicode_keys.chars() {
+                        let key_code = if c.is_alphabetic() {
+                            map_key(&format!("Key{}", c), &KeyboardLocation::STANDARD)
+                        } else {
+                            map_key(&format!("Digit{}", c), &KeyboardLocation::STANDARD)
+                        };
+
+                        self.send(self.keyboard_fd, ET_KEY, key_code, 1);
+                        self.send(self.keyboard_fd, ET_SYNC, EC_SYNC_REPORT, 0);
+                        self.send(self.keyboard_fd, ET_KEY, key_code, 0);
+                        self.send(self.keyboard_fd, ET_SYNC, EC_SYNC_REPORT, 0);
+                    }
+                    self.send(self.keyboard_fd, ET_KEY, KEY_LEFTCTRL, 0);
+                    self.send(self.keyboard_fd, ET_KEY, KEY_LEFTSHIFT, 0);
+                    self.send(self.keyboard_fd, ET_KEY, KEY_U, 0);
+                    self.send(self.keyboard_fd, ET_SYNC, EC_SYNC_REPORT, 0);
+                }
+            } else {
+                debug!(
+                    "Got unknow key: code: {} key: {}, ignoring event.",
+                    event.code, event.key
+                );
+            }
+            return;
+        }
 
         if event.ctrl {
             self.send(self.keyboard_fd, ET_KEY, KEY_LEFTCTRL, state);
