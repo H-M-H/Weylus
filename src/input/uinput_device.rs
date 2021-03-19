@@ -484,6 +484,7 @@ impl InputDevice for UInputDevice {
                         self.send(self.stylus_fd, ET_KEY, EC_KEY_TOUCH, 0);
                         self.send(self.stylus_fd, ET_KEY, EC_KEY_TOOL_PEN, 0);
                         self.send(self.stylus_fd, ET_KEY, EC_KEY_TOOL_RUBBER, 0);
+                        self.send(self.stylus_fd, ET_ABSOLUTE, EC_ABSOLUTE_PRESSURE, 0);
                         self.tool_pen_active = false;
                     }
                 }
