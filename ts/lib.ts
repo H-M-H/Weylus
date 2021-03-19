@@ -268,6 +268,7 @@ class PEvent {
 class WEvent {
     dx: number;
     dy: number;
+    timestamp: number;
 
     constructor(event: WheelEvent) {
         /* The WheelEvent can have different scrolling modes that affect how much scrolling
@@ -287,6 +288,7 @@ class WEvent {
         }
         this.dx = Math.round(scale * event.deltaX);
         this.dy = Math.round(scale * event.deltaY);
+        this.timestamp = Math.round(event.timeStamp * 1000);
     }
 }
 

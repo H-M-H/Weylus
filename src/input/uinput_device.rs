@@ -4,7 +4,7 @@ use std::os::raw::{c_char, c_int};
 use crate::input::device::InputDevice;
 use crate::protocol::{
     Button, KeyboardEvent, KeyboardEventType, KeyboardLocation, PointerEvent, PointerEventType,
-    PointerType,
+    PointerType, WheelEvent,
 };
 use crate::x11helper::{Capturable, X11Context};
 
@@ -229,6 +229,46 @@ const ABS_MAX: f64 = 65535.0;
 const MAX_SCREEN_MAPPING_TRIES: usize = 100;
 
 impl InputDevice for UInputDevice {
+    fn send_wheel_event(&mut self, event: &WheelEvent) {
+        if let Err(err) = self.capture.before_input() {
+            warn!("Failed to activate window, sending no input ({})", err);
+            return;
+        }
+
+        fn direction(d: i32) -> i32 {
+            if d == 0 {
+                0
+            } else if d < 0 {
+                -1
+            } else {
+                1
+            }
+        }
+
+        self.send(
+            self.mouse_fd,
+            ET_RELATIVE,
+            EC_REL_WHEEL,
+            direction(event.dy),
+        );
+        self.send(
+            self.mouse_fd,
+            ET_RELATIVE,
+            EC_REL_HWHEEL,
+            direction(event.dx),
+        );
+        self.send(self.mouse_fd, ET_RELATIVE, EC_REL_WHEEL_HI_RES, event.dy);
+        self.send(self.mouse_fd, ET_RELATIVE, EC_REL_HWHEEL_HI_RES, event.dx);
+
+        self.send(
+            self.mouse_fd,
+            ET_MSC,
+            EC_MSC_TIMESTAMP,
+            (event.timestamp % (i32::MAX as u64 + 1)) as i32,
+        );
+        self.send(self.mouse_fd, ET_SYNC, EC_SYNC_REPORT, 0);
+    }
+
     fn send_pointer_event(&mut self, event: &PointerEvent) {
         if let Err(err) = self.capture.before_input() {
             warn!("Failed to activate window, sending no input ({})", err);
@@ -514,6 +554,10 @@ impl InputDevice for UInputDevice {
     }
 
     fn send_keyboard_event(&mut self, event: &KeyboardEvent) {
+        if let Err(err) = self.capture.before_input() {
+            warn!("Failed to activate window, sending no input ({})", err);
+            return;
+        }
         use crate::input::uinput_keys::*;
         let key_code: c_int = match (event.code.as_str(), &event.location) {
             ("Escape", _) => KEY_ESC,

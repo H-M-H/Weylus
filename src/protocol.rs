@@ -81,7 +81,9 @@ fn location_from<'de, D: Deserializer<'de>>(deserializer: D) -> Result<KeyboardL
         1 => Ok(KeyboardLocation::LEFT),
         2 => Ok(KeyboardLocation::RIGHT),
         3 => Ok(KeyboardLocation::NUMPAD),
-        _ => Err(serde::de::Error::custom("Failed to parse keyboard location code.")),
+        _ => Err(serde::de::Error::custom(
+            "Failed to parse keyboard location code.",
+        )),
     }
 }
 
@@ -144,6 +146,7 @@ pub struct PointerEvent {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct WheelEvent {
-    dx: i32,
-    dy: i32,
+    pub dx: i32,
+    pub dy: i32,
+    pub timestamp: u64,
 }

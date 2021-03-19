@@ -4,7 +4,7 @@ use autopilot::screen::size as screen_size;
 use tracing::warn;
 
 use crate::input::device::InputDevice;
-use crate::protocol::{Button, KeyboardEvent, PointerEvent, PointerEventType};
+use crate::protocol::{Button, KeyboardEvent, PointerEvent, PointerEventType, WheelEvent};
 
 #[cfg(target_os = "linux")]
 use crate::x11helper::Capturable;
@@ -29,6 +29,11 @@ impl AutoPilotDevice {
 }
 
 impl InputDevice for AutoPilotDevice {
+
+    fn send_wheel_event(&mut self, event: &WheelEvent) {
+        // TODO
+    }
+
     fn send_pointer_event(&mut self, event: &PointerEvent) {
         if !event.is_primary {
             return;

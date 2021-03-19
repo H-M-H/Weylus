@@ -14,7 +14,7 @@ use websocket::{Message, OwnedMessage, WebSocketError};
 
 use crate::input::device::InputDevice;
 use crate::protocol::{
-    ClientConfiguration, KeyboardEvent, MessageInbound, MessageOutbound, PointerEvent,
+    ClientConfiguration, KeyboardEvent, MessageInbound, MessageOutbound, PointerEvent, WheelEvent,
 };
 use crate::screen_capture::generic::ScreenCaptureGeneric;
 #[cfg(target_os = "linux")]
@@ -404,6 +404,17 @@ impl WsHandler {
         self.video_sender.send(VideoCommands::TryGetFrame).unwrap();
     }
 
+    fn process_wheel_event(&mut self, event: &WheelEvent) {
+        if self.input_device.is_some() {
+            self.input_device
+                .as_mut()
+                .unwrap()
+                .send_wheel_event(&event)
+        } else {
+            warn!("Input device is not initalized, can not process WheelEvent!");
+        }
+    }
+
     fn process_pointer_event(&mut self, event: &PointerEvent) {
         if self.input_device.is_some() {
             self.input_device
@@ -422,7 +433,7 @@ impl WsHandler {
                 .unwrap()
                 .send_keyboard_event(&event)
         } else {
-            warn!("Input device is not initalized, can not process PointerEvent!");
+            warn!("Input device is not initalized, can not process KeyboardEvent!");
         }
     }
 
@@ -527,6 +538,7 @@ impl WsHandler {
                     Ok(message) => match message {
                         MessageInbound::WheelEvent(event) => {
                             trace!("Got: {:?}", &event);
+                            self.process_wheel_event(&event);
                         }
                         MessageInbound::PointerEvent(event) => {
                             trace!("Got: {:?}", &event);
