@@ -113,7 +113,7 @@ class Settings {
             this.checks.get("capture_cursor").disabled = !(e.target as HTMLInputElement).checked;
             upd_server_config()
         };
-        this.checks.get("stylus_support").onchange = upd_server_config;
+        this.checks.get("uinput_support").onchange = upd_server_config;
         this.checks.get("capture_cursor").onchange = upd_server_config;
 
         document.getElementById("refresh").onclick = () => this.webSocket.send('"GetCapturableList"');
@@ -124,7 +124,7 @@ class Settings {
         let config = new Object(null);
         config["capturable_id"] = Number(this.capturable_select.value);
         for (const key of [
-            "stylus_support",
+            "uinput_support",
             "faster_capture",
             "capture_cursor"])
             config[key] = this.checks.get(key).checked
@@ -299,10 +299,10 @@ class PointerHandler {
         this.video = document.getElementById("video") as HTMLVideoElement;
         this.webSocket = webSocket;
         this.pointerTypes = settings.pointer_types();
-        this.video.onpointerdown = (e) => { this.onEvent(e, "pointerdown") };
-        this.video.onpointerup = (e) => { this.onEvent(e, "pointerup") };
-        this.video.onpointercancel = (e) => { this.onEvent(e, "pointercancel") };
-        this.video.onpointermove = (e) => { this.onEvent(e, "pointermove") };
+        this.video.onpointerdown = (e) => this.onEvent(e, "pointerdown");
+        this.video.onpointerup = (e) => this.onEvent(e, "pointerup");
+        this.video.onpointercancel = (e) => this.onEvent(e, "pointercancel");
+        this.video.onpointermove = (e) => this.onEvent(e, "pointermove");
     }
 
     onEvent(event: PointerEvent, event_type: string) {
@@ -312,6 +312,55 @@ class PointerHandler {
                 settings.toggle();
             }
         }
+    }
+}
+
+class KEvent {
+    event_type: string;
+    code: string;
+    key: string;
+    location: number;
+    alt: boolean;
+    ctrl: boolean;
+    shift: boolean;
+    meta: boolean;
+
+    constructor(event_type: string, event: KeyboardEvent) {
+        this.event_type = event_type;
+        this.code = event.code;
+        this.key = event.key;
+        this.location = event.location;
+        this.alt = event.altKey;
+        this.ctrl = event.ctrlKey;
+        this.shift = event.shiftKey;
+        this.meta = event.metaKey;
+    }
+}
+
+class KeyboardHandler {
+    webSocket: WebSocket;
+
+    constructor(webSocket: WebSocket) {
+        this.webSocket = webSocket;
+
+        window.onkeydown = (e) => {
+            if (e.repeat)
+                return this.onEvent(e, "repeat");
+            return this.onEvent(e, "down");
+        };
+        window.onkeyup = (e) => { return this.onEvent(e, "up") };
+        window.onkeypress = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+    }
+
+    onEvent(event: KeyboardEvent, event_type: string) {
+        this.webSocket.send(JSON.stringify({ "KeyboardEvent": new KEvent(event_type, event) }));
+        event.preventDefault();
+        event.stopPropagation();
+        return false;
     }
 }
 
@@ -461,6 +510,7 @@ function init(access_code: string, websocket_port: number) {
         video.onwheel = (event) => {
             webSocket.send(JSON.stringify({ "WheelEvent": new WEvent(event) }));
         }
+        new KeyboardHandler(webSocket);
         new PointerHandler(webSocket);
         frame_timer(webSocket);
     },

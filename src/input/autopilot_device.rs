@@ -4,34 +4,32 @@ use autopilot::screen::size as screen_size;
 use tracing::warn;
 
 use crate::input::device::InputDevice;
-use crate::protocol::Button;
-use crate::protocol::PointerEvent;
-use crate::protocol::PointerEventType;
+use crate::protocol::{Button, KeyboardEvent, PointerEvent, PointerEventType};
 
 #[cfg(target_os = "linux")]
 use crate::x11helper::Capturable;
 
-pub struct Mouse {
+pub struct AutoPilotDevice {
     #[cfg(target_os = "linux")]
     capture: Capturable,
 }
 
 #[cfg(target_os = "linux")]
-impl Mouse {
+impl AutoPilotDevice {
     pub fn new(capture: Capturable) -> Self {
         Self { capture }
     }
 }
 
 #[cfg(not(target_os = "linux"))]
-impl Mouse {
+impl AutoPilotDevice {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl InputDevice for Mouse {
-    fn send_event(&mut self, event: &PointerEvent) {
+impl InputDevice for AutoPilotDevice {
+    fn send_pointer_event(&mut self, event: &PointerEvent) {
         if !event.is_primary {
             return;
         }
@@ -78,5 +76,9 @@ impl InputDevice for Mouse {
             }
             _ => (),
         }
+    }
+
+    fn send_keyboard_event(&mut self, event: &KeyboardEvent) {
+        // TODO
     }
 }

@@ -49,6 +49,34 @@ void setup(int fd, const char* name, Error* err)
 		ERROR(err, 1, "error: UI_DEV_SETUP");
 }
 
+void init_keyboard(int fd, const char* name, Error* err)
+{
+	// enable synchronization
+	if (ioctl(fd, UI_SET_EVBIT, EV_SYN) < 0)
+		ERROR(err, 1, "error: ioctl UI_SET_EVBIT EV_SYN");
+
+	// enable keys
+	if (ioctl(fd, UI_SET_EVBIT, EV_KEY) < 0)
+		ERROR(err, 1, "error: ioctl UI_SET_EVBIT EV_KEY");
+
+	// enable all the keys!
+	for (int keycode = KEY_ESC; keycode <= KEY_MICMUTE; ++keycode)
+		if (ioctl(fd, UI_SET_KEYBIT, keycode) < 0)
+			ERROR(err, 1, "error: ioctl UI_SET_KEYBIT %x", keycode);
+
+	// TODO: figure if scancodes are needed
+	// if (ioctl(fd, UI_SET_EVBIT, EV_MSC) < 0)
+	// 	ERROR(err, 1, "error: ioctl UI_SET_EVBIT EV_MSC");
+	// if (ioctl(fd, UI_SET_MSCBIT, MSC_SCAN) < 0)
+	// 	ERROR(err, 1, "error: ioctl UI_SET_MSCBIT MSC_SCAN");
+
+	setup(fd, name, err);
+	OK_OR_ABORT(err);
+
+	if (ioctl(fd, UI_DEV_CREATE) < 0)
+		ERROR(err, 1, "error: ioctl");
+}
+
 void init_mouse(int fd, const char* name, Error* err)
 {
 	// enable synchronization
@@ -209,6 +237,19 @@ void init_touch(int fd, const char* name, Error* err)
 
 	if (ioctl(fd, UI_DEV_CREATE) < 0)
 		ERROR(err, 1, "error: ioctl");
+}
+
+int init_uinput_keyboard(const char* name, Error* err)
+{
+	int device;
+
+	if ((device = open("/dev/uinput", O_WRONLY | O_NONBLOCK)) < 0)
+		fill_error(err, 101, "error: failed to open /dev/uinput");
+	else
+	{
+		init_keyboard(device, name, err);
+	}
+	return device;
 }
 
 int init_uinput_stylus(const char* name, Error* err)
