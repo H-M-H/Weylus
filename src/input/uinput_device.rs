@@ -371,6 +371,7 @@ impl InputDevice for GraphicTablet {
                     if let Some(x11ctx) = &mut self.x11ctx {
                         x11ctx.map_input_device_to_entire_screen(&self.name_stylus_device, true);
                     }
+                    self.num_touch_mapping_tries += 1;
                 }
                 match event.event_type {
                     PointerEventType::DOWN | PointerEventType::MOVE => {
@@ -438,6 +439,7 @@ impl InputDevice for GraphicTablet {
                     if let Some(x11ctx) = &mut self.x11ctx {
                         x11ctx.map_input_device_to_entire_screen(&self.name_mouse_device, false);
                     }
+                    self.num_touch_mapping_tries += 1;
                 }
                 match event.event_type {
                     PointerEventType::DOWN | PointerEventType::MOVE => {
