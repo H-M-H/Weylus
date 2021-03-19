@@ -13,6 +13,7 @@ pub struct ClientConfiguration {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum MessageInbound {
     PointerEvent(PointerEvent),
+    WheelEvent(WheelEvent),
     // request a video frame from the server
     // like this the client can partially control the framerate by sending requests at some given
     // rate. However, the server may drop a request if encoding is too slow.
@@ -96,4 +97,10 @@ pub struct PointerEvent {
     pub twist: i32,
     pub width: f64,
     pub height: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WheelEvent {
+    dx: i32,
+    dy: i32,
 }

@@ -149,7 +149,7 @@ impl Drop for GraphicTablet {
 // Event Types
 const ET_SYNC: c_int = 0x00;
 const ET_KEY: c_int = 0x01;
-//const ET_RELATIVE: c_int = 0x02;
+const ET_RELATIVE: c_int = 0x02;
 const ET_ABSOLUTE: c_int = 0x03;
 const ET_MSC: c_int = 0x04;
 
@@ -169,6 +169,11 @@ const EC_KEY_TOOL_QUADTAP: c_int = 0x14f; /* Four fingers on trackpad */
 const EC_KEY_TOOL_QUINTTAP: c_int = 0x148; /* Five fingers on trackpad */
 //const EC_RELATIVE_X: c_int = 0x00;
 //const EC_RELATIVE_Y: c_int = 0x01;
+
+const EC_REL_HWHEEL: c_int = 0x06;
+const EC_REL_WHEEL: c_int = 0x08;
+const EC_REL_WHEEL_HI_RES: c_int = 0x0b;
+const EC_REL_HWHEEL_HI_RES: c_int = 0x0c;
 
 const EC_ABSOLUTE_X: c_int = 0x00;
 const EC_ABSOLUTE_Y: c_int = 0x01;

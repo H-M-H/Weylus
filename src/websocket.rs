@@ -509,6 +509,9 @@ impl WsHandler {
                 let message: Result<MessageInbound, _> = serde_json::from_str(&s);
                 match message {
                     Ok(message) => match message {
+                        MessageInbound::WheelEvent(event) => {
+                            trace!("Got: {:?}", &event);
+                        }
                         MessageInbound::PointerEvent(event) => {
                             trace!("Got: {:?}", &event);
                             self.process_pointer_event(&event);
