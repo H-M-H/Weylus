@@ -14,7 +14,7 @@ use tracing::{error, info, warn, debug};
 struct WebConfig {
     access_code: Option<String>,
     websocket_port: u16,
-    stylus_support_enabled: bool,
+    uinput_enabled: bool,
     faster_capture_enabled: bool,
     capture_cursor_enabled: bool,
     log_level: String,
@@ -78,7 +78,7 @@ async fn serve(
             let config = WebConfig {
                 access_code: context.access_code.clone(),
                 websocket_port: context.ws_port,
-                stylus_support_enabled: cfg!(target_os = "linux"),
+                uinput_enabled: cfg!(target_os = "linux"),
                 faster_capture_enabled: cfg!(target_os = "linux"),
                 capture_cursor_enabled: cfg!(target_os = "linux"),
                 log_level: crate::log::get_log_level().to_string(),
