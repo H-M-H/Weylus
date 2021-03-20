@@ -1,4 +1,5 @@
 use autopilot::mouse;
+use autopilot::mouse::ScrollDirection;
 use autopilot::screen::size as screen_size;
 
 use tracing::warn;
@@ -29,9 +30,12 @@ impl AutoPilotDevice {
 }
 
 impl InputDevice for AutoPilotDevice {
-
     fn send_wheel_event(&mut self, event: &WheelEvent) {
-        // TODO
+        match event.dy {
+            1..=i32::MAX => mouse::scroll(ScrollDirection::Up, 1),
+            i32::MIN..=-1 => mouse::scroll(ScrollDirection::Down, 1),
+            0 => {}
+        }
     }
 
     fn send_pointer_event(&mut self, event: &PointerEvent) {
