@@ -275,7 +275,16 @@ A: Chrome lacks some features for video streaming on iPadOS/iOS, try Firefox or 
 Q: Can I use Weylus even if there is no WiFi?<br>
 A: Probably yes! Most tablets permit setting up a WiFi hotspot that can be used to connect your
 computer and tablet. Alternatively there is USB tethering too, which can be used to setup a peer to
-peer connection between your tablet and computer over USB. Weylus only requires that your devices
+peer connection between your tablet and computer over USB. Another method for Android devices is to
+setup a socket connection with
+[adb](https://developer.android.com/studio/command-line/adb#Enabling):
+```console
+adb reverse tcp:1701 tcp:1701
+adb reverse tcp:9001 tcp:9001
+```
+Like that you can connect from your Android device to Weylus with the URL: `http://127.0.0.1:1701`.
+
+Weylus only requires that your devices
 are connected via the Internet Protocol and that doesn't necessarily imply WiFi.
 
 ---
