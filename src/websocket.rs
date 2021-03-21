@@ -12,7 +12,7 @@ use websocket::server::upgrade::{sync::Buffer as WsBuffer, WsUpgrade};
 use websocket::sync::Server;
 use websocket::{Message, OwnedMessage, WebSocketError};
 
-use crate::input::device::InputDevice;
+use crate::input::device::{InputDevice, InputDeviceType};
 use crate::protocol::{
     ClientConfiguration, KeyboardEvent, MessageInbound, MessageOutbound, PointerEvent, WheelEvent,
 };
@@ -406,10 +406,7 @@ impl WsHandler {
 
     fn process_wheel_event(&mut self, event: &WheelEvent) {
         if self.input_device.is_some() {
-            self.input_device
-                .as_mut()
-                .unwrap()
-                .send_wheel_event(&event)
+            self.input_device.as_mut().unwrap().send_wheel_event(&event)
         } else {
             warn!("Input device is not initalized, can not process WheelEvent!");
         }
@@ -476,29 +473,41 @@ impl WsHandler {
                 }]
                 .clone();
                 if config.uinput_support {
-                    let device = crate::input::uinput_device::UInputDevice::new(
-                        capturable.clone(),
-                        self.client_addr.to_string(),
-                    );
-                    if let Err(err) = device {
-                        error!("Failed to create uinput device: {}", err);
-                        if let CErrorCode::UInputNotAccessible = err.to_enum() {
-                            if let Err(err) =
-                                self.gui_sender.send(Ws2GuiMessage::UInputInaccessible)
-                            {
-                                warn!("Failed to send message to gui thread: {}!", err);
+                    if self
+                        .input_device
+                        .as_ref()
+                        .map_or(true, |d| d.device_type() != InputDeviceType::UInputDevice)
+                    {
+                        let device = crate::input::uinput_device::UInputDevice::new(
+                            capturable.clone(),
+                            self.client_addr.to_string(),
+                        );
+                        if let Err(err) = device {
+                            error!("Failed to create uinput device: {}", err);
+                            if let CErrorCode::UInputNotAccessible = err.to_enum() {
+                                if let Err(err) =
+                                    self.gui_sender.send(Ws2GuiMessage::UInputInaccessible)
+                                {
+                                    warn!("Failed to send message to gui thread: {}!", err);
+                                }
                             }
+                            self.send_msg(&MessageOutbound::ConfigError(
+                                "Failed to create uinput device!".to_string(),
+                            ));
+                            return;
                         }
-                        self.send_msg(&MessageOutbound::ConfigError(
-                            "Failed to create uinput device!".to_string(),
-                        ));
-                        return;
+                        self.input_device = Some(Box::new(device.unwrap()))
                     }
-                    self.input_device = Some(Box::new(device.unwrap()))
                 } else {
-                    self.input_device = Some(Box::new(
-                        crate::input::autopilot_device::AutoPilotDevice::new(capturable.clone()),
-                    ))
+                    if self.input_device.as_ref().map_or(true, |d| {
+                        d.device_type() != InputDeviceType::AutoPilotDevice
+                    }) {
+                        self.input_device = Some(Box::new(
+                            crate::input::autopilot_device::AutoPilotDevice::new(
+                                capturable.clone(),
+                            ),
+                        ));
+                    }
                 }
 
                 self.video_sender
@@ -520,7 +529,9 @@ impl WsHandler {
 
         #[cfg(not(target_os = "linux"))]
         {
-            self.input_device = Some(Box::new(crate::input::autopilot_device::AutoPilotDevice::new()));
+            self.input_device = Some(Box::new(
+                crate::input::autopilot_device::AutoPilotDevice::new(),
+            ));
             self.video_sender
                 .send(VideoCommands::Start(VideoConfig {
                     max_width: config.max_width,

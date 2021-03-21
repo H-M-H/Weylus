@@ -1,7 +1,7 @@
 use std::ffi::CString;
 use std::os::raw::{c_char, c_int};
 
-use crate::input::device::InputDevice;
+use crate::input::device::{InputDevice, InputDeviceType};
 use crate::protocol::{
     Button, KeyboardEvent, KeyboardEventType, KeyboardLocation, PointerEvent, PointerEventType,
     PointerType, WheelEvent,
@@ -818,5 +818,9 @@ impl InputDevice for UInputDevice {
 
         self.send(self.keyboard_fd, ET_KEY, key_code, state);
         self.send(self.keyboard_fd, ET_SYNC, EC_SYNC_REPORT, 0);
+    }
+
+    fn device_type(&self) -> InputDeviceType {
+        InputDeviceType::UInputDevice
     }
 }

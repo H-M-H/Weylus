@@ -4,7 +4,7 @@ use autopilot::screen::size as screen_size;
 
 use tracing::warn;
 
-use crate::input::device::InputDevice;
+use crate::input::device::{InputDevice, InputDeviceType};
 use crate::protocol::{
     Button, KeyboardEvent, KeyboardEventType, PointerEvent, PointerEventType, WheelEvent,
 };
@@ -169,5 +169,9 @@ impl InputDevice for AutoPilotDevice {
                 }
             }
         }
+    }
+
+    fn device_type(&self) -> InputDeviceType {
+        InputDeviceType::AutoPilotDevice
     }
 }
