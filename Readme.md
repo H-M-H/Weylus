@@ -274,10 +274,26 @@ A: Chrome lacks some features for video streaming on iPadOS/iOS, try Firefox or 
 
 Q: Can I use Weylus even if there is no WiFi?<br>
 A: Probably yes! Most tablets permit setting up a WiFi hotspot that can be used to connect your
-computer and tablet. Alternatively there is USB tethering too, which can be used to setup a peer to
+computer and tablet. Alternatively there is USB tethering too (see below), which can be used to setup a peer to
 peer connection between your tablet and computer over USB. Weylus only requires that your devices
 are connected via the Internet Protocol and that doesn't necessarily imply WiFi.
 
+---
+## USB tethering
+
+You can connect your tablet to Wayland also through a "USB file transfer" connection by using adb to reverse the ports your tablet connects to
+
+1. Connect your tablet to your PC via the USB cable
+2. On your Android tablet, use "USB for file transfer" mode
+3. Enable USB debugging on your tablet (see [here](https://www.kingoapp.com/root-tutorials/how-to-enable-usb-debugging-mode-on-android.htm) for instructions)
+4. Install `adb` on your system (on Ubuntu, run `sudo apt-get install adb`)
+5. Reverse the port you are going to use, so that your tablet will connect to your PC
+```
+adb reverse tcp:1701 tcp:1701
+adb reverse tcp:9001 tcp:9001
+```
+6. Run Wyelus and start the server
+7. On your tablet, connect to `localhost:1701`. Use `localhost` and not an IP addres
 ---
 
 [![Packaging status](
