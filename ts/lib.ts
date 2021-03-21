@@ -508,13 +508,17 @@ function init(access_code: string, websocket_port: number) {
     }
     video.controls = false;
     video.onloadeddata = () => stretch_video();
+    let is_connected = false;
     handle_messages(webSocket, video, () => {
-        video.onwheel = (event) => {
-            webSocket.send(JSON.stringify({ "WheelEvent": new WEvent(event) }));
+        if (!is_connected) {
+            video.onwheel = (event) => {
+                webSocket.send(JSON.stringify({ "WheelEvent": new WEvent(event) }));
+            }
+            new KeyboardHandler(webSocket);
+            new PointerHandler(webSocket);
+            frame_timer(webSocket);
+            is_connected = true;
         }
-        new KeyboardHandler(webSocket);
-        new PointerHandler(webSocket);
-        frame_timer(webSocket);
     },
         (err) => alert(err),
         (window_names) => settings.onCapturableList(window_names)
