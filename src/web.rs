@@ -15,7 +15,6 @@ struct WebConfig {
     access_code: Option<String>,
     websocket_port: u16,
     uinput_enabled: bool,
-    faster_capture_enabled: bool,
     capture_cursor_enabled: bool,
     log_level: String,
 }
@@ -79,7 +78,6 @@ async fn serve(
                 access_code: context.access_code.clone(),
                 websocket_port: context.ws_port,
                 uinput_enabled: cfg!(target_os = "linux"),
-                faster_capture_enabled: cfg!(target_os = "linux"),
                 capture_cursor_enabled: cfg!(target_os = "linux"),
                 log_level: crate::log::get_log_level().to_string(),
             };

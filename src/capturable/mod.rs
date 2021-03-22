@@ -33,10 +33,7 @@ pub trait Capturable: Send + BoxCloneCapturable {
     fn name(&self) -> String;
     fn geometry_relative(&self) -> Result<(f64, f64, f64, f64), Box<dyn Error>>;
     fn before_input(&mut self) -> Result<(), Box<dyn Error>>;
-    fn recorder(
-        &self,
-        capture_cursor: bool,
-    ) -> Result<Box<dyn Recorder>, Box<dyn Error>>;
+    fn recorder(&self, capture_cursor: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>>;
 }
 
 impl Clone for Box<dyn Capturable> {
@@ -62,5 +59,7 @@ pub fn get_capturables() -> Vec<Box<dyn Capturable>> {
             }
         };
     }
+    use crate::capturable::autopilot::AutoPilotCapturable;
+    capturables.push(Box::new(AutoPilotCapturable::new()));
     capturables
 }

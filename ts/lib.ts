@@ -108,11 +108,6 @@ class Settings {
 
         // server
         let upd_server_config = () => { this.save_settings(); this.send_server_config() };
-        this.checks.get("faster_capture").onchange = (e) => {
-            this.capturable_select.disabled = !(e.target as HTMLInputElement).checked;
-            this.checks.get("capture_cursor").disabled = !(e.target as HTMLInputElement).checked;
-            upd_server_config()
-        };
         this.checks.get("uinput_support").onchange = upd_server_config;
         this.checks.get("capture_cursor").onchange = upd_server_config;
 
@@ -125,7 +120,6 @@ class Settings {
         config["capturable_id"] = Number(this.capturable_select.value);
         for (const key of [
             "uinput_support",
-            "faster_capture",
             "capture_cursor"])
             config[key] = this.checks.get(key).checked
         config["max_width"] = Math.round(window.screen.availWidth * window.devicePixelRatio);
@@ -151,8 +145,7 @@ class Settings {
                 if (typeof settings[key] === "boolean")
                     elem.checked = settings[key];
             }
-            this.capturable_select.disabled = !this.checks.get("faster_capture").checked;
-            this.checks.get("capture_cursor").disabled = !this.checks.get("faster_capture").checked;
+            this.checks.get("capture_cursor").disabled = !this.checks.get("capture_cursor").checked;
             let upd_limit = settings["frame_update_limit"];
             if (upd_limit)
                 this.frame_update_limit_input.value = upd_limit;

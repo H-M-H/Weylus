@@ -3,7 +3,6 @@ use serde::{Deserialize, Deserializer, Serialize};
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ClientConfiguration {
     pub uinput_support: bool,
-    pub faster_capture: bool,
     pub capturable_id: usize,
     pub capture_cursor: bool,
     pub max_width: usize,
