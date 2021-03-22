@@ -1,14 +1,13 @@
+use crate::cerror::CError;
+use crate::capturable::{Capturable, Recorder};
+use crate::video::PixelProvider;
 use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_float, c_int, c_void};
+use std::os::raw::{c_char, c_float, c_int, c_uint, c_void};
+use std::slice::from_raw_parts;
 use std::sync::Arc;
 use std::{error::Error, fmt};
 
 use tracing::debug;
-
-use crate::cerror::CError;
-
-use crate::screen_capture::linux::ScreenCaptureX11;
-use crate::screen_capture::{Capturable, ScreenCapture};
 
 extern "C" {
     fn XOpenDisplay(name: *const c_char) -> *mut c_void;
@@ -40,6 +39,14 @@ extern "C" {
         libinput: c_int,
         err: *mut CError,
     );
+    fn start_capture(handle: *const c_void, ctx: *mut c_void, err: *mut CError) -> *mut c_void;
+    fn capture_sceen(
+        handle: *mut c_void,
+        img: *mut CImage,
+        capture_cursor: c_int,
+        err: *mut CError,
+    );
+    fn stop_capture(handle: *mut c_void, err: *mut CError);
 }
 
 pub struct X11Capturable {
@@ -111,12 +118,12 @@ impl Capturable for X11Capturable {
         }
     }
 
-    fn screen_capture(
+    fn recorder(
         &self,
         capture_cursor: bool,
-    ) -> Result<Box<dyn ScreenCapture>, Box<dyn Error>> {
-        match ScreenCaptureX11::new(self.clone(), capture_cursor) {
-            Ok(screen_capture) => Ok(Box::new(screen_capture)),
+    ) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
+        match RecorderX11::new(self.clone(), capture_cursor) {
+            Ok(recorder) => Ok(Box::new(recorder)),
             Err(err) => Err(Box::new(err)),
         }
     }
@@ -216,5 +223,103 @@ impl X11Context {
             debug!("Failed to map input device to screen: {}", &err);
         }
         err
+    }
+}
+
+#[repr(C)]
+struct CImage {
+    data: *const u8,
+    width: c_uint,
+    height: c_uint,
+}
+
+impl CImage {
+    pub fn new() -> Self {
+        Self {
+            data: std::ptr::null(),
+            width: 0,
+            height: 0,
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        (self.width * self.height * 4) as usize
+    }
+
+    pub fn data(&self) -> &[u8] {
+        unsafe { from_raw_parts(self.data, self.size()) }
+    }
+}
+
+pub struct RecorderX11 {
+    handle: *mut c_void,
+    // keep a reference to the capturable so it is not destroyed until we are done
+    #[allow(dead_code)]
+    capturable: X11Capturable,
+    img: CImage,
+    capture_cursor: bool,
+}
+
+impl RecorderX11 {
+    pub fn new(mut capturable: X11Capturable, capture_cursor: bool) -> Result<Self, CError> {
+        let mut err = CError::new();
+        fltk::app::lock().unwrap();
+        let handle = unsafe { start_capture(capturable.handle(), std::ptr::null_mut(), &mut err) };
+        fltk::app::unlock();
+        if err.is_err() {
+            Err(err)
+        } else {
+            Ok(Self {
+                handle,
+                capturable,
+                img: CImage::new(),
+                capture_cursor,
+            })
+        }
+    }
+}
+
+impl Drop for RecorderX11 {
+    fn drop(&mut self) {
+        let mut err = CError::new();
+        fltk::app::lock().unwrap();
+        unsafe {
+            stop_capture(self.handle, &mut err);
+        }
+        fltk::app::unlock();
+    }
+}
+
+impl Recorder for RecorderX11 {
+    fn capture(&mut self) -> Result<(), Box<dyn Error>> {
+        let mut err = CError::new();
+        fltk::app::lock().unwrap();
+        unsafe {
+            capture_sceen(
+                self.handle,
+                &mut self.img,
+                self.capture_cursor.into(),
+                &mut err,
+            );
+        }
+        fltk::app::unlock();
+        if err.is_err() {
+            self.img.data = std::ptr::null();
+            Err(err.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn pixel_provider(&self) -> crate::video::PixelProvider {
+        if self.img.data.is_null() {
+            PixelProvider::None
+        } else {
+            PixelProvider::BGR0(self.img.data())
+        }
+    }
+
+    fn size(&self) -> (usize, usize) {
+        (self.img.width as usize, self.img.height as usize)
     }
 }

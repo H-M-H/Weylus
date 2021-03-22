@@ -1,5 +1,5 @@
 use crate::protocol::{WheelEvent, PointerEvent, KeyboardEvent};
-use crate::screen_capture::Capturable;
+use crate::capturable::Capturable;
 
 #[derive(PartialEq, Eq)]
 pub enum InputDeviceType {

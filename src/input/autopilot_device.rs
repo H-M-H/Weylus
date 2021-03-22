@@ -9,7 +9,7 @@ use crate::protocol::{
     Button, KeyboardEvent, KeyboardEventType, PointerEvent, PointerEventType, WheelEvent,
 };
 
-use crate::screen_capture::Capturable;
+use crate::capturable::Capturable;
 
 pub struct AutoPilotDevice {
     capturable: Box<dyn Capturable>,

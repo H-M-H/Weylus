@@ -3,15 +3,15 @@ use std::error::Error;
 
 use image_autopilot::GenericImageView;
 
-use crate::screen_capture::ScreenCapture;
+use crate::capturable::Recorder;
 
-pub struct ScreenCaptureGeneric {
+pub struct RecorderAutoPilot {
     img: Vec<u8>,
     width: usize,
     height: usize,
 }
 
-impl ScreenCaptureGeneric {
+impl RecorderAutoPilot {
     pub fn new() -> Self {
         Self {
             img: Vec::new(),
@@ -21,7 +21,7 @@ impl ScreenCaptureGeneric {
     }
 }
 
-impl ScreenCapture for ScreenCaptureGeneric {
+impl Recorder for RecorderAutoPilot {
     fn capture(&mut self) -> Result<(), Box<dyn Error>> {
         let img = autopilot::bitmap::capture_screen()?.image;
         self.width = img.width() as usize;

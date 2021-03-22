@@ -16,7 +16,7 @@ use crate::input::device::{InputDevice, InputDeviceType};
 use crate::protocol::{
     ClientConfiguration, KeyboardEvent, MessageInbound, MessageOutbound, PointerEvent, WheelEvent,
 };
-use crate::screen_capture::{get_capturables, Capturable, ScreenCapture};
+use crate::capturable::{get_capturables, Capturable, Recorder};
 
 use crate::cerror::CErrorCode;
 use crate::video::VideoEncoder;
@@ -215,7 +215,7 @@ enum VideoCommands {
 }
 
 fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, config: WsConfig) {
-    let mut screen_capture: Option<Box<dyn ScreenCapture>> = None;
+    let mut recorder: Option<Box<dyn Recorder>> = None;
     let mut video_encoder: Option<Box<VideoEncoder>> = None;
 
     let mut max_width = 1920;
@@ -247,16 +247,16 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, confi
         }
         match msg {
             VideoCommands::TryGetFrame => {
-                if screen_capture.is_none() {
+                if recorder.is_none() {
                     warn!("Screen capture not initalized, can not send video frame!");
                     continue;
                 }
-                if let Err(err) = screen_capture.as_mut().unwrap().capture() {
+                if let Err(err) = recorder.as_mut().unwrap().capture() {
                     warn!("Error capturing screen: {}", err);
                     continue;
                 }
-                let screen_capture = screen_capture.as_ref().unwrap();
-                let (width_in, height_in) = screen_capture.size();
+                let recorder = recorder.as_ref().unwrap();
+                let (width_in, height_in) = recorder.size();
                 let scale =
                     (max_width as f64 / width_in as f64).max(max_height as f64 / height_in as f64);
                 let mut width_out = width_in;
@@ -308,13 +308,13 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, confi
                     video_encoder = Some(res.unwrap());
                 }
                 let video_encoder = video_encoder.as_mut().unwrap();
-                video_encoder.encode(screen_capture.pixel_provider());
+                video_encoder.encode(recorder.pixel_provider());
             }
             VideoCommands::Start(config) => {
-                screen_capture = Some(
+                recorder = Some(
                     config
                         .capturable
-                        .screen_capture(config.capture_cursor)
+                        .recorder(config.capture_cursor)
                         .unwrap(),
                 );
                 max_width = config.max_width;

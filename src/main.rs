@@ -15,12 +15,10 @@ mod gui;
 mod input;
 mod log;
 mod protocol;
-mod screen_capture;
+mod capturable;
 mod video;
 mod web;
 mod websocket;
-#[cfg(target_os = "linux")]
-mod x11helper;
 
 fn main() {
     let (sender, receiver) = mpsc::sync_channel::<String>(100);
@@ -35,7 +33,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use screen_capture::ScreenCapture;
+    use capturable::ScreenCapture;
     use test::Bencher;
 
     #[cfg(target_os = "linux")]
@@ -43,7 +41,7 @@ mod tests {
     fn bench_capture_x11(b: &mut Bencher) {
         let mut x11ctx = x11helper::X11Context::new().unwrap();
         let root = x11ctx.capturables().unwrap()[0].clone();
-        let mut sc = screen_capture::linux::ScreenCaptureX11::new(root, false).unwrap();
+        let mut sc = capturable::linux::ScreenCaptureX11::new(root, false).unwrap();
         b.iter(|| sc.capture().unwrap());
     }
 
@@ -52,8 +50,8 @@ mod tests {
     fn bench_video_x11(b: &mut Bencher) {
         let mut x11ctx = x11helper::X11Context::new().unwrap();
         let root = x11ctx.capturables().unwrap()[0].clone();
-        use screen_capture::ScreenCapture;
-        let mut sc = screen_capture::linux::ScreenCaptureX11::new(root, false).unwrap();
+        use capturable::ScreenCapture;
+        let mut sc = capturable::linux::ScreenCaptureX11::new(root, false).unwrap();
         sc.capture().unwrap();
         let (width, height) = sc.size();
 

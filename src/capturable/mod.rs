@@ -1,12 +1,12 @@
-pub mod generic;
+pub mod autopilot;
 use std::boxed::Box;
 use std::error::Error;
 use tracing::warn;
 
 #[cfg(target_os = "linux")]
-pub mod linux;
+pub mod x11;
 
-pub trait ScreenCapture {
+pub trait Recorder {
     /// capture screen
     fn capture(&mut self) -> Result<(), Box<dyn Error>>;
 
@@ -33,10 +33,10 @@ pub trait Capturable: Send + BoxCloneCapturable {
     fn name(&self) -> String;
     fn geometry_relative(&self) -> Result<(f64, f64, f64, f64), Box<dyn Error>>;
     fn before_input(&mut self) -> Result<(), Box<dyn Error>>;
-    fn screen_capture(
+    fn recorder(
         &self,
         capture_cursor: bool,
-    ) -> Result<Box<dyn ScreenCapture>, Box<dyn Error>>;
+    ) -> Result<Box<dyn Recorder>, Box<dyn Error>>;
 }
 
 impl Clone for Box<dyn Capturable> {
@@ -49,7 +49,7 @@ pub fn get_capturables() -> Vec<Box<dyn Capturable>> {
     let mut capturables: Vec<Box<dyn Capturable>> = vec![];
     #[cfg(target_os = "linux")]
     {
-        use crate::x11helper::X11Context;
+        use crate::capturable::x11::X11Context;
         let x11ctx = X11Context::new();
         if let Some(mut x11ctx) = x11ctx {
             match x11ctx.capturables() {

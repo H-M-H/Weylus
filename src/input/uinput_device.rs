@@ -6,8 +6,8 @@ use crate::protocol::{
     Button, KeyboardEvent, KeyboardEventType, KeyboardLocation, PointerEvent, PointerEventType,
     PointerType, WheelEvent,
 };
-use crate::screen_capture::Capturable;
-use crate::x11helper::X11Context;
+use crate::capturable::Capturable;
+use crate::capturable::x11::X11Context;
 
 use crate::cerror::CError;
 
