@@ -9,25 +9,16 @@ use crate::protocol::{
     Button, KeyboardEvent, KeyboardEventType, PointerEvent, PointerEventType, WheelEvent,
 };
 
-#[cfg(target_os = "linux")]
-use crate::x11helper::X11Capturable;
+use crate::screen_capture::Capturable;
 
 pub struct AutoPilotDevice {
-    #[cfg(target_os = "linux")]
-    capture: X11Capturable,
+    capturable: Box<dyn Capturable>,
 }
 
 #[cfg(target_os = "linux")]
 impl AutoPilotDevice {
-    pub fn new(capture: X11Capturable) -> Self {
-        Self { capture }
-    }
-}
-
-#[cfg(not(target_os = "linux"))]
-impl AutoPilotDevice {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(capturable: Box<dyn Capturable>) -> Self {
+        Self { capturable }
     }
 }
 
@@ -44,34 +35,21 @@ impl InputDevice for AutoPilotDevice {
         if !event.is_primary {
             return;
         }
-        #[cfg(target_os = "linux")]
-        {
-            if let Err(err) = self.capture.before_input() {
-                warn!("Failed to activate window, sending no input ({})", err);
-                return;
-            }
-            let geometry = self.capture.geometry();
-            if let Err(err) = geometry {
-                warn!("Failed to get window geometry, sending no input ({})", err);
-                return;
-            }
-            let geometry = geometry.unwrap();
-            if let Err(err) = mouse::move_to(autopilot::geometry::Point::new(
-                (event.x * geometry.width + geometry.x) * screen_size().width,
-                (event.y * geometry.height + geometry.y) * screen_size().height,
-            )) {
-                warn!("Could not move mouse: {}", err);
-            }
+        if let Err(err) = self.capturable.before_input() {
+            warn!("Failed to activate window, sending no input ({})", err);
+            return;
         }
-
-        #[cfg(not(target_os = "linux"))]
-        {
-            if let Err(err) = mouse::move_to(autopilot::geometry::Point::new(
-                event.x * screen_size().width,
-                event.y * screen_size().height,
-            )) {
-                warn!("Could not move mouse: {}", err);
-            }
+        let geometry = self.capturable.geometry_relative();
+        if let Err(err) = geometry {
+            warn!("Failed to get window geometry, sending no input ({})", err);
+            return;
+        }
+        let (x_rel, y_rel, width_rel, height_rel) = geometry.unwrap();
+        if let Err(err) = mouse::move_to(autopilot::geometry::Point::new(
+            (event.x * width_rel + x_rel) * screen_size().width,
+            (event.y * height_rel + y_rel) * screen_size().height,
+        )) {
+            warn!("Could not move mouse: {}", err);
         }
         match event.event_type {
             PointerEventType::DOWN => match event.button {

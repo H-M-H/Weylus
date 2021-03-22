@@ -16,10 +16,7 @@ use crate::input::device::{InputDevice, InputDeviceType};
 use crate::protocol::{
     ClientConfiguration, KeyboardEvent, MessageInbound, MessageOutbound, PointerEvent, WheelEvent,
 };
-use crate::screen_capture::generic::ScreenCaptureGeneric;
-#[cfg(target_os = "linux")]
-use crate::screen_capture::linux::ScreenCaptureX11;
-use crate::screen_capture::ScreenCapture;
+use crate::screen_capture::{Capturable, ScreenCapture};
 #[cfg(target_os = "linux")]
 use crate::x11helper::{X11Capturable, X11Context};
 
@@ -209,11 +206,10 @@ fn send_msg(sender: &WsWriter, msg: &MessageOutbound) {
 
 struct VideoConfig {
     #[cfg(target_os = "linux")]
-    capturable: X11Capturable,
+    capturable: Box<dyn Capturable + Send>,
     #[cfg(target_os = "linux")]
     capture_cursor: bool,
     #[cfg(target_os = "linux")]
-    x11_capture: bool,
     max_width: usize,
     max_height: usize,
 }
@@ -320,22 +316,12 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, confi
                 video_encoder.encode(screen_capture.pixel_provider());
             }
             VideoCommands::Start(config) => {
-                #[cfg(target_os = "linux")]
-                {
-                    if config.x11_capture {
-                        screen_capture = Some(Box::new(
-                            ScreenCaptureX11::new(config.capturable, config.capture_cursor)
-                                .unwrap(),
-                        ))
-                    } else {
-                        screen_capture = Some(Box::new(ScreenCaptureGeneric::new()))
-                    }
-                }
-
-                #[cfg(not(target_os = "linux"))]
-                {
-                    screen_capture = Some(Box::new(ScreenCaptureGeneric::new()));
-                }
+                screen_capture = Some(
+                    config
+                        .capturable
+                        .screen_capture(config.capture_cursor)
+                        .unwrap(),
+                );
                 max_width = config.max_width;
                 max_height = config.max_height;
                 send_msg(&sender, &MessageOutbound::ConfigOk);
@@ -503,18 +489,17 @@ impl WsHandler {
                         d.device_type() != InputDeviceType::AutoPilotDevice
                     }) {
                         self.input_device = Some(Box::new(
-                            crate::input::autopilot_device::AutoPilotDevice::new(
+                            crate::input::autopilot_device::AutoPilotDevice::new(Box::new(
                                 capturable.clone(),
-                            ),
+                            )),
                         ));
                     }
                 }
 
                 self.video_sender
                     .send(VideoCommands::Start(VideoConfig {
-                        capturable,
+                        capturable: Box::new(capturable),
                         capture_cursor: config.capture_cursor,
-                        x11_capture: config.faster_capture,
                         max_width: config.max_width,
                         max_height: config.max_height,
                     }))

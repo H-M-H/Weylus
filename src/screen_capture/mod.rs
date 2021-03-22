@@ -14,3 +14,10 @@ pub trait ScreenCapture {
     /// width and size of captured image
     fn size(&self) -> (usize, usize);
 }
+
+pub trait Capturable {
+    fn name(&self) -> String;
+    fn geometry_relative(&self) -> Result<(f64, f64, f64, f64), Box<dyn Error>>;
+    fn before_input(&mut self) -> Result<(), Box<dyn Error>>;
+    fn screen_capture(&self, capture_cursor: bool) -> Result<Box<dyn ScreenCapture>, Box<dyn Error>>;
+}

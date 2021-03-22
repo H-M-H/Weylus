@@ -6,6 +6,7 @@ use crate::protocol::{
     Button, KeyboardEvent, KeyboardEventType, KeyboardLocation, PointerEvent, PointerEventType,
     PointerType, WheelEvent,
 };
+use crate::screen_capture::Capturable;
 use crate::x11helper::{X11Capturable, X11Context};
 
 use crate::cerror::CError;
@@ -274,16 +275,16 @@ impl InputDevice for UInputDevice {
             warn!("Failed to activate window, sending no input ({})", err);
             return;
         }
-        let geometry = self.capture.geometry();
+        let geometry = self.capture.geometry_relative();
         if let Err(err) = geometry {
             warn!("Failed to get window geometry, sending no input ({})", err);
             return;
         }
-        let geometry = geometry.unwrap();
-        self.x = geometry.x;
-        self.y = geometry.y;
-        self.width = geometry.width;
-        self.height = geometry.height;
+        let (x, y, width, height) = geometry.unwrap();
+        self.x = x;
+        self.y = y;
+        self.width = width;
+        self.height = height;
         match event.pointer_type {
             PointerType::Touch => {
                 if self.num_touch_mapping_tries < MAX_SCREEN_MAPPING_TRIES {

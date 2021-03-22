@@ -1,11 +1,14 @@
 use std::ffi::{CStr, CString};
-use std::fmt;
 use std::os::raw::{c_char, c_float, c_int, c_void};
 use std::sync::Arc;
+use std::{error::Error, fmt};
 
 use tracing::debug;
 
 use crate::cerror::CError;
+
+use crate::screen_capture::linux::ScreenCaptureX11;
+use crate::screen_capture::{Capturable, ScreenCapture};
 
 extern "C" {
     fn XOpenDisplay(name: *const c_char) -> *mut c_void;
@@ -61,8 +64,10 @@ impl X11Capturable {
     pub unsafe fn handle(&mut self) -> *mut c_void {
         self.handle
     }
+}
 
-    pub fn name(&self) -> String {
+impl Capturable for X11Capturable {
+    fn name(&self) -> String {
         unsafe {
             CStr::from_ptr(get_capturable_name(self.handle))
                 .to_string_lossy()
@@ -70,7 +75,7 @@ impl X11Capturable {
         }
     }
 
-    pub fn geometry(&self) -> Result<CaptureGeometry, CError> {
+    fn geometry_relative(&self) -> Result<(f64, f64, f64, f64), Box<dyn Error>> {
         let mut x: c_float = 0.0;
         let mut y: c_float = 0.0;
         let mut width: c_float = 0.0;
@@ -89,25 +94,30 @@ impl X11Capturable {
         }
         fltk::app::unlock();
         if err.is_err() {
-            return Err(err);
+            return Err(Box::new(err));
         }
-        Ok(CaptureGeometry {
-            x: x.into(),
-            y: y.into(),
-            width: width.into(),
-            height: height.into(),
-        })
+        Ok((x.into(), y.into(), width.into(), height.into()))
     }
 
-    pub fn before_input(&mut self) -> Result<(), CError> {
+    fn before_input(&mut self) -> Result<(), Box<dyn Error>> {
         let mut err = CError::new();
         fltk::app::lock().unwrap();
         unsafe { capturable_before_input(self.handle, &mut err) };
         fltk::app::unlock();
         if err.is_err() {
-            Err(err)
+            Err(Box::new(err))
         } else {
             Ok(())
+        }
+    }
+
+    fn screen_capture(
+        &self,
+        capture_cursor: bool,
+    ) -> Result<Box<dyn ScreenCapture>, Box<dyn Error>> {
+        match ScreenCaptureX11::new(self.clone(), capture_cursor) {
+            Ok(screen_capture) => Ok(Box::new(screen_capture)),
+            Err(err) => Err(Box::new(err)),
         }
     }
 }
@@ -124,13 +134,6 @@ impl Drop for X11Capturable {
             destroy_capturable(self.handle);
         }
     }
-}
-
-pub struct CaptureGeometry {
-    pub x: f64,
-    pub y: f64,
-    pub width: f64,
-    pub height: f64,
 }
 
 struct XDisplay {
