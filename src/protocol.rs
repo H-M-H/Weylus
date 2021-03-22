@@ -104,7 +104,7 @@ fn button_from<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Button, D::
     let bits: u8 = Deserialize::deserialize(deserializer)?;
     Button::from_bits(bits).map_or(
         Err(serde::de::Error::custom("Failed to parse button code.")),
-        |b| Ok(b),
+        Ok,
     )
 }
 
