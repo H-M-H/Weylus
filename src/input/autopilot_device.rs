@@ -15,7 +15,6 @@ pub struct AutoPilotDevice {
     capturable: Box<dyn Capturable>,
 }
 
-#[cfg(target_os = "linux")]
 impl AutoPilotDevice {
     pub fn new(capturable: Box<dyn Capturable>) -> Self {
         Self { capturable }
@@ -147,6 +146,10 @@ impl InputDevice for AutoPilotDevice {
                 }
             }
         }
+    }
+
+    fn set_capturable(&mut self, capturable: Box<dyn Capturable>) {
+        self.capturable = capturable;
     }
 
     fn device_type(&self) -> InputDeviceType {

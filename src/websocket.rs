@@ -16,9 +16,7 @@ use crate::input::device::{InputDevice, InputDeviceType};
 use crate::protocol::{
     ClientConfiguration, KeyboardEvent, MessageInbound, MessageOutbound, PointerEvent, WheelEvent,
 };
-use crate::screen_capture::{Capturable, ScreenCapture};
-#[cfg(target_os = "linux")]
-use crate::x11helper::{X11Capturable, X11Context};
+use crate::screen_capture::{get_capturables, Capturable, ScreenCapture};
 
 use crate::cerror::CErrorCode;
 use crate::video::VideoEncoder;
@@ -205,11 +203,8 @@ fn send_msg(sender: &WsWriter, msg: &MessageOutbound) {
 }
 
 struct VideoConfig {
-    #[cfg(target_os = "linux")]
-    capturable: Box<dyn Capturable + Send>,
-    #[cfg(target_os = "linux")]
+    capturable: Box<dyn Capturable>,
     capture_cursor: bool,
-    #[cfg(target_os = "linux")]
     max_width: usize,
     max_height: usize,
 }
@@ -335,10 +330,7 @@ struct WsHandler {
     client_addr: SocketAddr,
     video_sender: mpsc::Sender<VideoCommands>,
     input_device: Option<Box<dyn InputDevice>>,
-    #[cfg(target_os = "linux")]
-    x11ctx: Option<X11Context>,
-    #[cfg(target_os = "linux")]
-    capturables: Vec<X11Capturable>,
+    capturables: Vec<Box<dyn Capturable>>,
     gui_sender: mpsc::Sender<Ws2GuiMessage>,
 }
 
@@ -357,23 +349,12 @@ impl WsHandler {
             spawn(move || handle_video(video_receiver, sender, config));
         }
 
-        #[cfg(target_os = "linux")]
-        let mut x11ctx = X11Context::new();
-
-        #[cfg(target_os = "linux")]
-        let capturables = x11ctx.as_mut().map_or_else(Vec::new, |ctx| {
-            ctx.capturables().unwrap_or_else(|_| Vec::new())
-        });
-
         Self {
             sender,
             client_addr: *client_addr,
             video_sender,
             input_device: None,
-            #[cfg(target_os = "linux")]
-            x11ctx,
-            #[cfg(target_os = "linux")]
-            capturables,
+            capturables: get_capturables(),
             gui_sender,
         }
     }
@@ -422,107 +403,73 @@ impl WsHandler {
 
     fn send_capturable_list(&mut self) {
         let mut windows = Vec::<String>::new();
-        #[cfg(not(target_os = "linux"))]
-        {
-            windows.push("Desktop".to_string());
-        }
-
-        #[cfg(target_os = "linux")]
-        {
-            if let Some(x11ctx) = self.x11ctx.as_mut() {
-                let capturables = x11ctx.capturables();
-                match capturables {
-                    Ok(capturables) => {
-                        capturables.iter().for_each(|c| {
-                            windows.push(c.name());
-                        });
-                        self.capturables = capturables;
-                    }
-                    Err(err) => warn!("Failed to get list of capturables: {}", err),
-                }
-            } else {
-                windows.push("Desktop".to_string());
-            }
-        }
+        self.capturables = get_capturables();
+        self.capturables.iter().for_each(|c| {
+            windows.push(c.name());
+        });
         self.send_msg(&MessageOutbound::CapturableList(windows));
     }
 
     fn setup(&mut self, config: ClientConfiguration) {
-        #[cfg(target_os = "linux")]
-        {
-            if config.capturable_id < self.capturables.len() {
-                let capturable = self.capturables[if config.faster_capture {
-                    config.capturable_id
-                } else {
-                    // can only capture desktop if capturing with ScreenCaptureGeneric
-                    0
-                }]
-                .clone();
-                if config.uinput_support {
-                    if self
-                        .input_device
-                        .as_ref()
-                        .map_or(true, |d| d.device_type() != InputDeviceType::UInputDevice)
-                    {
-                        let device = crate::input::uinput_device::UInputDevice::new(
-                            capturable.clone(),
-                            self.client_addr.to_string(),
-                        );
-                        if let Err(err) = device {
-                            error!("Failed to create uinput device: {}", err);
-                            if let CErrorCode::UInputNotAccessible = err.to_enum() {
-                                if let Err(err) =
-                                    self.gui_sender.send(Ws2GuiMessage::UInputInaccessible)
-                                {
-                                    warn!("Failed to send message to gui thread: {}!", err);
-                                }
+        if config.capturable_id < self.capturables.len() {
+            let capturable = self.capturables[config.capturable_id].clone();
+            if config.uinput_support {
+                if self
+                    .input_device
+                    .as_ref()
+                    .map_or(true, |d| d.device_type() != InputDeviceType::UInputDevice)
+                {
+                    let device = crate::input::uinput_device::UInputDevice::new(
+                        capturable.clone(),
+                        self.client_addr.to_string(),
+                    );
+                    if let Err(err) = device {
+                        error!("Failed to create uinput device: {}", err);
+                        if let CErrorCode::UInputNotAccessible = err.to_enum() {
+                            if let Err(err) =
+                                self.gui_sender.send(Ws2GuiMessage::UInputInaccessible)
+                            {
+                                warn!("Failed to send message to gui thread: {}!", err);
                             }
-                            self.send_msg(&MessageOutbound::ConfigError(
-                                "Failed to create uinput device!".to_string(),
-                            ));
-                            return;
                         }
-                        self.input_device = Some(Box::new(device.unwrap()))
-                    }
-                } else {
-                    if self.input_device.as_ref().map_or(true, |d| {
-                        d.device_type() != InputDeviceType::AutoPilotDevice
-                    }) {
-                        self.input_device = Some(Box::new(
-                            crate::input::autopilot_device::AutoPilotDevice::new(Box::new(
-                                capturable.clone(),
-                            )),
+                        self.send_msg(&MessageOutbound::ConfigError(
+                            "Failed to create uinput device!".to_string(),
                         ));
+                        return;
                     }
+                    self.input_device = Some(Box::new(device.unwrap()))
+                } else {
+                    self.input_device
+                        .as_mut()
+                        .map(|d| d.set_capturable(capturable.clone()));
                 }
-
-                self.video_sender
-                    .send(VideoCommands::Start(VideoConfig {
-                        capturable: Box::new(capturable),
-                        capture_cursor: config.capture_cursor,
-                        max_width: config.max_width,
-                        max_height: config.max_height,
-                    }))
-                    .unwrap();
             } else {
-                error!("Got invalid id for capturable: {}", config.capturable_id);
-                self.send_msg(&MessageOutbound::ConfigError(
-                    "Invalid id for capturable!".to_string(),
-                ));
+                if self.input_device.as_ref().map_or(true, |d| {
+                    d.device_type() != InputDeviceType::AutoPilotDevice
+                }) {
+                    self.input_device = Some(Box::new(
+                        crate::input::autopilot_device::AutoPilotDevice::new(capturable.clone()),
+                    ));
+                } else {
+                    self.input_device
+                        .as_mut()
+                        .map(|d| d.set_capturable(capturable.clone()));
+                }
             }
-        }
 
-        #[cfg(not(target_os = "linux"))]
-        {
-            self.input_device = Some(Box::new(
-                crate::input::autopilot_device::AutoPilotDevice::new(),
-            ));
             self.video_sender
                 .send(VideoCommands::Start(VideoConfig {
+                    capturable,
+                    capture_cursor: config.capture_cursor,
                     max_width: config.max_width,
                     max_height: config.max_height,
                 }))
                 .unwrap();
+        } else {
+            error!("Got invalid id for capturable: {}", config.capturable_id);
+            self.send_msg(&MessageOutbound::ConfigError(
+                "Invalid id for capturable!".to_string(),
+            ));
         }
     }
 

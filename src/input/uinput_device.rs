@@ -7,7 +7,7 @@ use crate::protocol::{
     PointerType, WheelEvent,
 };
 use crate::screen_capture::Capturable;
-use crate::x11helper::{X11Capturable, X11Context};
+use crate::x11helper::X11Context;
 
 use crate::cerror::CError;
 
@@ -33,7 +33,7 @@ pub struct UInputDevice {
     touch_fd: c_int,
     touches: [Option<MultiTouch>; 5],
     tool_pen_active: bool,
-    capture: X11Capturable,
+    capturable: Box<dyn Capturable>,
     x: f64,
     y: f64,
     width: f64,
@@ -48,7 +48,7 @@ pub struct UInputDevice {
 }
 
 impl UInputDevice {
-    pub fn new(capture: X11Capturable, id: String) -> Result<Self, CError> {
+    pub fn new(capturable: Box<dyn Capturable>, id: String) -> Result<Self, CError> {
         let mut err = CError::new();
         let name_stylus = format!("Weylus Stylus - {}", id);
         let name_stylus_c_str = CString::new(name_stylus.as_bytes()).unwrap();
@@ -91,7 +91,7 @@ impl UInputDevice {
             touch_fd,
             touches: Default::default(),
             tool_pen_active: false,
-            capture,
+            capturable,
             x: 0.0,
             y: 0.0,
             width: 1.0,
@@ -231,7 +231,7 @@ const MAX_SCREEN_MAPPING_TRIES: usize = 100;
 
 impl InputDevice for UInputDevice {
     fn send_wheel_event(&mut self, event: &WheelEvent) {
-        if let Err(err) = self.capture.before_input() {
+        if let Err(err) = self.capturable.before_input() {
             warn!("Failed to activate window, sending no input ({})", err);
             return;
         }
@@ -271,11 +271,11 @@ impl InputDevice for UInputDevice {
     }
 
     fn send_pointer_event(&mut self, event: &PointerEvent) {
-        if let Err(err) = self.capture.before_input() {
+        if let Err(err) = self.capturable.before_input() {
             warn!("Failed to activate window, sending no input ({})", err);
             return;
         }
-        let geometry = self.capture.geometry_relative();
+        let geometry = self.capturable.geometry_relative();
         if let Err(err) = geometry {
             warn!("Failed to get window geometry, sending no input ({})", err);
             return;
@@ -557,7 +557,7 @@ impl InputDevice for UInputDevice {
 
     fn send_keyboard_event(&mut self, event: &KeyboardEvent) {
         use crate::input::uinput_keys::*;
-        if let Err(err) = self.capture.before_input() {
+        if let Err(err) = self.capturable.before_input() {
             warn!("Failed to activate window, sending no input ({})", err);
             return;
         }
@@ -819,6 +819,10 @@ impl InputDevice for UInputDevice {
 
         self.send(self.keyboard_fd, ET_KEY, key_code, state);
         self.send(self.keyboard_fd, ET_SYNC, EC_SYNC_REPORT, 0);
+    }
+
+    fn set_capturable(&mut self, capturable: Box<dyn Capturable>) {
+        self.capturable = capturable;
     }
 
     fn device_type(&self) -> InputDeviceType {
