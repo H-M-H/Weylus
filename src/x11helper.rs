@@ -39,13 +39,13 @@ extern "C" {
     );
 }
 
-pub struct Capturable {
+pub struct X11Capturable {
     handle: *mut c_void,
     // keep a reference to the display so it is not closed while a capturable still exists
     disp: Arc<XDisplay>,
 }
 
-impl Clone for Capturable {
+impl Clone for X11Capturable {
     fn clone(&self) -> Self {
         let handle = unsafe { clone_capturable(self.handle) };
         Self {
@@ -55,9 +55,9 @@ impl Clone for Capturable {
     }
 }
 
-unsafe impl Send for Capturable {}
+unsafe impl Send for X11Capturable {}
 
-impl Capturable {
+impl X11Capturable {
     pub unsafe fn handle(&mut self) -> *mut c_void {
         self.handle
     }
@@ -112,13 +112,13 @@ impl Capturable {
     }
 }
 
-impl fmt::Display for Capturable {
+impl fmt::Display for X11Capturable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.name())
     }
 }
 
-impl Drop for Capturable {
+impl Drop for X11Capturable {
     fn drop(&mut self) {
         unsafe {
             destroy_capturable(self.handle);
@@ -167,7 +167,7 @@ impl X11Context {
         })
     }
 
-    pub fn capturables(&mut self) -> Result<Vec<Capturable>, CError> {
+    pub fn capturables(&mut self) -> Result<Vec<X11Capturable>, CError> {
         let mut err = CError::new();
         let mut handles = [std::ptr::null_mut::<c_void>(); 128];
         fltk::app::lock().unwrap();
@@ -189,11 +189,11 @@ impl X11Context {
         }
         Ok(handles[0..size as usize]
             .iter()
-            .map(|handle| Capturable {
+            .map(|handle| X11Capturable {
                 handle: *handle,
                 disp: self.disp.clone(),
             })
-            .collect::<Vec<Capturable>>())
+            .collect::<Vec<X11Capturable>>())
     }
 
     pub fn map_input_device_to_entire_screen(&mut self, device_name: &str, pen: bool) -> CError {

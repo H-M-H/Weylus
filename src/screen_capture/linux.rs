@@ -6,7 +6,7 @@ use std::slice::from_raw_parts;
 use crate::cerror::CError;
 use crate::screen_capture::ScreenCapture;
 use crate::video::PixelProvider;
-use crate::x11helper::Capturable;
+use crate::x11helper::X11Capturable;
 
 extern "C" {
     fn start_capture(handle: *const c_void, ctx: *mut c_void, err: *mut CError) -> *mut c_void;
@@ -48,13 +48,13 @@ pub struct ScreenCaptureX11 {
     handle: *mut c_void,
     // keep a reference to the capturable so it is not destroyed until we are done
     #[allow(dead_code)]
-    capturable: Capturable,
+    capturable: X11Capturable,
     img: CImage,
     capture_cursor: bool,
 }
 
 impl ScreenCaptureX11 {
-    pub fn new(mut capturable: Capturable, capture_cursor: bool) -> Result<Self, CError> {
+    pub fn new(mut capturable: X11Capturable, capture_cursor: bool) -> Result<Self, CError> {
         let mut err = CError::new();
         fltk::app::lock().unwrap();
         let handle = unsafe { start_capture(capturable.handle(), std::ptr::null_mut(), &mut err) };

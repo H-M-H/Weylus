@@ -10,16 +10,16 @@ use crate::protocol::{
 };
 
 #[cfg(target_os = "linux")]
-use crate::x11helper::Capturable;
+use crate::x11helper::X11Capturable;
 
 pub struct AutoPilotDevice {
     #[cfg(target_os = "linux")]
-    capture: Capturable,
+    capture: X11Capturable,
 }
 
 #[cfg(target_os = "linux")]
 impl AutoPilotDevice {
-    pub fn new(capture: Capturable) -> Self {
+    pub fn new(capture: X11Capturable) -> Self {
         Self { capture }
     }
 }

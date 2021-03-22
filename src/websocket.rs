@@ -21,7 +21,7 @@ use crate::screen_capture::generic::ScreenCaptureGeneric;
 use crate::screen_capture::linux::ScreenCaptureX11;
 use crate::screen_capture::ScreenCapture;
 #[cfg(target_os = "linux")]
-use crate::x11helper::{Capturable, X11Context};
+use crate::x11helper::{X11Capturable, X11Context};
 
 use crate::cerror::CErrorCode;
 use crate::video::VideoEncoder;
@@ -209,7 +209,7 @@ fn send_msg(sender: &WsWriter, msg: &MessageOutbound) {
 
 struct VideoConfig {
     #[cfg(target_os = "linux")]
-    capturable: Capturable,
+    capturable: X11Capturable,
     #[cfg(target_os = "linux")]
     capture_cursor: bool,
     #[cfg(target_os = "linux")]
@@ -352,7 +352,7 @@ struct WsHandler {
     #[cfg(target_os = "linux")]
     x11ctx: Option<X11Context>,
     #[cfg(target_os = "linux")]
-    capturables: Vec<Capturable>,
+    capturables: Vec<X11Capturable>,
     gui_sender: mpsc::Sender<Ws2GuiMessage>,
 }
 
