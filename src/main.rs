@@ -33,33 +33,32 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use capturable::ScreenCapture;
+    use capturable::{Recorder, Capturable};
     use test::Bencher;
 
     #[cfg(target_os = "linux")]
     #[bench]
     fn bench_capture_x11(b: &mut Bencher) {
-        let mut x11ctx = x11helper::X11Context::new().unwrap();
+        let mut x11ctx = capturable::x11::X11Context::new().unwrap();
         let root = x11ctx.capturables().unwrap()[0].clone();
-        let mut sc = capturable::linux::ScreenCaptureX11::new(root, false).unwrap();
-        b.iter(|| sc.capture().unwrap());
+        let mut r = root.recorder(false).unwrap();
+        b.iter(|| r.capture().unwrap());
     }
 
     #[cfg(target_os = "linux")]
     #[bench]
     fn bench_video_x11(b: &mut Bencher) {
-        let mut x11ctx = x11helper::X11Context::new().unwrap();
+        let mut x11ctx = capturable::x11::X11Context::new().unwrap();
         let root = x11ctx.capturables().unwrap()[0].clone();
-        use capturable::ScreenCapture;
-        let mut sc = capturable::linux::ScreenCaptureX11::new(root, false).unwrap();
-        sc.capture().unwrap();
-        let (width, height) = sc.size();
+        let mut r = root.recorder(false).unwrap();
+        r.capture().unwrap();
+        let (width, height) = r.size();
 
         let mut encoder =
             video::VideoEncoder::new(width, height, width, height, |_| {}, true, true).unwrap();
         b.iter(|| {
-            sc.capture().unwrap();
-            encoder.encode(sc.pixel_provider())
+            r.capture().unwrap();
+            encoder.encode(r.pixel_provider())
         });
     }
 
