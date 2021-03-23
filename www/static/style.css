@@ -106,7 +106,7 @@ video {
     margin-top: 0.5em;
 }
 #settings section.hide, section label.hide {
-    display: none;
+    display: none !important;
 }
 select {
     width: 15em;
