@@ -2,6 +2,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ClientConfiguration {
+    #[cfg(target_os="linux")]
     pub uinput_support: bool,
     pub capturable_id: usize,
     pub capture_cursor: bool,

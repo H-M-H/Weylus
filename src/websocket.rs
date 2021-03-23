@@ -12,11 +12,11 @@ use websocket::server::upgrade::{sync::Buffer as WsBuffer, WsUpgrade};
 use websocket::sync::Server;
 use websocket::{Message, OwnedMessage, WebSocketError};
 
+use crate::capturable::{get_capturables, Capturable, Recorder};
 use crate::input::device::{InputDevice, InputDeviceType};
 use crate::protocol::{
     ClientConfiguration, KeyboardEvent, MessageInbound, MessageOutbound, PointerEvent, WheelEvent,
 };
-use crate::capturable::{get_capturables, Capturable, Recorder};
 
 use crate::cerror::CErrorCode;
 use crate::video::VideoEncoder;
@@ -311,12 +311,7 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, confi
                 video_encoder.encode(recorder.pixel_provider());
             }
             VideoCommands::Start(config) => {
-                recorder = Some(
-                    config
-                        .capturable
-                        .recorder(config.capture_cursor)
-                        .unwrap(),
-                );
+                recorder = Some(config.capturable.recorder(config.capture_cursor).unwrap());
                 max_width = config.max_width;
                 max_height = config.max_height;
                 send_msg(&sender, &MessageOutbound::ConfigOk);
@@ -413,6 +408,8 @@ impl WsHandler {
     fn setup(&mut self, config: ClientConfiguration) {
         if config.capturable_id < self.capturables.len() {
             let capturable = self.capturables[config.capturable_id].clone();
+
+            #[cfg(target_os = "linux")]
             if config.uinput_support {
                 if self
                     .input_device
@@ -455,6 +452,17 @@ impl WsHandler {
                         .as_mut()
                         .map(|d| d.set_capturable(capturable.clone()));
                 }
+            }
+
+            #[cfg(not(target_os = "linux"))]
+            if self.input_device.is_none() {
+                self.input_device = Some(Box::new(
+                    crate::input::autopilot_device::AutoPilotDevice::new(capturable.clone()),
+                ));
+            } else {
+                self.input_device
+                    .as_mut()
+                    .map(|d| d.set_capturable(capturable.clone()));
             }
 
             self.video_sender
