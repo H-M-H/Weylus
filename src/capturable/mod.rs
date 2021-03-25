@@ -5,6 +5,10 @@ use tracing::warn;
 
 #[cfg(target_os = "linux")]
 pub mod x11;
+#[cfg(target_os = "linux")]
+pub mod pipewire;
+#[cfg(target_os = "linux")]
+pub mod pipewire_dbus;
 
 pub trait Recorder {
     /// capture screen

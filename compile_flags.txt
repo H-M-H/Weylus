@@ -1,7 +1,10 @@
 -lX11
 -lXext
+-lpipewire-0.3
 -Wall
 -Wextra
 -Ideps/dist/include
+-I/usr/include/pipewire-0.3
+-I/usr/include/spa-0.2
 -DHAS_NVENC
 -DHAS_VAAPI
