@@ -155,7 +155,6 @@ class Settings {
                 if (typeof settings[key] === "boolean")
                     elem.checked = settings[key];
             }
-            this.checks.get("capture_cursor").disabled = !this.checks.get("capture_cursor").checked;
             let upd_limit = settings["frame_update_limit"];
             if (upd_limit)
                 this.frame_update_limit_input.value = frame_update_scale_inv(upd_limit).toString();
