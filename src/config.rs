@@ -25,6 +25,9 @@ pub struct Config {
     #[cfg(target_os = "linux")]
     #[structopt(long, help = "Try to use Nvidia's NVENC to encode the video via GPU.")]
     pub try_nvenc: bool,
+    #[structopt(long, help = "Start Weylus server immediately on program start.")]
+    #[serde(default)]
+    pub auto_start: bool,
 }
 
 pub fn read_config() -> Option<Config> {

@@ -35,7 +35,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
 
     let app = App::default().with_scheme(fltk::app::AppScheme::Gtk);
     let mut wind = Window::default()
-        .with_size(660, 600)
+        .with_size(660, 620)
         .center_screen()
         .with_label(&format!("Weylus - {}", env!("CARGO_PKG_VERSION")));
 
@@ -71,9 +71,16 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         .with_label("Websocket Port");
     input_ws_port.set_value(&config.websocket_port.to_string());
 
+    let mut check_auto_start = CheckButton::default()
+        .with_size(70, height)
+        .below_of(&input_ws_port, padding)
+        .with_label("Auto Start");
+    check_auto_start.set_tooltip("Start Weylus server immediately on program start.");
+    check_auto_start.set_checked(config.auto_start);
+
     let mut label_hw_accel = Frame::default()
         .with_size(width, height)
-        .below_of(&input_ws_port, padding)
+        .below_of(&check_auto_start, padding)
         .with_label("Try Hardware acceleration");
     label_hw_accel.set_tooltip(
         "On many systems video encoding can be done with hardware \
@@ -114,18 +121,19 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         .below_of(&check_vaapi, 2 * padding)
         .with_label("Start");
 
-    let output_buf = TextBuffer::default();
-    let mut output = TextDisplay::default()
-        .with_size(600, 6 * height)
-        .with_pos(30, 600 - 30 - 6 * height);
-    output.set_buffer(output_buf);
-    let output_buf = output.buffer().unwrap();
-
     let mut output_server_addr = Output::default()
         .with_size(500, height)
-        .with_pos(130, 600 - 30 - 7 * height - 3 * padding)
+        .below_of(&but_toggle, 3 * padding)
         .with_label("Connect your\ntablet to:");
     output_server_addr.hide();
+
+    let output_buf = TextBuffer::default();
+    let mut output = TextDisplay::default().with_size(600, 6 * height).with_pos(
+        30,
+        output_server_addr.y() + output_server_addr.height() + padding,
+    );
+    output.set_buffer(output_buf);
+    let output_buf = output.buffer().unwrap();
 
     let mut qr_frame = Frame::default()
         .with_size(240, 240)
@@ -138,6 +146,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     wind.show();
 
     let but_toggle_ref = Rc::new(RefCell::new(but_toggle));
+    let but_toggle_ref2 = but_toggle_ref.clone();
     let output_server_addr = Arc::new(Mutex::new(output_server_addr));
     let output_buf = Arc::new(Mutex::new(output_buf));
 
@@ -182,9 +191,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                         pop_up_text.set_buffer(buf);
                         pop_up_text.wrap_mode(fltk::text::WrapMode::AtBounds, 5);
                         let mut buf = pop_up_text.buffer().unwrap();
-                        buf.set_text(
-                            std::include_str!("strings/uinput_error.txt")
-                        );
+                        buf.set_text(std::include_str!("strings/uinput_error.txt"));
 
                         pop_up.end();
                         pop_up.make_modal(true);
@@ -200,154 +207,159 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
 
     let mut is_server_running = false;
 
-    but_toggle_ref
-        .clone()
-        .borrow_mut()
-        .set_callback(Box::new(move || {
-            if let Err(err) = || -> Result<(), Box<dyn std::error::Error>> {
-                let but_toggle_ref = but_toggle_ref.clone();
-                let mut but = but_toggle_ref.try_borrow_mut()?;
+    let mut toggle_server = move || {
+        if let Err(err) = || -> Result<(), Box<dyn std::error::Error>> {
+            let but_toggle_ref = but_toggle_ref.clone();
+            let mut but = but_toggle_ref.try_borrow_mut()?;
 
-                if !is_server_running {
-                    let access_code_string = input_access_code.value();
-                    let access_code = match access_code_string.as_str() {
-                        "" => None,
-                        code => Some(code),
-                    };
-                    let bind_addr: IpAddr = input_bind_addr.value().parse()?;
-                    let web_port: u16 = input_port.value().parse()?;
-                    let ws_port: u16 = input_ws_port.value().parse()?;
+            if !is_server_running {
+                let access_code_string = input_access_code.value();
+                let access_code = match access_code_string.as_str() {
+                    "" => None,
+                    code => Some(code),
+                };
+                let bind_addr: IpAddr = input_bind_addr.value().parse()?;
+                let web_port: u16 = input_port.value().parse()?;
+                let ws_port: u16 = input_ws_port.value().parse()?;
 
-                    let (sender_gui2ws_tmp, receiver_gui2ws) = mpsc::channel();
-                    sender_gui2ws = Some(sender_gui2ws_tmp);
-                    let ws_config = WsConfig {
-                        address: SocketAddr::new(bind_addr, ws_port),
-                        access_code: access_code.map(|s| s.into()),
-                        #[cfg(target_os = "linux")]
-                        try_vaapi: check_vaapi.is_checked(),
-                        #[cfg(target_os = "linux")]
-                        try_nvenc: check_nvenc.is_checked(),
-                    };
-                    crate::websocket::run(sender_ws2gui.clone(), receiver_gui2ws, ws_config);
+                let (sender_gui2ws_tmp, receiver_gui2ws) = mpsc::channel();
+                sender_gui2ws = Some(sender_gui2ws_tmp);
+                let ws_config = WsConfig {
+                    address: SocketAddr::new(bind_addr, ws_port),
+                    access_code: access_code.map(|s| s.into()),
+                    #[cfg(target_os = "linux")]
+                    try_vaapi: check_vaapi.is_checked(),
+                    #[cfg(target_os = "linux")]
+                    try_nvenc: check_nvenc.is_checked(),
+                };
+                crate::websocket::run(sender_ws2gui.clone(), receiver_gui2ws, ws_config);
 
-                    let (sender_gui2web_tmp, receiver_gui2web) = mpsc_tokio::channel(100);
-                    sender_gui2web = Some(sender_gui2web_tmp);
-                    let mut web_sock = SocketAddr::new(bind_addr, web_port);
-                    crate::web::run(
-                        sender_web2gui.clone(),
-                        receiver_gui2web,
-                        &web_sock,
-                        ws_port,
-                        access_code,
-                    );
+                let (sender_gui2web_tmp, receiver_gui2web) = mpsc_tokio::channel(100);
+                sender_gui2web = Some(sender_gui2web_tmp);
+                let mut web_sock = SocketAddr::new(bind_addr, web_port);
+                crate::web::run(
+                    sender_web2gui.clone(),
+                    receiver_gui2web,
+                    &web_sock,
+                    ws_port,
+                    access_code,
+                );
 
-                    #[cfg(not(target_os = "windows"))]
-                    {
-                        if web_sock.ip().is_unspecified() {
-                            // try to guess an ip
-                            let mut ips = Vec::<IpAddr>::new();
-                            for iface in datalink::interfaces()
-                                .iter()
-                                .filter(|iface| iface.is_up() && !iface.is_loopback())
-                            {
-                                for ipnetw in &iface.ips {
-                                    if (ipnetw.is_ipv4() && web_sock.ip().is_ipv4())
-                                        || (ipnetw.is_ipv6() && web_sock.ip().is_ipv6())
-                                    {
-                                        // filtering ipv6 unicast requires nightly or more fiddling,
-                                        // lets wait for nightlies to stabilize...
-                                        ips.push(ipnetw.ip())
-                                    }
-                                }
-                            }
-                            if !ips.is_empty() {
-                                web_sock.set_ip(ips[0]);
-                            }
-                            if ips.len() > 1 {
-                                info!("Found more than one IP address for browsers to connect to,");
-                                info!("other urls are:");
-                                for ip in &ips[1..] {
-                                    info!("http://{}", SocketAddr::new(*ip, web_port));
+                #[cfg(not(target_os = "windows"))]
+                {
+                    if web_sock.ip().is_unspecified() {
+                        // try to guess an ip
+                        let mut ips = Vec::<IpAddr>::new();
+                        for iface in datalink::interfaces()
+                            .iter()
+                            .filter(|iface| iface.is_up() && !iface.is_loopback())
+                        {
+                            for ipnetw in &iface.ips {
+                                if (ipnetw.is_ipv4() && web_sock.ip().is_ipv4())
+                                    || (ipnetw.is_ipv6() && web_sock.ip().is_ipv6())
+                                {
+                                    // filtering ipv6 unicast requires nightly or more fiddling,
+                                    // lets wait for nightlies to stabilize...
+                                    ips.push(ipnetw.ip())
                                 }
                             }
                         }
-                    }
-                    let mut output_server_addr = output_server_addr.lock()?;
-
-                    #[cfg(not(target_os = "windows"))]
-                    {
-                        use image::Luma;
-                        use qrcode::QrCode;
-                        let addr_string = format!("http://{}", web_sock.to_string());
-                        output_server_addr.set_value(&addr_string);
-                        let access_code = access_code.map(|s| s.to_string());
-                        let mut url_string = addr_string;
-                        if let Some(access_code) = &access_code {
-                            url_string.push_str("?access_code=");
-                            url_string.push_str(
-                                &percent_encoding::utf8_percent_encode(
-                                    &access_code,
-                                    percent_encoding::NON_ALPHANUMERIC,
-                                )
-                                .to_string(),
-                            );
+                        if !ips.is_empty() {
+                            web_sock.set_ip(ips[0]);
                         }
-                        let code = QrCode::new(&url_string).unwrap();
-                        let img_buf = code.render::<Luma<u8>>().build();
-                        let image = image::DynamicImage::ImageLuma8(img_buf);
-                        let image = image.resize_exact(
-                            qr_frame.width() as u32,
-                            qr_frame.height() as u32,
-                            image::imageops::FilterType::Nearest,
-                        );
-                        let mut buf = vec![];
-                        image
-                            .write_to(&mut buf, image::ImageOutputFormat::Png)
-                            .unwrap();
-                        let png = fltk::image::PngImage::from_data(&buf).unwrap();
-
-                        qr_frame.set_image(Some(png));
-                        qr_frame.show();
-                    }
-                    #[cfg(target_os = "windows")]
-                    {
-                        if web_sock.ip().is_unspecified() {
-                            output_server_addr.set_value("http://<your ip address>");
-                        } else {
-                            output_server_addr
-                                .set_value(&format!("http://{}", web_sock.to_string()));
+                        if ips.len() > 1 {
+                            info!("Found more than one IP address for browsers to connect to,");
+                            info!("other urls are:");
+                            for ip in &ips[1..] {
+                                info!("http://{}", SocketAddr::new(*ip, web_port));
+                            }
                         }
                     }
-                    output_server_addr.show();
-                    but.set_label("Stop");
-                    let config = Config {
-                        access_code: access_code.map(|s| s.to_string()),
-                        web_port,
-                        websocket_port: ws_port,
-                        bind_address: bind_addr,
-                        #[cfg(target_os = "linux")]
-                        try_vaapi: check_vaapi.is_checked(),
-                        #[cfg(target_os = "linux")]
-                        try_nvenc: check_nvenc.is_checked(),
-                    };
-                    write_config(&config);
-                } else {
-                    if let Some(mut sender_gui2web) = sender_gui2web.clone() {
-                        sender_gui2web.try_send(Gui2WebMessage::Shutdown)?;
-                    }
-
-                    if let Some(sender_gui2ws) = sender_gui2ws.clone() {
-                        sender_gui2ws.send(Gui2WsMessage::Shutdown)?;
-                    }
-                    but.set_label("Start");
-                    qr_frame.hide();
                 }
-                is_server_running = !is_server_running;
-                Ok(())
-            }() {
-                error!("{}", err);
-            };
-        }));
+                let mut output_server_addr = output_server_addr.lock()?;
+
+                #[cfg(not(target_os = "windows"))]
+                {
+                    use image::Luma;
+                    use qrcode::QrCode;
+                    let addr_string = format!("http://{}", web_sock.to_string());
+                    output_server_addr.set_value(&addr_string);
+                    let access_code = access_code.map(|s| s.to_string());
+                    let mut url_string = addr_string;
+                    if let Some(access_code) = &access_code {
+                        url_string.push_str("?access_code=");
+                        url_string.push_str(
+                            &percent_encoding::utf8_percent_encode(
+                                &access_code,
+                                percent_encoding::NON_ALPHANUMERIC,
+                            )
+                            .to_string(),
+                        );
+                    }
+                    let code = QrCode::new(&url_string).unwrap();
+                    let img_buf = code.render::<Luma<u8>>().build();
+                    let image = image::DynamicImage::ImageLuma8(img_buf);
+                    let image = image.resize_exact(
+                        qr_frame.width() as u32,
+                        qr_frame.height() as u32,
+                        image::imageops::FilterType::Nearest,
+                    );
+                    let mut buf = vec![];
+                    image
+                        .write_to(&mut buf, image::ImageOutputFormat::Png)
+                        .unwrap();
+                    let png = fltk::image::PngImage::from_data(&buf).unwrap();
+
+                    qr_frame.set_image(Some(png));
+                    qr_frame.show();
+                }
+                #[cfg(target_os = "windows")]
+                {
+                    if web_sock.ip().is_unspecified() {
+                        output_server_addr.set_value("http://<your ip address>");
+                    } else {
+                        output_server_addr.set_value(&format!("http://{}", web_sock.to_string()));
+                    }
+                }
+                output_server_addr.show();
+                but.set_label("Stop");
+                let config = Config {
+                    access_code: access_code.map(|s| s.to_string()),
+                    web_port,
+                    websocket_port: ws_port,
+                    bind_address: bind_addr,
+                    #[cfg(target_os = "linux")]
+                    try_vaapi: check_vaapi.is_checked(),
+                    #[cfg(target_os = "linux")]
+                    try_nvenc: check_nvenc.is_checked(),
+                    auto_start: check_auto_start.is_checked(),
+                };
+                write_config(&config);
+            } else {
+                if let Some(mut sender_gui2web) = sender_gui2web.clone() {
+                    sender_gui2web.try_send(Gui2WebMessage::Shutdown)?;
+                }
+
+                if let Some(sender_gui2ws) = sender_gui2ws.clone() {
+                    sender_gui2ws.send(Gui2WsMessage::Shutdown)?;
+                }
+                but.set_label("Start");
+                qr_frame.hide();
+            }
+            is_server_running = !is_server_running;
+            Ok(())
+        }() {
+            error!("{}", err);
+        };
+    };
+
+    if config.auto_start {
+        toggle_server();
+    }
+
+    but_toggle_ref2
+        .borrow_mut()
+        .set_callback(toggle_server);
 
     app.run().expect("Failed to run Gui!");
 }
