@@ -1,5 +1,5 @@
-use crate::cerror::CError;
 use crate::capturable::{Capturable, Recorder};
+use crate::cerror::CError;
 use crate::video::PixelProvider;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_float, c_int, c_uint, c_void};
@@ -118,10 +118,7 @@ impl Capturable for X11Capturable {
         }
     }
 
-    fn recorder(
-        &self,
-        capture_cursor: bool,
-    ) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
+    fn recorder(&self, capture_cursor: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
         match RecorderX11::new(self.clone(), capture_cursor) {
             Ok(recorder) => Ok(Box::new(recorder)),
             Err(err) => Err(Box::new(err)),
@@ -291,7 +288,7 @@ impl Drop for RecorderX11 {
 }
 
 impl Recorder for RecorderX11 {
-    fn capture(&mut self) -> Result<(), Box<dyn Error>> {
+    fn capture(&mut self) -> Result<PixelProvider, Box<dyn Error>> {
         let mut err = CError::new();
         fltk::app::lock().unwrap();
         unsafe {
@@ -307,19 +304,11 @@ impl Recorder for RecorderX11 {
             self.img.data = std::ptr::null();
             Err(err.into())
         } else {
-            Ok(())
+            Ok(PixelProvider::BGR0(
+                self.img.width as usize,
+                self.img.height as usize,
+                self.img.data(),
+            ))
         }
-    }
-
-    fn pixel_provider(&self) -> crate::video::PixelProvider {
-        if self.img.data.is_null() {
-            PixelProvider::None
-        } else {
-            PixelProvider::BGR0(self.img.data())
-        }
-    }
-
-    fn size(&self) -> (usize, usize) {
-        (self.img.width as usize, self.img.height as usize)
     }
 }
