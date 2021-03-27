@@ -62,6 +62,30 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     #[bench]
+    fn bench_capture_wayland(b: &mut Bencher) {
+        gstreamer::init().unwrap();
+        let root = capturable::pipewire::get_capturables().unwrap().remove(0);
+        let mut r = root.recorder(false).unwrap();
+        b.iter(|| { r.capture().unwrap(); });
+    }
+
+    #[cfg(target_os = "linux")]
+    #[bench]
+    fn bench_video_wayland(b: &mut Bencher) {
+        gstreamer::init().unwrap();
+        let root = capturable::pipewire::get_capturables().unwrap().remove(0);
+        let mut r = root.recorder(false).unwrap();
+        let (width, height) = r.capture().unwrap().size();
+
+        let mut encoder =
+            video::VideoEncoder::new(width, height, width, height, |_| {}, true, true).unwrap();
+        b.iter(|| {
+            encoder.encode(r.capture().unwrap())
+        });
+    }
+
+    #[cfg(target_os = "linux")]
+    #[bench]
     fn bench_video_vaapi(b: &mut Bencher) {
         const WIDTH: usize = 1920;
         const HEIGHT: usize = 1080;

@@ -123,15 +123,10 @@ fn linux() {
     println!("cargo:rerun-if-changed=lib/linux/xhelper.c");
     println!("cargo:rerun-if-changed=lib/linux/xhelper.h");
 
-    let lib_pipewire = pkg_config::Config::new()
-        .probe("libpipewire-0.3")
-        .expect("Failed to find libpipewire-0.3 using pkg-config.");
     cc::Build::new()
         .file("lib/linux/uinput.c")
         .file("lib/linux/xcapture.c")
         .file("lib/linux/xhelper.c")
-        .file("lib/linux/pipewire.c")
-        .includes(lib_pipewire.include_paths)
         .compile("linux");
 
     println!("cargo:rustc-link-lib=X11");
@@ -150,5 +145,4 @@ fn linux() {
     println!("cargo:rustc-link-lib={}=va-glx", va_link_kind);
     println!("cargo:rustc-link-lib={}=va-x11", va_link_kind);
     println!("cargo:rustc-link-lib=drm");
-    println!("cargo:rustc-link-lib=pipewire-0.3");
 }

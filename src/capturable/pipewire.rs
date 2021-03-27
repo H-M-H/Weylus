@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::error::Error;
-use std::os::raw::c_int;
 use std::os::unix::io::AsRawFd;
 use std::sync::{atomic::AtomicBool, Arc, Mutex};
 use std::time::Duration;
@@ -8,22 +7,25 @@ use tracing::{debug, warn};
 
 use dbus::{
     arg::{OwnedFd, PropMap, RefArg, Variant},
-    blocking::{Connection, Proxy},
+    blocking::{Proxy, SyncConnection},
     message::{MatchRule, MessageType},
     Message,
 };
+
+use gstreamer as gst;
+use gstreamer::prelude::*;
+use gstreamer_app::AppSink;
+
+use crate::capturable::{Capturable, Recorder};
+use crate::video::PixelProvider;
 
 use crate::capturable::pipewire_dbus::{
     OrgFreedesktopPortalRequestResponse, OrgFreedesktopPortalScreenCast,
 };
 
-extern "C" {
-    fn init_pipewire(fd: c_int);
-}
-
 #[derive(Debug, Clone, Copy)]
-pub struct PwStream {
-    id: u64,
+struct PwStreamInfo {
+    path: u64,
     source_type: u64,
 }
 
@@ -32,14 +34,152 @@ pub struct DBusError(String);
 
 impl std::fmt::Display for DBusError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+        let Self(s) = self;
+        write!(f, "{}", s)
     }
 }
 
 impl Error for DBusError {}
 
+#[derive(Debug)]
+pub struct GStreamerError(String);
+
+impl std::fmt::Display for GStreamerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self(s) = self;
+        write!(f, "{}", s)
+    }
+}
+
+impl Error for GStreamerError {}
+
+#[derive(Clone)]
+pub struct PipeWireCapturable {
+    // connection needs to be kept alive for recording
+    dbus_conn: Arc<SyncConnection>,
+    fd: OwnedFd,
+    path: u64,
+    source_type: u64,
+}
+
+impl PipeWireCapturable {
+    fn new(conn: Arc<SyncConnection>, fd: OwnedFd, stream: PwStreamInfo) -> Self {
+        Self {
+            dbus_conn: conn,
+            fd,
+            path: stream.path,
+            source_type: stream.source_type,
+        }
+    }
+}
+
+impl std::fmt::Debug for PipeWireCapturable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "PipeWireCapturable {{dbus: {}, fd: {}, path: {}, source_type: {}}}",
+            self.dbus_conn.unique_name(),
+            self.fd.as_raw_fd(),
+            self.path,
+            self.source_type
+        )
+    }
+}
+
+impl Capturable for PipeWireCapturable {
+    fn name(&self) -> String {
+        let type_str = match self.source_type {
+            1 => "Desktop",
+            2 => "Window",
+            _ => "Unknow",
+        };
+        format!("Pipewire {}, path: {}", type_str, self.path)
+    }
+
+    fn geometry_relative(&self) -> Result<(f64, f64, f64, f64), Box<dyn Error>> {
+        Ok((0.0, 0.0, 1.0, 1.0))
+    }
+
+    fn before_input(&mut self) -> Result<(), Box<dyn Error>> {
+        Ok(())
+    }
+
+    fn recorder(&self, capture_cursor: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
+        Ok(Box::new(PipeWireRecorder::new(self.clone())?))
+    }
+}
+
+pub struct PipeWireRecorder {
+    buffer: Option<gst::MappedBuffer<gst::buffer::Readable>>,
+    pipeline: gst::Pipeline,
+    appsink: AppSink,
+}
+
+impl PipeWireRecorder {
+    pub fn new(capturable: PipeWireCapturable) -> Result<Self, Box<dyn Error>> {
+        let pipeline = gst::Pipeline::new(None);
+
+        let src = gst::ElementFactory::make("pipewiresrc", None)?;
+        src.set_property("fd", &capturable.fd.as_raw_fd())?;
+        src.set_property("path", &format!("{}", capturable.path))?;
+
+        let sink = gst::ElementFactory::make("appsink", None)?;
+        sink.set_property("drop", &true)?;
+        sink.set_property("max-buffers", &1u32)?;
+
+        pipeline.add_many(&[&src, &sink])?;
+        src.link(&sink)?;
+        let appsink = sink
+            .dynamic_cast::<AppSink>()
+            .map_err(|_| GStreamerError("Sink element is expected to be an appsink!".into()))?;
+        appsink.set_caps(Some(&gst::Caps::new_simple(
+            "video/x-raw",
+            &[("format", &"BGRx")],
+        )));
+
+        pipeline.set_state(gst::State::Playing)?;
+        Ok(Self {
+            pipeline,
+            appsink,
+            buffer: None,
+        })
+    }
+}
+
+impl Recorder for PipeWireRecorder {
+    fn capture(&mut self) -> Result<PixelProvider, Box<dyn Error>> {
+        let sample = self
+            .appsink
+            .try_pull_sample(gst::ClockTime::from_seconds(1))
+            .ok_or_else(|| GStreamerError("Failed to pull sample!".into()))?;
+        let cap = sample.get_caps().unwrap().get_structure(0).unwrap();
+        let w: i32 = cap.get_value("width")?.get_some()?;
+        let h: i32 = cap.get_value("height")?.get_some()?;
+        self.buffer = Some(
+            sample
+                .get_buffer_owned()
+                .ok_or_else(|| GStreamerError("Failed to get owned buffer.".into()))?
+                .into_mapped_buffer_readable()
+                .map_err(|_| GStreamerError("Failed to map buffer.".into()))?,
+        );
+        Ok(PixelProvider::BGR0(
+            w as usize,
+            h as usize,
+            self.buffer.as_ref().unwrap().as_slice(),
+        ))
+    }
+}
+
+impl Drop for PipeWireRecorder {
+    fn drop(&mut self) {
+        if let Err(err) = self.pipeline.set_state(gst::State::Null) {
+            warn!("Failed to stop GStreamer pipeline: {}.", err);
+        }
+    }
+}
+
 fn handle_response<F>(
-    conn: &Connection,
+    conn: &SyncConnection,
     path: dbus::Path<'static>,
     mut f: F,
     failure_out: Arc<AtomicBool>,
@@ -47,10 +187,11 @@ fn handle_response<F>(
 where
     F: FnMut(
             OrgFreedesktopPortalRequestResponse,
-            &Connection,
+            &SyncConnection,
             &Message,
         ) -> Result<(), Box<dyn Error>>
         + Send
+        + Sync
         + 'static,
 {
     let mut m = MatchRule::new();
@@ -81,7 +222,7 @@ where
     })
 }
 
-fn get_portal(conn: &Connection) -> Proxy<&Connection> {
+fn get_portal(conn: &SyncConnection) -> Proxy<&SyncConnection> {
     conn.with_proxy(
         "org.freedesktop.portal.Desktop",
         "/org/freedesktop/portal/desktop",
@@ -89,7 +230,7 @@ fn get_portal(conn: &Connection) -> Proxy<&Connection> {
     )
 }
 
-fn streams_from_response(response: OrgFreedesktopPortalRequestResponse) -> Vec<PwStream> {
+fn streams_from_response(response: OrgFreedesktopPortalRequestResponse) -> Vec<PwStreamInfo> {
     (move || {
         Some(
             response
@@ -100,7 +241,7 @@ fn streams_from_response(response: OrgFreedesktopPortalRequestResponse) -> Vec<P
                 .as_iter()?
                 .filter_map(|stream| {
                     let mut itr = stream.as_iter()?;
-                    let id = itr.next()?.as_u64()?;
+                    let path = itr.next()?.as_u64()?;
                     let (keys, values): (Vec<(usize, &dyn RefArg)>, Vec<(usize, &dyn RefArg)>) =
                         itr.next()?
                             .as_iter()?
@@ -116,25 +257,25 @@ fn streams_from_response(response: OrgFreedesktopPortalRequestResponse) -> Vec<P
                                 .collect::<Vec<&dyn RefArg>>(),
                         )
                         .collect::<HashMap<String, &dyn RefArg>>();
-                    Some(PwStream {
-                        id,
+                    Some(PwStreamInfo {
+                        path,
                         source_type: attributes.get("source_type")?.as_u64()?,
                     })
                 })
-                .collect::<Vec<PwStream>>(),
+                .collect::<Vec<PwStreamInfo>>(),
         )
     })()
     .unwrap_or_default()
 }
 
 // mostly inspired by https://gitlab.gnome.org/snippets/19
-pub fn request_screen_cast() -> Result<(OwnedFd, Vec<PwStream>), Box<dyn Error>> {
-    let conn = Connection::new_session()?;
+fn request_screen_cast() -> Result<(SyncConnection, OwnedFd, Vec<PwStreamInfo>), Box<dyn Error>> {
+    let conn = SyncConnection::new_session()?;
     let portal = get_portal(&conn);
     let mut args: PropMap = HashMap::new();
     let fd: Arc<Mutex<Option<OwnedFd>>> = Arc::new(Mutex::new(None));
     let fd_res = fd.clone();
-    let streams: Arc<Mutex<Vec<PwStream>>> = Arc::new(Mutex::new(Vec::new()));
+    let streams: Arc<Mutex<Vec<PwStreamInfo>>> = Arc::new(Mutex::new(Vec::new()));
     let streams_res = streams.clone();
     let failure = Arc::new(AtomicBool::new(false));
     let failure_res = failure.clone();
@@ -157,8 +298,10 @@ pub fn request_screen_cast() -> Result<(OwnedFd, Vec<PwStream>), Box<dyn Error>>
                 "handle_token".to_string(),
                 Variant(Box::new("u2".to_string())),
             );
+            // https://flatpak.github.io/xdg-desktop-portal/portal-docs.html#gdbus-method-org-freedesktop-portal-ScreenCast.SelectSources
             args.insert("multiple".into(), Variant(Box::new(true)));
             args.insert("types".into(), Variant(Box::new(1u32 | 2u32)));
+            args.insert("cursor_mode".into(), Variant(Box::new(2u32)));
             let session: dbus::Path = r
                 .results
                 .get("session_handle")
@@ -233,7 +376,7 @@ pub fn request_screen_cast() -> Result<(OwnedFd, Vec<PwStream>), Box<dyn Error>>
     let fd_res = fd_res.lock().unwrap();
     let streams_res = streams_res.lock().unwrap();
     if fd_res.is_some() && !streams_res.is_empty() {
-        Ok((fd_res.clone().unwrap(), streams_res.clone()))
+        Ok((conn, fd_res.clone().unwrap(), streams_res.clone()))
     } else {
         Err(Box::new(DBusError(
             "Failed to obtain screen capture.".into(),
@@ -241,10 +384,11 @@ pub fn request_screen_cast() -> Result<(OwnedFd, Vec<PwStream>), Box<dyn Error>>
     }
 }
 
-pub fn get_capturables() {
-    let res = crate::capturable::pipewire::request_screen_cast();
-    warn!("Res: {:?}", res);
-    if let Ok((fd, streams)) = res {
-        unsafe { init_pipewire(fd.as_raw_fd()) }
-    }
+pub fn get_capturables() -> Result<Vec<PipeWireCapturable>, Box<dyn Error>> {
+    let (conn, fd, streams) = request_screen_cast()?;
+    let conn = Arc::new(conn);
+    Ok(streams
+        .into_iter()
+        .map(|s| PipeWireCapturable::new(conn.clone(), fd.clone(), s))
+        .collect())
 }
