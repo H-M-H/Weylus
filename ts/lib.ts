@@ -46,6 +46,14 @@ function log(level: LogLevel, msg: string) {
     log_pre.textContent += LogLevel[level] + ": " + msg + "\n";
 }
 
+function frame_update_scale(x: number) {
+    return Math.pow(x / 100, 3);
+}
+
+function frame_update_scale_inv(x: number) {
+    return 100 * Math.pow(x, 1 / 3);
+}
+
 class Settings {
     webSocket: WebSocket;
     checks: Map<string, HTMLInputElement>;
@@ -60,9 +68,11 @@ class Settings {
         this.checks = new Map<string, HTMLInputElement>();
         this.capturable_select = document.getElementById("window") as HTMLSelectElement;
         this.frame_update_limit_input = document.getElementById("frame_update_limit") as HTMLInputElement;
+        this.frame_update_limit_input.min = frame_update_scale_inv(0).toString();
+        this.frame_update_limit_input.max = frame_update_scale_inv(1000).toString();
         this.frame_update_limit_output = this.frame_update_limit_input.nextElementSibling as HTMLOutputElement;
         this.frame_update_limit_input.oninput = (e) => {
-            this.frame_update_limit_output.value = this.frame_update_limit_input.value;
+            this.frame_update_limit_output.value = Math.round(frame_update_scale(this.frame_update_limit_input.valueAsNumber)).toString();
         }
         this.visible = true;
 
@@ -131,7 +141,7 @@ class Settings {
         let settings = Object(null);
         for (const [key, elem] of this.checks.entries())
             settings[key] = elem.checked;
-        settings["frame_update_limit"] = this.frame_update_limit_input.value;
+        settings["frame_update_limit"] = frame_update_scale(this.frame_update_limit_input.valueAsNumber).toString();
         localStorage.setItem("settings", JSON.stringify(settings));
     }
 
@@ -148,10 +158,10 @@ class Settings {
             this.checks.get("capture_cursor").disabled = !this.checks.get("capture_cursor").checked;
             let upd_limit = settings["frame_update_limit"];
             if (upd_limit)
-                this.frame_update_limit_input.value = upd_limit;
+                this.frame_update_limit_input.value = frame_update_scale_inv(upd_limit).toString();
             else
-                this.frame_update_limit_input.value = "0";
-            this.frame_update_limit_output.value = this.frame_update_limit_input.value;
+                this.frame_update_limit_input.value = frame_update_scale_inv(33).toString();
+            this.frame_update_limit_output.value = Math.round(frame_update_scale(this.frame_update_limit_input.valueAsNumber)).toString();
             if (this.checks.get("lefty").checked) {
                 this.settings.classList.add("lefty");
             }
@@ -177,7 +187,7 @@ class Settings {
     }
 
     frame_update_limit() {
-        return this.frame_update_limit_input.valueAsNumber
+        return frame_update_scale(this.frame_update_limit_input.valueAsNumber)
     }
 
     toggle() {
