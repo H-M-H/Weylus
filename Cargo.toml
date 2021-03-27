@@ -31,11 +31,10 @@ dirs = "^3.0"
 cc = "^1.0"
 num_cpus = "^1.13"
 
-[target.'cfg(target_os = "linux")'.build-dependencies]
-pkg-config = "0.3.19"
-
 [target.'cfg(target_os = "linux")'.dependencies]
 dbus = "^0.9"
+gstreamer = "^0.16"
+gstreamer-app = { version = "^0.16", features = ["v1_10"] }
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 pnet = "^0.26"

@@ -29,6 +29,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     // this makes sure XInitThreads is called before any threading is done
     fltk::app::lock().unwrap();
     fltk::app::unlock();
+
     let width = 200;
     let height = 30;
     let padding = 10;
@@ -363,6 +364,15 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     but_toggle_ref2
         .borrow_mut()
         .set_callback(toggle_server);
+
+    #[cfg(target_os = "linux")]
+    if let Err(err) = gstreamer::init() {
+        error!(
+            "Failed to initialize gstreamer, screen capturing will most likely not work \
+            on Wayland: {}",
+            err
+        );
+    }
 
     app.run().expect("Failed to run Gui!");
 }
