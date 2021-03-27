@@ -251,12 +251,13 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, confi
                     warn!("Screen capture not initalized, can not send video frame!");
                     continue;
                 }
-                if let Err(err) = recorder.as_mut().unwrap().capture() {
+                let pixel_data = recorder.as_mut().unwrap().capture();
+                if let Err(err) = pixel_data {
                     warn!("Error capturing screen: {}", err);
                     continue;
                 }
-                let recorder = recorder.as_ref().unwrap();
-                let (width_in, height_in) = recorder.size();
+                let pixel_data = pixel_data.unwrap();
+                let (width_in, height_in) = pixel_data.size();
                 let scale =
                     (max_width as f64 / width_in as f64).max(max_height as f64 / height_in as f64);
                 let mut width_out = width_in;
@@ -308,7 +309,7 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, confi
                     video_encoder = Some(res.unwrap());
                 }
                 let video_encoder = video_encoder.as_mut().unwrap();
-                video_encoder.encode(recorder.pixel_provider());
+                video_encoder.encode(pixel_data);
             }
             VideoCommands::Start(config) => {
                 recorder = Some(config.capturable.recorder(config.capture_cursor).unwrap());
@@ -349,7 +350,7 @@ impl WsHandler {
             client_addr: *client_addr,
             video_sender,
             input_device: None,
-            capturables: get_capturables(),
+            capturables: vec![],
             gui_sender,
         }
     }

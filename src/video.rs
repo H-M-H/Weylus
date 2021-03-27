@@ -34,10 +34,18 @@ fn write_video_packet(video_encoder: *mut c_void, buf: *const c_uchar, buf_size:
 }
 
 pub enum PixelProvider<'a> {
-    None,
     // 8 bits per color
-    RGB(&'a [u8]),
-    BGR0(&'a [u8]),
+    RGB(usize, usize, &'a [u8]),
+    BGR0(usize, usize, &'a [u8]),
+}
+
+impl<'a> PixelProvider<'a> {
+    pub fn size(&self) -> (usize, usize) {
+        match self {
+            PixelProvider::RGB(w, h, _) => (*w, *h),
+            PixelProvider::BGR0(w, h, _) => (*w, *h),
+        }
+    }
 }
 
 pub struct VideoEncoder {
@@ -99,14 +107,10 @@ impl VideoEncoder {
     pub fn encode(&mut self, pixel_provider: PixelProvider) {
         let mut err = CError::new();
         match pixel_provider {
-            PixelProvider::None => {
-                warn!("Nothing to encode!");
-                return;
-            }
-            PixelProvider::BGR0(bgra) => unsafe {
+            PixelProvider::BGR0(_, _, bgra) => unsafe {
                 fill_bgra(self.handle, bgra.as_ptr(), &mut err);
             },
-            PixelProvider::RGB(rgb) => unsafe {
+            PixelProvider::RGB(_, _, rgb) => unsafe {
                 fill_rgb(self.handle, rgb.as_ptr(), &mut err);
             },
         }

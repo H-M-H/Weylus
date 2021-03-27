@@ -4,20 +4,14 @@ use std::error::Error;
 use tracing::warn;
 
 #[cfg(target_os = "linux")]
-pub mod x11;
-#[cfg(target_os = "linux")]
 pub mod pipewire;
 #[cfg(target_os = "linux")]
 pub mod pipewire_dbus;
+#[cfg(target_os = "linux")]
+pub mod x11;
 
 pub trait Recorder {
-    /// capture screen
-    fn capture(&mut self) -> Result<(), Box<dyn Error>>;
-
-    fn pixel_provider(&self) -> crate::video::PixelProvider;
-
-    /// width and size of captured image
-    fn size(&self) -> (usize, usize);
+    fn capture(&mut self) -> Result<crate::video::PixelProvider, Box<dyn Error>>;
 }
 
 pub trait BoxCloneCapturable {
