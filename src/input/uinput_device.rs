@@ -1,13 +1,14 @@
+use std::cmp::Ordering;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_int};
 
+use crate::capturable::x11::X11Context;
+use crate::capturable::Capturable;
 use crate::input::device::{InputDevice, InputDeviceType};
 use crate::protocol::{
     Button, KeyboardEvent, KeyboardEventType, KeyboardLocation, PointerEvent, PointerEventType,
     PointerType, WheelEvent,
 };
-use crate::capturable::Capturable;
-use crate::capturable::x11::X11Context;
 
 use crate::cerror::CError;
 
@@ -237,12 +238,10 @@ impl InputDevice for UInputDevice {
         }
 
         fn direction(d: i32) -> i32 {
-            if d == 0 {
-                0
-            } else if d < 0 {
-                -1
-            } else {
-                1
+            match d.cmp(&0) {
+                Ordering::Equal => 0,
+                Ordering::Less => -1,
+                Ordering::Greater => 1,
             }
         }
 

@@ -435,23 +435,17 @@ impl WsHandler {
                         return;
                     }
                     self.input_device = Some(Box::new(device.unwrap()))
-                } else {
-                    self.input_device
-                        .as_mut()
-                        .map(|d| d.set_capturable(capturable.clone()));
+                } else if let Some(d) = self.input_device.as_mut() {
+                    d.set_capturable(capturable.clone());
                 }
-            } else {
-                if self.input_device.as_ref().map_or(true, |d| {
-                    d.device_type() != InputDeviceType::AutoPilotDevice
-                }) {
-                    self.input_device = Some(Box::new(
-                        crate::input::autopilot_device::AutoPilotDevice::new(capturable.clone()),
-                    ));
-                } else {
-                    self.input_device
-                        .as_mut()
-                        .map(|d| d.set_capturable(capturable.clone()));
-                }
+            } else if self.input_device.as_ref().map_or(true, |d| {
+                d.device_type() != InputDeviceType::AutoPilotDevice
+            }) {
+                self.input_device = Some(Box::new(
+                    crate::input::autopilot_device::AutoPilotDevice::new(capturable.clone()),
+                ));
+            } else if let Some(d) = self.input_device.as_mut() {
+                d.set_capturable(capturable.clone());
             }
 
             #[cfg(not(target_os = "linux"))]
