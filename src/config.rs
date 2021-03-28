@@ -29,6 +29,10 @@ pub struct Config {
     #[structopt(long, help = "Start Weylus server immediately on program start.")]
     #[serde(default)]
     pub auto_start: bool,
+    #[cfg(target_os = "linux")]
+    #[structopt(long, help = "Wayland/PipeWire Support.")]
+    #[serde(default)]
+    pub wayland_support: bool,
 }
 
 pub fn read_config() -> Option<Config> {

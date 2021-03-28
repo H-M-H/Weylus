@@ -79,6 +79,20 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     check_auto_start.set_tooltip("Start Weylus server immediately on program start.");
     check_auto_start.set_checked(config.auto_start);
 
+    #[cfg(target_os = "linux")]
+    let mut check_wayland = CheckButton::default()
+        .with_size(70, height)
+        .right_of(&check_auto_start, 3 * padding)
+        .with_label("Wayland/\nPipeWire\nSupport");
+    #[cfg(target_os = "linux")]
+    {
+        check_wayland.set_tooltip(
+            "EXPERIMENTAL! This may crash your desktop! Enables screen \
+        capturing for Wayland using PipeWire and GStreamer.",
+        );
+        check_wayland.set_checked(config.wayland_support);
+    }
+
     let mut label_hw_accel = Frame::default()
         .with_size(width, height)
         .below_of(&check_auto_start, padding)
@@ -235,6 +249,8 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     try_vaapi: check_vaapi.is_checked(),
                     #[cfg(any(target_os = "linux", target_os = "windows"))]
                     try_nvenc: check_nvenc.is_checked(),
+                    #[cfg(target_os = "linux")]
+                    wayland_support: check_wayland.is_checked(),
                 };
                 crate::websocket::run(sender_ws2gui.clone(), receiver_gui2ws, ws_config);
 
@@ -337,6 +353,8 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     #[cfg(any(target_os = "linux", target_os = "windows"))]
                     try_nvenc: check_nvenc.is_checked(),
                     auto_start: check_auto_start.is_checked(),
+                    #[cfg(target_os = "linux")]
+                    wayland_support: check_wayland.is_checked(),
                 };
                 write_config(&config);
             } else {
@@ -361,9 +379,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         toggle_server();
     }
 
-    but_toggle_ref2
-        .borrow_mut()
-        .set_callback(toggle_server);
+    but_toggle_ref2.borrow_mut().set_callback(toggle_server);
 
     #[cfg(target_os = "linux")]
     if let Err(err) = gstreamer::init() {

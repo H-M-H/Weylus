@@ -49,21 +49,25 @@ impl Clone for Box<dyn Capturable> {
     }
 }
 
-pub fn get_capturables() -> Vec<Box<dyn Capturable>> {
+pub fn get_capturables(
+    #[cfg(target_os = "linux")] wayland_support: bool,
+) -> Vec<Box<dyn Capturable>> {
     let mut capturables: Vec<Box<dyn Capturable>> = vec![];
     #[cfg(target_os = "linux")]
     {
-        use crate::capturable::pipewire::get_capturables as get_capturables_pw;
-        match get_capturables_pw() {
-            Ok(captrs) => {
-                for c in captrs {
-                    capturables.push(Box::new(c));
+        if wayland_support {
+            use crate::capturable::pipewire::get_capturables as get_capturables_pw;
+            match get_capturables_pw() {
+                Ok(captrs) => {
+                    for c in captrs {
+                        capturables.push(Box::new(c));
+                    }
                 }
+                Err(err) => warn!(
+                    "Failed to get list of capturables via dbus/pipewire: {}",
+                    err
+                ),
             }
-            Err(err) => warn!(
-                "Failed to get list of capturables via dbus/pipewire: {}",
-                err
-            ),
         }
 
         use crate::capturable::x11::X11Context;
