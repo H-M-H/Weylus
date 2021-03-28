@@ -323,10 +323,21 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, confi
                     // This shouldn't affect other Recorder trait objects.
                     recorder = None;
                 }
-                recorder = Some(config.capturable.recorder(config.capture_cursor).unwrap());
-                max_width = config.max_width;
-                max_height = config.max_height;
-                send_msg(&sender, &MessageOutbound::ConfigOk);
+                match config.capturable.recorder(config.capture_cursor) {
+                    Ok(r) => {
+                        recorder = Some(r);
+                        max_width = config.max_width;
+                        max_height = config.max_height;
+                        send_msg(&sender, &MessageOutbound::ConfigOk);
+                    }
+                    Err(err) => {
+                        warn!("Failed to init screen cast: {}!", err);
+                        send_msg(
+                            &sender,
+                            &MessageOutbound::Error("Failed to init screen cast!".into()),
+                        )
+                    }
+                }
             }
         }
     }
