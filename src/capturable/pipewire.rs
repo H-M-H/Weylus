@@ -111,6 +111,8 @@ impl Capturable for PipeWireCapturable {
 
 pub struct PipeWireRecorder {
     buffer: Option<gst::MappedBuffer<gst::buffer::Readable>>,
+    buffer_cropped: Vec<u8>,
+    is_cropped: bool,
     pipeline: gst::Pipeline,
     appsink: AppSink,
     width: usize,
@@ -150,6 +152,8 @@ impl PipeWireRecorder {
             buffer: None,
             width: 0,
             height: 0,
+            buffer_cropped: vec![],
+            is_cropped: false,
         })
     }
 }
@@ -163,14 +167,24 @@ impl Recorder for PipeWireRecorder {
             let cap = sample.get_caps().unwrap().get_structure(0).unwrap();
             let w: i32 = cap.get_value("width")?.get_some()?;
             let h: i32 = cap.get_value("height")?.get_some()?;
+            let w = w as usize;
+            let h = h as usize;
             let buf = sample
                 .get_buffer_owned()
-                .ok_or_else(|| GStreamerError("Failed to get owned buffer.".into()))?
+                .ok_or_else(|| GStreamerError("Failed to get owned buffer.".into()))?;
+            let mut crop = buf
+                .get_meta::<gstreamer_video::VideoCropMeta>()
+                .map(|m| m.get_rect());
+            // only crop if necessary
+            if Some((0, 0, w as u32, h as u32)) == crop {
+                crop = None;
+            }
+            let buf = buf
                 .into_mapped_buffer_readable()
                 .map_err(|_| GStreamerError("Failed to map buffer.".into()))?;
             let buf_size = buf.get_size();
             // BGRx is 4 bytes per pixel
-            if buf_size != (w * h * 4) as usize {
+            if buf_size != (w * h * 4) {
                 // for some reason the width and height of the caps do not guarantee correct buffer
                 // size, so ignore those
                 trace!(
@@ -181,8 +195,28 @@ impl Recorder for PipeWireRecorder {
                     h
                 );
             } else {
-                self.width = w as usize;
-                self.height = h as usize;
+                // Copy region specified by crop into self.buffer_cropped
+                // TODO: Figure out if ffmpeg provides a zero copy alternative
+                if let Some((x_off, y_off, w_crop, h_crop)) = crop {
+                    let x_off = x_off as usize;
+                    let y_off = y_off as usize;
+                    let w_crop = w_crop as usize;
+                    let h_crop = h_crop as usize;
+                    self.buffer_cropped.clear();
+                    let data = buf.as_slice();
+                    // BGRx is 4 bytes per pixel
+                    self.buffer_cropped.reserve(w_crop * h_crop * 4);
+                    for y in y_off..(y_off + h_crop) {
+                        let i = 4 * (w * y + x_off);
+                        self.buffer_cropped.extend(&data[i..i + 4 * w_crop]);
+                    }
+                    self.width = w_crop;
+                    self.height = h_crop;
+                } else {
+                    self.width = w;
+                    self.height = h;
+                }
+                self.is_cropped = crop.is_some();
                 self.buffer = Some(buf);
             }
         } else {
@@ -192,9 +226,13 @@ impl Recorder for PipeWireRecorder {
             return Err(Box::new(GStreamerError("No buffer available!".into())));
         }
         Ok(PixelProvider::BGR0(
-            self.width as usize,
-            self.height as usize,
-            self.buffer.as_ref().unwrap().as_slice(),
+            self.width,
+            self.height,
+            if self.is_cropped {
+                self.buffer_cropped.as_slice()
+            } else {
+                self.buffer.as_ref().unwrap().as_slice()
+            },
         ))
     }
 }

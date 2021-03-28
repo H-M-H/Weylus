@@ -35,6 +35,7 @@ num_cpus = "^1.13"
 dbus = "^0.9"
 gstreamer = "^0.16"
 gstreamer-app = { version = "^0.16", features = ["v1_10"] }
+gstreamer-video = "^0.16"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 pnet = "^0.26"
