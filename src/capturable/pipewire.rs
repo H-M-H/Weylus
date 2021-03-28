@@ -186,7 +186,8 @@ impl Recorder for PipeWireRecorder {
             // BGRx is 4 bytes per pixel
             if buf_size != (w * h * 4) {
                 // for some reason the width and height of the caps do not guarantee correct buffer
-                // size, so ignore those
+                // size, so ignore those buffers, see:
+                // https://gitlab.freedesktop.org/pipewire/pipewire/-/issues/985
                 trace!(
                     "Size of mapped buffer: {} does NOT match size of capturable {}x{}@BGRx, \
                     dropping it!",
