@@ -3,7 +3,7 @@ use std::error::Error;
 use std::os::unix::io::AsRawFd;
 use std::sync::{atomic::AtomicBool, Arc, Mutex};
 use std::time::Duration;
-use tracing::{debug, warn};
+use tracing::{debug, trace, warn};
 
 use dbus::{
     arg::{OwnedFd, PropMap, RefArg, Variant},
@@ -113,6 +113,8 @@ pub struct PipeWireRecorder {
     buffer: Option<gst::MappedBuffer<gst::buffer::Readable>>,
     pipeline: gst::Pipeline,
     appsink: AppSink,
+    width: usize,
+    height: usize,
 }
 
 impl PipeWireRecorder {
@@ -142,29 +144,39 @@ impl PipeWireRecorder {
             pipeline,
             appsink,
             buffer: None,
+            width: 0,
+            height: 0,
         })
     }
 }
 
 impl Recorder for PipeWireRecorder {
     fn capture(&mut self) -> Result<PixelProvider, Box<dyn Error>> {
-        let sample = self
+        if let Some(sample) = self
             .appsink
-            .try_pull_sample(gst::ClockTime::from_seconds(1))
-            .ok_or_else(|| GStreamerError("Failed to pull sample!".into()))?;
-        let cap = sample.get_caps().unwrap().get_structure(0).unwrap();
-        let w: i32 = cap.get_value("width")?.get_some()?;
-        let h: i32 = cap.get_value("height")?.get_some()?;
-        self.buffer = Some(
-            sample
-                .get_buffer_owned()
-                .ok_or_else(|| GStreamerError("Failed to get owned buffer.".into()))?
-                .into_mapped_buffer_readable()
-                .map_err(|_| GStreamerError("Failed to map buffer.".into()))?,
-        );
+            .try_pull_sample(gst::ClockTime::from_mseconds(33))
+        {
+            let cap = sample.get_caps().unwrap().get_structure(0).unwrap();
+            let w: i32 = cap.get_value("width")?.get_some()?;
+            let h: i32 = cap.get_value("height")?.get_some()?;
+            self.width = w as usize;
+            self.height = h as usize;
+            self.buffer = Some(
+                sample
+                    .get_buffer_owned()
+                    .ok_or_else(|| GStreamerError("Failed to get owned buffer.".into()))?
+                    .into_mapped_buffer_readable()
+                    .map_err(|_| GStreamerError("Failed to map buffer.".into()))?,
+            );
+        } else {
+            if self.buffer.is_none() {
+                return Err(Box::new(GStreamerError("Failed to pull sample!".into())));
+            }
+            trace!("No new buffer available, falling back to previous one.");
+        }
         Ok(PixelProvider::BGR0(
-            w as usize,
-            h as usize,
+            self.width as usize,
+            self.height as usize,
             self.buffer.as_ref().unwrap().as_slice(),
         ))
     }
