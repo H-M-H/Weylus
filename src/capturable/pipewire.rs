@@ -125,6 +125,10 @@ impl PipeWireRecorder {
         src.set_property("fd", &capturable.fd.as_raw_fd())?;
         src.set_property("path", &format!("{}", capturable.path))?;
 
+        // For some reason pipewire blocks on destruction of AppSink if this is not set to true,
+        // see: https://gitlab.freedesktop.org/pipewire/pipewire/-/issues/982
+        src.set_property("always-copy", &true)?;
+
         let sink = gst::ElementFactory::make("appsink", None)?;
         sink.set_property("drop", &true)?;
         sink.set_property("max-buffers", &1u32)?;
