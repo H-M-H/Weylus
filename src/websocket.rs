@@ -319,6 +319,7 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, confi
                     // This line makes sure that there always is only a single recorder and thus
                     // single pipeline in this thread by forcing rust to call the destructor of the
                     // current pipeline here, right before creating a new pipeline.
+                    // See: https://gitlab.freedesktop.org/pipewire/pipewire/-/issues/986
                     //
                     // This shouldn't affect other Recorder trait objects.
                     recorder = None;
