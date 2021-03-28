@@ -163,8 +163,6 @@ impl Recorder for PipeWireRecorder {
             let cap = sample.get_caps().unwrap().get_structure(0).unwrap();
             let w: i32 = cap.get_value("width")?.get_some()?;
             let h: i32 = cap.get_value("height")?.get_some()?;
-            self.width = w as usize;
-            self.height = h as usize;
             let buf = sample
                 .get_buffer_owned()
                 .ok_or_else(|| GStreamerError("Failed to get owned buffer.".into()))?
@@ -172,20 +170,26 @@ impl Recorder for PipeWireRecorder {
                 .map_err(|_| GStreamerError("Failed to map buffer.".into()))?;
             let buf_size = buf.get_size();
             // BGRx is 4 bytes per pixel
-            if buf_size != self.width * self.height * 4 {
+            if buf_size != (w * h * 4) as usize {
                 // for some reason the width and height of the caps do not guarantee correct buffer
-                // size, so return an error if this does not match
-                return Err(Box::new(GStreamerError(format!(
-                    "Size of mapped buffer: {} does NOT match size of capturable {}x{}@BGRx!",
-                    buf_size, w, h
-                ))));
+                // size, so ignore those
+                trace!(
+                    "Size of mapped buffer: {} does NOT match size of capturable {}x{}@BGRx, \
+                    dropping it!",
+                    buf_size,
+                    w,
+                    h
+                );
+            } else {
+                self.width = w as usize;
+                self.height = h as usize;
+                self.buffer = Some(buf);
             }
-            self.buffer = Some(buf);
         } else {
-            if self.buffer.is_none() {
-                return Err(Box::new(GStreamerError("Failed to pull sample!".into())));
-            }
             trace!("No new buffer available, falling back to previous one.");
+        }
+        if self.buffer.is_none() {
+            return Err(Box::new(GStreamerError("No buffer available!".into())));
         }
         Ok(PixelProvider::BGR0(
             self.width as usize,
