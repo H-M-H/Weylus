@@ -40,6 +40,8 @@ pub struct WsConfig {
     pub try_vaapi: bool,
     #[cfg(any(target_os = "linux", target_os = "windows"))]
     pub try_nvenc: bool,
+    #[cfg(target_os = "linux")]
+    pub wayland_support: bool,
 }
 
 pub fn run(
@@ -351,6 +353,7 @@ struct WsHandler {
     input_device: Option<Box<dyn InputDevice>>,
     capturables: Vec<Box<dyn Capturable>>,
     gui_sender: mpsc::Sender<Ws2GuiMessage>,
+    ws_config: WsConfig,
 }
 
 impl WsHandler {
@@ -363,6 +366,7 @@ impl WsHandler {
         let (video_sender, video_receiver) = mpsc::channel::<VideoCommands>();
         {
             let sender = sender.clone();
+            let config = config.clone();
             // offload creating the videostream to another thread to avoid blocking the thread that
             // is receiving messages from the websocket
             spawn(move || handle_video(video_receiver, sender, config));
@@ -375,6 +379,7 @@ impl WsHandler {
             input_device: None,
             capturables: vec![],
             gui_sender,
+            ws_config: config,
         }
     }
 
@@ -422,7 +427,10 @@ impl WsHandler {
 
     fn send_capturable_list(&mut self) {
         let mut windows = Vec::<String>::new();
-        self.capturables = get_capturables();
+        self.capturables = get_capturables(
+            #[cfg(target_os = "linux")]
+            self.ws_config.wayland_support,
+        );
         self.capturables.iter().for_each(|c| {
             windows.push(c.name());
         });
