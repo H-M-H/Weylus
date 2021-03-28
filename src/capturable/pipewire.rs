@@ -161,13 +161,22 @@ impl Recorder for PipeWireRecorder {
             let h: i32 = cap.get_value("height")?.get_some()?;
             self.width = w as usize;
             self.height = h as usize;
-            self.buffer = Some(
-                sample
-                    .get_buffer_owned()
-                    .ok_or_else(|| GStreamerError("Failed to get owned buffer.".into()))?
-                    .into_mapped_buffer_readable()
-                    .map_err(|_| GStreamerError("Failed to map buffer.".into()))?,
-            );
+            let buf = sample
+                .get_buffer_owned()
+                .ok_or_else(|| GStreamerError("Failed to get owned buffer.".into()))?
+                .into_mapped_buffer_readable()
+                .map_err(|_| GStreamerError("Failed to map buffer.".into()))?;
+            let buf_size = buf.get_size();
+            // BGRx is 4 bytes per pixel
+            if buf_size != self.width * self.height * 4 {
+                // for some reason the width and height of the caps do not guarantee correct buffer
+                // size, so return an error if this does not match
+                return Err(Box::new(GStreamerError(format!(
+                    "Size of mapped buffer: {} does NOT match size of capturable {}x{}@BGRx!",
+                    buf_size, w, h
+                ))));
+            }
+            self.buffer = Some(buf);
         } else {
             if self.buffer.is_none() {
                 return Err(Box::new(GStreamerError("Failed to pull sample!".into())));
