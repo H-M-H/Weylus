@@ -312,6 +312,17 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, confi
                 video_encoder.encode(pixel_data);
             }
             VideoCommands::Start(config) => {
+                #[allow(unused_assignments)]
+                {
+                    // gstpipewire can not handle setting a pipeline's state to Null after another
+                    // pipeline has been created and its state has been set to Play.
+                    // This line makes sure that there always is only a single recorder and thus
+                    // single pipeline in this thread by forcing rust to call the destructor of the
+                    // current pipeline here, right before creating a new pipeline.
+                    //
+                    // This shouldn't affect other Recorder trait objects.
+                    recorder = None;
+                }
                 recorder = Some(config.capturable.recorder(config.capture_cursor).unwrap());
                 max_width = config.max_width;
                 max_height = config.max_height;
