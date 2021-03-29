@@ -369,7 +369,11 @@ fn request_screen_cast() -> Result<(SyncConnection, OwnedFd, Vec<PwStreamInfo>),
             // https://flatpak.github.io/xdg-desktop-portal/portal-docs.html#gdbus-method-org-freedesktop-portal-ScreenCast.SelectSources
             args.insert("multiple".into(), Variant(Box::new(true)));
             args.insert("types".into(), Variant(Box::new(1u32 | 2u32)));
-            args.insert("cursor_mode".into(), Variant(Box::new(2u32)));
+
+            // Do not capture the cursor for now, this crashes kwin_wayland and tears down the
+            // plasma desktop, see:
+            // https://bugs.kde.org/show_bug.cgi?id=435042
+            args.insert("cursor_mode".into(), Variant(Box::new(1u32)));
             let session: dbus::Path = r
                 .results
                 .get("session_handle")
