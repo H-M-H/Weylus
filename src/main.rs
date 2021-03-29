@@ -66,6 +66,7 @@ mod tests {
         gstreamer::init().unwrap();
         let root = capturable::pipewire::get_capturables().unwrap().remove(0);
         let mut r = root.recorder(false).unwrap();
+        let _ = r.capture();
         b.iter(|| { r.capture().unwrap(); });
     }
 
