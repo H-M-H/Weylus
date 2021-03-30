@@ -10,11 +10,16 @@ let log_pre: HTMLPreElement;
 let log_level: LogLevel = LogLevel.ERROR;
 let no_log_messages: boolean = true;
 
+let fps_out: HTMLOutputElement;
+let frame_count = 0;
+let last_fps_calc: number = performance.now();
+
 function run(access_code: string, websocket_port: number, level: string) {
     window.onload = () => {
         log_pre = document.getElementById("log") as HTMLPreElement;
         log_pre.textContent = "";
         log_level = LogLevel[level];
+        fps_out = document.getElementById("fps") as HTMLOutputElement;
         window.addEventListener("error", (e: ErrorEvent | Event | UIEvent) => {
             if ((e as ErrorEvent).error) {
                 let err = e as ErrorEvent;
@@ -481,6 +486,14 @@ function handle_messages(
         // not a string -> got a video frame
         queue.push(event.data);
         upd_buf();
+        frame_count += 1;
+        let t = performance.now();
+        if (t - last_fps_calc > 1500) {
+            let fps = Math.round(frame_count/(t - last_fps_calc)*10000)/10;
+            fps_out.value = fps.toString();
+            frame_count = 0;
+            last_fps_calc = performance.now();
+        }
         if (video.seekable.length > 0 &&
             // only seek if there is data available, some browsers choke otherwise
             (video.readyState >= 3 ||
