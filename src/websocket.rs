@@ -38,7 +38,7 @@ pub struct WsConfig {
     pub access_code: Option<String>,
     #[cfg(target_os = "linux")]
     pub try_vaapi: bool,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
     pub try_nvenc: bool,
 }
 
@@ -298,7 +298,7 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, confi
                         },
                         #[cfg(target_os = "linux")]
                         config.try_vaapi,
-                        #[cfg(target_os = "linux")]
+                        #[cfg(any(target_os = "linux", target_os = "windows"))]
                         config.try_nvenc,
                     );
                     if let Err(err) = res {

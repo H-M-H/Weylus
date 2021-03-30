@@ -105,7 +105,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         .with_label("NVENC");
     check_nvenc.set_tooltip("Try to use Nvidia's NVENC to encode the video via GPU.");
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
     if config.try_nvenc {
         check_nvenc.set_checked(true);
     }
@@ -113,6 +113,9 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     #[cfg(not(target_os = "linux"))]
     {
         check_vaapi.deactivate();
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    {
         check_nvenc.deactivate();
     }
 
@@ -229,7 +232,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     access_code: access_code.map(|s| s.into()),
                     #[cfg(target_os = "linux")]
                     try_vaapi: check_vaapi.is_checked(),
-                    #[cfg(target_os = "linux")]
+                    #[cfg(any(target_os = "linux", target_os = "windows"))]
                     try_nvenc: check_nvenc.is_checked(),
                 };
                 crate::websocket::run(sender_ws2gui.clone(), receiver_gui2ws, ws_config);
@@ -330,7 +333,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     bind_address: bind_addr,
                     #[cfg(target_os = "linux")]
                     try_vaapi: check_vaapi.is_checked(),
-                    #[cfg(target_os = "linux")]
+                    #[cfg(any(target_os = "linux", target_os = "windows"))]
                     try_nvenc: check_nvenc.is_checked(),
                     auto_start: check_auto_start.is_checked(),
                 };

@@ -58,7 +58,7 @@ impl VideoEncoder {
         height_out: usize,
         write_data: impl Fn(&[u8]) + 'static,
         #[cfg(target_os = "linux")] try_vaapi: bool,
-        #[cfg(target_os = "linux")] try_nvenc: bool,
+        #[cfg(any(target_os = "linux", target_os = "windows"))] try_nvenc: bool,
     ) -> Result<Box<Self>, CError> {
         let mut video_encoder = Box::new(Self {
             handle: std::ptr::null_mut(),
@@ -78,11 +78,11 @@ impl VideoEncoder {
                 height_out as c_int,
                 #[cfg(target_os = "linux")]
                 try_vaapi.into(),
-                #[cfg(target_os = "linux")]
+                #[cfg(any(target_os = "linux", target_os = "windows"))]
                 try_nvenc.into(),
                 #[cfg(not(target_os = "linux"))]
                 0,
-                #[cfg(not(target_os = "linux"))]
+                #[cfg(not(any(target_os = "linux", target_os = "windows")))]
                 0,
             )
         };
