@@ -18,5 +18,5 @@ PKG_CONFIG_PATH="../dist/lib/pkgconfig" ./configure \
 	--extra-ldflags="$FFMPEG_LIBRARY_PATH" \
 	$FFMPEG_EXTRA_ARGS
 
-make -j$(nproc)
+make -j$NPROCS
 make install

@@ -71,6 +71,8 @@ fn main() {
     cc_video.define("HAS_NVENC", None);
     #[cfg(target_os = "linux")]
     cc_video.define("HAS_VAAPI", None);
+    #[cfg(target_os = "macos")]
+    cc_video.define("HAS_VIDEOTOOLBOX", None);
     cc_video.compile("video");
     let ffmpeg_link_kind =
         // https://github.com/rust-lang/rust/pull/72785
@@ -96,6 +98,12 @@ fn main() {
 
     #[cfg(target_os = "linux")]
     linux();
+
+    #[cfg(target_os = "macos")]
+    {
+        println!("cargo:rustc-link-lib=framework=VideoToolbox");
+        println!("cargo:rustc-link-lib=framework=CoreMedia");
+    }
 }
 
 #[cfg(target_os = "linux")]

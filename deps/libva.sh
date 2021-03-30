@@ -17,5 +17,5 @@ sed -i -e 's/-lva-\${display}$/-lva-\${display} -ldrm/' pkgconfig/libva-drm.pc.i
     --enable-glx \
     --with-drivers-path="/usr/lib/dri"
 
-make -j$(nproc)
+make -j$NPROCS
 make install

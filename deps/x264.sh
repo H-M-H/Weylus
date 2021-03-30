@@ -12,5 +12,5 @@ cd x264
 	--disable-cli \
 	--disable-opencl
 
-make -j$(nproc)
+make -j$NPROCS
 make install

@@ -167,7 +167,9 @@ void open_video(VideoContext* ctx, Error* err)
 					if (strstr(vendor_string, *pattern) != NULL)
 					{
 						force_nv12 = 1;
-						log_debug("'%s' is blacklisted and NV12 is forced as pixel format.", vendor_string);
+						log_debug(
+							"'%s' is blacklisted and NV12 is forced as pixel format.",
+							vendor_string);
 						break;
 					}
 
@@ -226,9 +228,29 @@ void open_video(VideoContext* ctx, Error* err)
 				av_opt_set(ctx->c->priv_data, "cq", "21", 0);
 				set_codec_params(ctx);
 				if (avcodec_open2(ctx->c, codec, NULL) == 0)
-				{
 					using_hw = 1;
-				}
+				else
+					avcodec_free_context(&ctx->c);
+			}
+		}
+	}
+#endif
+
+#ifdef HAS_VIDEOTOOLBOX
+	if (!using_hw)
+	{
+		codec = avcodec_find_encoder_by_name("h264_videotoolbox");
+		if (codec)
+		{
+			ctx->c = avcodec_alloc_context3(codec);
+			if (ctx->c)
+			{
+				ctx->sw_pix_fmt = ctx->c->pix_fmt = AV_PIX_FMT_YUV420P;
+				av_opt_set(ctx->c->priv_data, "realtime", "true", 0);
+				av_opt_set(ctx->c->priv_data, "allow_sw", "true", 0);
+				set_codec_params(ctx);
+				if (avcodec_open2(ctx->c, codec, NULL) == 0)
+					using_hw = 1;
 				else
 					avcodec_free_context(&ctx->c);
 			}

@@ -5,6 +5,12 @@ if [ "$OSTYPE" == "linux-gnu" ]; then
     export RUNNER_OS="Linux"
 fi
 
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    export RUNNER_OS="macOS"
+fi
+
+export NPROCS=$(nproc || echo 4)
+
 ./download.sh
 
 if [ "$RUNNER_OS" == "Windows" ]; then
@@ -21,6 +27,9 @@ else
             --enable-vaapi \
             --enable-libdrm \
             --enable-xlib"
+    fi
+    if [ "$RUNNER_OS" == "macOS" ]; then
+        export FFMPEG_EXTRA_ARGS="--enable-videotoolbox"
     fi
 fi
 
