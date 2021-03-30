@@ -54,12 +54,22 @@ function frame_update_scale_inv(x: number) {
     return 100 * Math.pow(x, 1 / 3);
 }
 
+
+function calc_max_video_resolution(scale: number) {
+    return [
+        Math.round(scale * window.screen.availWidth * window.devicePixelRatio),
+        Math.round(scale * window.screen.availHeight * window.devicePixelRatio)
+    ];
+}
+
 class Settings {
     webSocket: WebSocket;
     checks: Map<string, HTMLInputElement>;
     capturable_select: HTMLSelectElement;
     frame_update_limit_input: HTMLInputElement;
     frame_update_limit_output: HTMLOutputElement;
+    scale_video_input: HTMLInputElement;
+    scale_video_output: HTMLOutputElement;
     visible: boolean;
     settings: HTMLElement;
 
@@ -71,8 +81,14 @@ class Settings {
         this.frame_update_limit_input.min = frame_update_scale_inv(0).toString();
         this.frame_update_limit_input.max = frame_update_scale_inv(1000).toString();
         this.frame_update_limit_output = this.frame_update_limit_input.nextElementSibling as HTMLOutputElement;
+        this.scale_video_input = document.getElementById("scale_video") as HTMLInputElement;
+        this.scale_video_output = this.scale_video_input.nextElementSibling as HTMLOutputElement;
         this.frame_update_limit_input.oninput = (e) => {
             this.frame_update_limit_output.value = Math.round(frame_update_scale(this.frame_update_limit_input.valueAsNumber)).toString();
+        }
+        this.scale_video_input.oninput = (e) => {
+            let [w, h] = calc_max_video_resolution(this.scale_video_input.valueAsNumber)
+            this.scale_video_output.value = w + "x" + h
         }
         this.visible = true;
 
@@ -120,6 +136,7 @@ class Settings {
         let upd_server_config = () => { this.save_settings(); this.send_server_config() };
         this.checks.get("uinput_support").onchange = upd_server_config;
         this.checks.get("capture_cursor").onchange = upd_server_config;
+        this.scale_video_input.onchange = upd_server_config;
 
         document.getElementById("refresh").onclick = () => this.webSocket.send('"GetCapturableList"');
         this.capturable_select.onchange = () => this.send_server_config();
@@ -131,9 +148,10 @@ class Settings {
         for (const key of [
             "uinput_support",
             "capture_cursor"])
-            config[key] = this.checks.get(key).checked
-        config["max_width"] = Math.round(window.screen.availWidth * window.devicePixelRatio);
-        config["max_height"] = Math.round(window.screen.availHeight * window.devicePixelRatio);
+            config[key] = this.checks.get(key).checked;
+        let [w, h] = calc_max_video_resolution(this.scale_video_input.valueAsNumber);
+        config["max_width"] = w;
+        config["max_height"] = h;
         this.webSocket.send(JSON.stringify({ "Config": config }));
     }
 
@@ -142,6 +160,7 @@ class Settings {
         for (const [key, elem] of this.checks.entries())
             settings[key] = elem.checked;
         settings["frame_update_limit"] = frame_update_scale(this.frame_update_limit_input.valueAsNumber).toString();
+        settings["scale_video"] = this.scale_video_input.value;
         localStorage.setItem("settings", JSON.stringify(settings));
     }
 
@@ -161,11 +180,19 @@ class Settings {
             else
                 this.frame_update_limit_input.value = frame_update_scale_inv(33).toString();
             this.frame_update_limit_output.value = Math.round(frame_update_scale(this.frame_update_limit_input.valueAsNumber)).toString();
+
+            let scale_video = settings["scale_video"];
+            if (scale_video)
+                this.scale_video_input.value = scale_video;
+            let [w, h] = calc_max_video_resolution(this.scale_video_input.valueAsNumber)
+            this.scale_video_output.value = w + "x" + h
+
             if (this.checks.get("lefty").checked) {
                 this.settings.classList.add("lefty");
             }
 
         } catch {
+            log(LogLevel.DEBUG, "Failed to load settings.")
             return;
         }
     }
@@ -505,6 +532,8 @@ function init(access_code: string, websocket_port: number) {
     webSocket.onclose = () => handle_disconnect("Connection closed.");
     window.onresize = () => {
         stretch_video();
+        let [w, h] = calc_max_video_resolution(settings.scale_video_input.valueAsNumber);
+        settings.scale_video_output.value = w + "x" + h;
         if (authed)
             settings.send_server_config();
     }
