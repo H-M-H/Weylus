@@ -9,6 +9,9 @@ if [ "$RUNNER_OS" == "Linux" ]; then
     git clone --depth 1 https://git.videolan.org/git/ffmpeg/nv-codec-headers.git
     git clone --depth 1 -b 2.10.0 https://github.com/intel/libva
 fi
+if [ "$RUNNER_OS" == "Windows" ]; then
+    git clone --depth 1 https://git.videolan.org/git/ffmpeg/nv-codec-headers.git
+fi
 cd ffmpeg
 
 if [ "$RUNNER_OS" == "Windows" ]; then

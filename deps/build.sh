@@ -31,12 +31,18 @@ else
     if [ "$RUNNER_OS" == "macOS" ]; then
         export FFMPEG_EXTRA_ARGS="--enable-videotoolbox"
     fi
+    if [ "$RUNNER_OS" == "Windows" ]; then
+        export FFMPEG_EXTRA_ARGS="--enable-nvenc --enable-ffnvcodec"
+    fi
 fi
 
 ./x264.sh
 if [ "$RUNNER_OS" == "Linux" ]; then
     ./nv-codec-headers.sh
     ./libva.sh
+fi
+if [ "$RUNNER_OS" == "Windows" ]; then
+    ./nv-codec-headers.sh
 fi
 ./ffmpeg.sh
 

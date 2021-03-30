@@ -67,7 +67,7 @@ fn main() {
     let mut cc_video = cc::Build::new();
     cc_video.file("lib/encode_video.c");
     cc_video.include("deps/dist/include");
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
     cc_video.define("HAS_NVENC", None);
     #[cfg(target_os = "linux")]
     cc_video.define("HAS_VAAPI", None);
