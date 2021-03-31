@@ -3,5 +3,5 @@
 set -ex
 
 cd nv-codec-headers
-make
+make PREFIX=../dist
 make install PREFIX=../dist
