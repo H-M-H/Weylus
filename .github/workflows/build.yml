@@ -127,6 +127,13 @@ jobs:
         name: ${{ runner.os }}
         path: |
           ${{ matrix.exec-file }}
+    - name: ArtifactsDebug
+      if: failure()
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ runner.os }}-deps
+        path: |
+          deps/
     - name: Publish
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
