@@ -78,10 +78,10 @@ impl VideoEncoder {
                 height_out as c_int,
                 #[cfg(target_os = "linux")]
                 try_vaapi.into(),
-                #[cfg(any(target_os = "linux", target_os = "windows"))]
-                try_nvenc.into(),
                 #[cfg(not(target_os = "linux"))]
                 0,
+                #[cfg(any(target_os = "linux", target_os = "windows"))]
+                try_nvenc.into(),
                 #[cfg(not(any(target_os = "linux", target_os = "windows")))]
                 0,
             )
