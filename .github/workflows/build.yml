@@ -93,6 +93,8 @@ jobs:
              7z x nasm-2.14.02-win64.zip
              cp nasm-2.14.02/nasm.exe /usr/bin/nasm.exe
              npm install typescript
+             # default pkg-config is broken, fortunately this one comes first in PATH
+             choco install pkgconfiglite
           build-cmd: cargo build --release --verbose
           package-files: target/release/Windows.zip
           exec-file: target/release/Windows.zip
@@ -131,9 +133,16 @@ jobs:
       if: failure()
       uses: actions/upload-artifact@v2
       with:
-        name: ${{ runner.os }}-deps
+        name: ${{ runner.os }}-ffbuild
         path: |
-          deps/
+          deps/ffmpeg/ffbuild
+    - name: Debug via SSH
+      if: failure()
+      uses: luchihoratiu/debug-via-ssh@main
+      with:
+        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+        SSH_PASS: ${{ secrets.SSH_PASS }}
+        NGROK_REGION: eu
     - name: Publish
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
