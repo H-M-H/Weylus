@@ -15,7 +15,7 @@ export NPROCS=$(nproc || echo 4)
 
 if [ "$RUNNER_OS" == "Windows" ]; then
     export CC=cl
-    export FFMPEG_EXTRA_ARGS="--toolchain=msvc"
+    export FFMPEG_EXTRA_ARGS="--toolchain=msvc --enable-nvenc --enable-ffnvcodec"
     export FFMPEG_CFLAGS="-I../dist/include"
     export FFMPEG_LIBRARY_PATH="-LIBPATH:../dist/lib"
 else
@@ -30,9 +30,6 @@ else
     fi
     if [ "$RUNNER_OS" == "macOS" ]; then
         export FFMPEG_EXTRA_ARGS="--enable-videotoolbox"
-    fi
-    if [ "$RUNNER_OS" == "Windows" ]; then
-        export FFMPEG_EXTRA_ARGS="--enable-nvenc --enable-ffnvcodec"
     fi
 fi
 
