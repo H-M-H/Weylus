@@ -212,37 +212,6 @@ void open_video(VideoContext* ctx, Error* err)
 	}
 #endif
 
-#ifdef HAS_MEDIAFOUNDATION
-	if (!using_hw)
-	{
-		codec = avcodec_find_encoder_by_name("h264_mf");
-		if (codec)
-		{
-			ctx->c = avcodec_alloc_context3(codec);
-			if (ctx->c)
-			{
-				ctx->sw_pix_fmt = ctx->c->pix_fmt = AV_PIX_FMT_NV12;
-				av_opt_set(ctx->c->priv_data, "rate_control", "ld_vbr", 0);
-				av_opt_set(ctx->c->priv_data, "scenario", "display_remoting", 0);
-				av_opt_set(ctx->c->priv_data, "quality", "100", 0);
-				set_codec_params(ctx);
-				int ret = avcodec_open2(ctx->c, codec, NULL);
-				if (ret == 0)
-					using_hw = 1;
-				else
-				{
-					log_debug("Could not open codec: %s!", av_err2str(ret));
-					avcodec_free_context(&ctx->c);
-				}
-			}
-			else
-				log_debug("Could not allocate video codec context for 'h264_mf'!");
-		}
-		else
-			log_debug("Codec 'h264_mf' not found!");
-	}
-#endif
-
 #ifdef HAS_NVENC
 	if (ctx->try_nvenc && !using_hw)
 	{
@@ -272,6 +241,37 @@ void open_video(VideoContext* ctx, Error* err)
 		}
 		else
 			log_debug("Codec 'h264_nvenc' not found!");
+	}
+#endif
+
+#ifdef HAS_MEDIAFOUNDATION
+	if (!using_hw)
+	{
+		codec = avcodec_find_encoder_by_name("h264_mf");
+		if (codec)
+		{
+			ctx->c = avcodec_alloc_context3(codec);
+			if (ctx->c)
+			{
+				ctx->sw_pix_fmt = ctx->c->pix_fmt = AV_PIX_FMT_NV12;
+				av_opt_set(ctx->c->priv_data, "rate_control", "ld_vbr", 0);
+				av_opt_set(ctx->c->priv_data, "scenario", "display_remoting", 0);
+				av_opt_set(ctx->c->priv_data, "quality", "100", 0);
+				set_codec_params(ctx);
+				int ret = avcodec_open2(ctx->c, codec, NULL);
+				if (ret == 0)
+					using_hw = 1;
+				else
+				{
+					log_debug("Could not open codec: %s!", av_err2str(ret));
+					avcodec_free_context(&ctx->c);
+				}
+			}
+			else
+				log_debug("Could not allocate video codec context for 'h264_mf'!");
+		}
+		else
+			log_debug("Codec 'h264_mf' not found!");
 	}
 #endif
 
