@@ -227,12 +227,20 @@ void open_video(VideoContext* ctx, Error* err)
 				av_opt_set(ctx->c->priv_data, "rc", "vbr_hq", 0);
 				av_opt_set(ctx->c->priv_data, "cq", "21", 0);
 				set_codec_params(ctx);
-				if (avcodec_open2(ctx->c, codec, NULL) == 0)
+				int ret = avcodec_open2(ctx->c, codec, NULL);
+				if (ret == 0)
 					using_hw = 1;
 				else
+				{
+					log_debug("Could not open codec: %s!", av_err2str(ret));
 					avcodec_free_context(&ctx->c);
+				}
 			}
+			else
+				log_debug("Could not allocate video codec context!");
 		}
+		else
+			log_debug("Codec 'h264_nvenc' not found!");
 	}
 #endif
 
