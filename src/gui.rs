@@ -104,40 +104,52 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         varies greatly among hardware and drivers. Currently this is only supported on Linux.",
     );
 
-    let mut check_vaapi = CheckButton::default()
+    let mut check_native_hw_accel = CheckButton::default()
         .with_size(70, height)
-        .below_of(&label_hw_accel, 0)
-        .with_label("VAAPI");
-    check_vaapi.set_tooltip("Try to use hardware acceleration through the Video Acceleration API.");
+        .below_of(&label_hw_accel, 0);
 
     #[cfg(target_os = "linux")]
-    if config.try_vaapi {
-        check_vaapi.set_checked(true);
+    {
+        check_native_hw_accel.set_label("VAAPI");
+        check_native_hw_accel
+            .set_tooltip("Try to use hardware acceleration through the Video Acceleration API.");
+        check_native_hw_accel.set_checked(config.try_vaapi);
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        check_native_hw_accel.set_label("VideoToolbox");
+        check_native_hw_accel
+            .set_tooltip("Try to use hardware acceleration through the VideoToolbox API.");
+        check_native_hw_accel.set_checked(config.try_videotoolbox);
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        check_native_hw_accel.set_label("MediaFoundation");
+        check_native_hw_accel
+            .set_tooltip("Try to use hardware acceleration through the MediaFoundation API.");
+        check_native_hw_accel.set_checked(config.try_mediafoundation);
     }
 
     let mut check_nvenc = CheckButton::default()
         .with_size(70, height)
-        .right_of(&check_vaapi, padding)
+        .right_of(&check_native_hw_accel, padding)
         .with_label("NVENC");
     check_nvenc.set_tooltip("Try to use Nvidia's NVENC to encode the video via GPU.");
 
     #[cfg(any(target_os = "linux", target_os = "windows"))]
-    if config.try_nvenc {
-        check_nvenc.set_checked(true);
-    }
+    check_nvenc.set_checked(config.try_nvenc);
 
-    #[cfg(not(target_os = "linux"))]
-    {
-        check_vaapi.deactivate();
-    }
     #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     {
         check_nvenc.deactivate();
+        check_nvenc.hide();
     }
 
     let but_toggle = Button::default()
         .with_size(width, height)
-        .below_of(&check_vaapi, 2 * padding)
+        .below_of(&check_native_hw_accel, 2 * padding)
         .with_label("Start");
 
     let mut output_server_addr = Output::default()
@@ -245,7 +257,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                 sender_gui2ws = Some(sender_gui2ws_tmp);
                 let encoder_options = EncoderOptions {
                     #[cfg(target_os = "linux")]
-                    try_vaapi: check_vaapi.is_checked(),
+                    try_vaapi: check_native_hw_accel.is_checked(),
                     #[cfg(not(target_os = "linux"))]
                     try_vaapi: false,
 
@@ -253,6 +265,16 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     try_nvenc: check_nvenc.is_checked(),
                     #[cfg(not(any(target_os = "linux", target_os = "windows")))]
                     try_nvenc: false,
+
+                    #[cfg(target_os = "macos")]
+                    try_videotoolbox: check_native_hw_accel.is_checked(),
+                    #[cfg(not(target_os = "macos"))]
+                    try_videotoolbox: false,
+
+                    #[cfg(target_os = "windows")]
+                    try_mediafoundation: check_native_hw_accel.is_checked(),
+                    #[cfg(not(target_os = "windows"))]
+                    try_mediafoundation: false,
                 };
                 let ws_config = WsConfig {
                     address: SocketAddr::new(bind_addr, ws_port),
@@ -358,7 +380,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     websocket_port: ws_port,
                     bind_address: bind_addr,
                     #[cfg(target_os = "linux")]
-                    try_vaapi: check_vaapi.is_checked(),
+                    try_vaapi: check_native_hw_accel.is_checked(),
                     #[cfg(any(target_os = "linux", target_os = "windows"))]
                     try_nvenc: check_nvenc.is_checked(),
                     auto_start: check_auto_start.is_checked(),

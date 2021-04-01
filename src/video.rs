@@ -14,6 +14,8 @@ extern "C" {
         height_out: c_int,
         try_vaapi: c_int,
         try_nvenc: c_int,
+        try_videotoolbox: c_int,
+        try_mediafoundation: c_int,
     ) -> *mut c_void;
     fn open_video(handle: *mut c_void, err: *mut CError);
     fn destroy_video_encoder(handle: *mut c_void);
@@ -52,6 +54,8 @@ impl<'a> PixelProvider<'a> {
 pub struct EncoderOptions {
     pub try_vaapi: bool,
     pub try_nvenc: bool,
+    pub try_videotoolbox: bool,
+    pub try_mediafoundation: bool,
 }
 
 pub struct VideoEncoder {
@@ -91,6 +95,8 @@ impl VideoEncoder {
                 height_out as c_int,
                 options.try_vaapi.into(),
                 options.try_nvenc.into(),
+                options.try_videotoolbox.into(),
+                options.try_mediafoundation.into(),
             )
         };
         video_encoder.handle = handle;

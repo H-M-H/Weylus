@@ -26,6 +26,20 @@ pub struct Config {
     #[structopt(long, help = "Try to use Nvidia's NVENC to encode the video via GPU.")]
     #[serde(default)]
     pub try_nvenc: bool,
+    #[cfg(target_os = "macos")]
+    #[structopt(
+        long,
+        help = "Try to use hardware acceleration through the VideoToolbox API."
+    )]
+    #[serde(default)]
+    pub try_videotoolbox: bool,
+    #[cfg(target_os = "windows")]
+    #[structopt(
+        long,
+        help = "Try to use hardware acceleration through the MediaFoundation API."
+    )]
+    #[serde(default)]
+    pub try_mediafoundation: bool,
     #[structopt(long, help = "Start Weylus server immediately on program start.")]
     #[serde(default)]
     pub auto_start: bool,
