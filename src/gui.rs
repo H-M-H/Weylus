@@ -381,6 +381,10 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     bind_address: bind_addr,
                     #[cfg(target_os = "linux")]
                     try_vaapi: check_native_hw_accel.is_checked(),
+                    #[cfg(target_os = "macos")]
+                    try_videotoolbox: check_native_hw_accel.is_checked(),
+                    #[cfg(target_os = "windows")]
+                    try_mediafoundation: check_native_hw_accel.is_checked(),
                     #[cfg(any(target_os = "linux", target_os = "windows"))]
                     try_nvenc: check_nvenc.is_checked(),
                     auto_start: check_auto_start.is_checked(),
