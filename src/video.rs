@@ -48,6 +48,12 @@ impl<'a> PixelProvider<'a> {
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct EncoderOptions {
+    pub try_vaapi: bool,
+    pub try_nvenc: bool,
+}
+
 pub struct VideoEncoder {
     handle: *mut c_void,
     width_in: usize,
@@ -65,8 +71,7 @@ impl VideoEncoder {
         width_out: usize,
         height_out: usize,
         write_data: impl Fn(&[u8]) + 'static,
-        #[cfg(target_os = "linux")] try_vaapi: bool,
-        #[cfg(any(target_os = "linux", target_os = "windows"))] try_nvenc: bool,
+        options: EncoderOptions,
     ) -> Result<Box<Self>, CError> {
         let mut video_encoder = Box::new(Self {
             handle: std::ptr::null_mut(),
@@ -84,14 +89,8 @@ impl VideoEncoder {
                 height_in as c_int,
                 width_out as c_int,
                 height_out as c_int,
-                #[cfg(target_os = "linux")]
-                try_vaapi.into(),
-                #[cfg(not(target_os = "linux"))]
-                0,
-                #[cfg(any(target_os = "linux", target_os = "windows"))]
-                try_nvenc.into(),
-                #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-                0,
+                options.try_vaapi.into(),
+                options.try_nvenc.into(),
             )
         };
         video_encoder.handle = handle;

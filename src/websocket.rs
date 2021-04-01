@@ -19,7 +19,7 @@ use crate::protocol::{
 };
 
 use crate::cerror::CErrorCode;
-use crate::video::VideoEncoder;
+use crate::video::{VideoEncoder, EncoderOptions};
 
 type WsWriter = Arc<Mutex<websocket::sender::Writer<std::net::TcpStream>>>;
 type WsClients = Arc<Mutex<HashMap<SocketAddr, Arc<Mutex<Writer<TcpStream>>>>>>;
@@ -36,10 +36,7 @@ pub enum Gui2WsMessage {
 pub struct WsConfig {
     pub address: SocketAddr,
     pub access_code: Option<String>,
-    #[cfg(target_os = "linux")]
-    pub try_vaapi: bool,
-    #[cfg(any(target_os = "linux", target_os = "windows"))]
-    pub try_nvenc: bool,
+    pub encoder_options: EncoderOptions,
     #[cfg(target_os = "linux")]
     pub wayland_support: bool,
 }
@@ -299,10 +296,7 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, confi
                                 }
                             }
                         },
-                        #[cfg(target_os = "linux")]
-                        config.try_vaapi,
-                        #[cfg(any(target_os = "linux", target_os = "windows"))]
-                        config.try_nvenc,
+                        config.encoder_options,
                     );
                     if let Err(err) = res {
                         warn!("{}", err);

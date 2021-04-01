@@ -22,6 +22,7 @@ use fltk::{
 use pnet::datalink;
 
 use crate::config::{write_config, Config};
+use crate::video::EncoderOptions;
 use crate::web::{Gui2WebMessage, Web2GuiMessage};
 use crate::websocket::{Gui2WsMessage, Ws2GuiMessage, WsConfig};
 
@@ -242,13 +243,21 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
 
                 let (sender_gui2ws_tmp, receiver_gui2ws) = mpsc::channel();
                 sender_gui2ws = Some(sender_gui2ws_tmp);
+                let encoder_options = EncoderOptions {
+                    #[cfg(target_os = "linux")]
+                    try_vaapi: check_vaapi.is_checked(),
+                    #[cfg(not(target_os = "linux"))]
+                    try_vaapi: false,
+
+                    #[cfg(any(target_os = "linux", target_os = "windows"))]
+                    try_nvenc: check_nvenc.is_checked(),
+                    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+                    try_nvenc: false,
+                };
                 let ws_config = WsConfig {
                     address: SocketAddr::new(bind_addr, ws_port),
                     access_code: access_code.map(|s| s.into()),
-                    #[cfg(target_os = "linux")]
-                    try_vaapi: check_vaapi.is_checked(),
-                    #[cfg(any(target_os = "linux", target_os = "windows"))]
-                    try_nvenc: check_nvenc.is_checked(),
+                    encoder_options,
                     #[cfg(target_os = "linux")]
                     wayland_support: check_wayland.is_checked(),
                 };
