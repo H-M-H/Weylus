@@ -47,6 +47,9 @@ video {
     display: block;
     margin: auto auto;
 }
+input[type='range']::-webkit-slider-runnable-track, input[type="range"]::-moz-range-track {
+      background-color: #00aaff;
+}
 #settings_scroll {
     overflow: auto;
     width: 100%;
