@@ -489,7 +489,7 @@ function handle_messages(
         frame_count += 1;
         let t = performance.now();
         if (t - last_fps_calc > 1500) {
-            let fps = Math.round(frame_count/(t - last_fps_calc)*10000)/10;
+            let fps = Math.round(frame_count / (t - last_fps_calc) * 10000) / 10;
             fps_out.value = fps.toString();
             frame_count = 0;
             last_fps_calc = performance.now();
@@ -500,7 +500,12 @@ function handle_messages(
                 // seek to end if we are more than half a second off, this may happen if a tab is
                 // moved to the background
                 video.seekable.end(video.seekable.length - 1) - video.currentTime > 0.5)) {
-            video.currentTime = video.seekable.end(video.seekable.length - 1);
+            let seek_time = video.seekable.end(video.seekable.length - 1);
+            if (isFinite(seek_time))
+                video.currentTime = seek_time;
+            else
+                log(LogLevel.WARN, "Failed to seek to end of video.")
+
         }
     }
 }
