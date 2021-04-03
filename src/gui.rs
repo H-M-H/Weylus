@@ -126,7 +126,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
 
     #[cfg(target_os = "windows")]
     {
-        check_native_hw_accel.set_label("MediaFoundation");
+        check_native_hw_accel.set_label("Media-\nFoundation");
         check_native_hw_accel
             .set_tooltip("Try to use hardware acceleration through the MediaFoundation API.");
         check_native_hw_accel.set_checked(config.try_mediafoundation);
