@@ -14,12 +14,15 @@ let fps_out: HTMLOutputElement;
 let frame_count = 0;
 let last_fps_calc: number = performance.now();
 
+let check_video: HTMLInputElement;
+
 function run(access_code: string, websocket_port: number, level: string) {
     window.onload = () => {
         log_pre = document.getElementById("log") as HTMLPreElement;
         log_pre.textContent = "";
         log_level = LogLevel[level];
         fps_out = document.getElementById("fps") as HTMLOutputElement;
+        check_video = document.getElementById("enable_video") as HTMLInputElement;
         window.addEventListener("error", (e: ErrorEvent | Event | UIEvent) => {
             if ((e as ErrorEvent).error) {
                 let err = e as ErrorEvent;
@@ -83,7 +86,7 @@ class Settings {
         this.checks = new Map<string, HTMLInputElement>();
         this.capturable_select = document.getElementById("window") as HTMLSelectElement;
         this.frame_update_limit_input = document.getElementById("frame_update_limit") as HTMLInputElement;
-        this.frame_update_limit_input.min = frame_update_scale_inv(0).toString();
+        this.frame_update_limit_input.min = frame_update_scale_inv(1).toString();
         this.frame_update_limit_input.max = frame_update_scale_inv(1000).toString();
         this.frame_update_limit_output = this.frame_update_limit_input.nextElementSibling as HTMLOutputElement;
         this.scale_video_input = document.getElementById("scale_video") as HTMLInputElement;
@@ -130,6 +133,11 @@ class Settings {
             this.save_settings();
         };
 
+        this.checks.get("enable_video").onchange = (e) => {
+            document.getElementById("video").classList.toggle("vanish", !(e.target as HTMLInputElement).checked);
+            this.save_settings();
+        }
+
         let upd_pointer_filter = () => { this.save_settings(); new PointerHandler(this.webSocket); }
         this.checks.get("enable_mouse").onchange = upd_pointer_filter;
         this.checks.get("enable_stylus").onchange = upd_pointer_filter;
@@ -171,8 +179,11 @@ class Settings {
 
     load_settings() {
         let settings_string = localStorage.getItem("settings");
-        if (settings_string === null)
+        if (settings_string === null) {
+            this.frame_update_limit_input.value = frame_update_scale_inv(33).toString();
+            this.frame_update_limit_output.value = (33).toString();
             return;
+        }
         try {
             let settings = JSON.parse(settings_string);
             for (const [key, elem] of this.checks.entries()) {
@@ -194,6 +205,10 @@ class Settings {
 
             if (this.checks.get("lefty").checked) {
                 this.settings.classList.add("lefty");
+            }
+
+            if (!this.checks.get("enable_video").checked) {
+                document.getElementById("video").classList.add("vanish");
             }
 
         } catch {
@@ -269,9 +284,9 @@ class PEvent {
     width: number;
     height: number;
 
-    constructor(eventType: string, event: PointerEvent, video: HTMLVideoElement) {
-        let videoRect = video.getBoundingClientRect();
-        let diag_len = Math.sqrt(videoRect.width * videoRect.width + videoRect.height * videoRect.height)
+    constructor(eventType: string, event: PointerEvent, target: HTMLElement) {
+        let targetRect = target.getBoundingClientRect();
+        let diag_len = Math.sqrt(targetRect.width * targetRect.width + targetRect.height * targetRect.height)
         this.event_type = eventType.toString();
         this.pointer_id = event.pointerId;
         this.timestamp = Math.round(event.timeStamp * 1000);
@@ -286,8 +301,8 @@ class PEvent {
             btn = 2;
         this.button = (btn < 0 ? 0 : 1 << btn);
         this.buttons = event.buttons;
-        this.x = (event.clientX - videoRect.left) / videoRect.width;
-        this.y = (event.clientY - videoRect.top) / videoRect.height;
+        this.x = (event.clientX - targetRect.left) / targetRect.width;
+        this.y = (event.clientY - targetRect.top) / targetRect.height;
         this.movement_x = event.movementX ? event.movementX : 0;
         this.movement_y = event.movementY ? event.movementY : 0;
         this.pressure = event.pressure;
@@ -327,23 +342,38 @@ class WEvent {
 }
 
 class PointerHandler {
-    video: HTMLVideoElement;
     webSocket: WebSocket;
     pointerTypes: string[];
 
     constructor(webSocket: WebSocket) {
-        this.video = document.getElementById("video") as HTMLVideoElement;
+        let video = document.getElementById("video");
+        let canvas = document.getElementById("canvas");
         this.webSocket = webSocket;
         this.pointerTypes = settings.pointer_types();
-        this.video.onpointerdown = (e) => this.onEvent(e, "pointerdown");
-        this.video.onpointerup = (e) => this.onEvent(e, "pointerup");
-        this.video.onpointercancel = (e) => this.onEvent(e, "pointercancel");
-        this.video.onpointermove = (e) => this.onEvent(e, "pointermove");
+        for (let elem of [video, canvas]) {
+            elem.onpointerdown = (e) => this.onEvent(e, "pointerdown");
+            elem.onpointerup = (e) => this.onEvent(e, "pointerup");
+            elem.onpointercancel = (e) => this.onEvent(e, "pointercancel");
+            elem.onpointermove = (e) => this.onEvent(e, "pointermove");
+            elem.onwheel = (e) => {
+                this.webSocket.send(JSON.stringify({ "WheelEvent": new WEvent(e) }));
+            }
+        }
     }
 
     onEvent(event: PointerEvent, event_type: string) {
         if (this.pointerTypes.includes(event.pointerType)) {
-            this.webSocket.send(JSON.stringify({ "PointerEvent": new PEvent(event_type, event, this.video) }));
+            this.webSocket.send(
+                JSON.stringify(
+                    {
+                        "PointerEvent": new PEvent(
+                            event_type,
+                            event,
+                            event.target as HTMLElement
+                        )
+                    }
+                )
+            );
             if (settings.visible) {
                 settings.toggle();
             }
@@ -404,7 +434,7 @@ function frame_timer(webSocket: WebSocket) {
     if (webSocket.readyState > webSocket.OPEN)  // Closing or closed, so no more frames
         return;
 
-    if (webSocket.readyState === webSocket.OPEN)
+    if (webSocket.readyState === webSocket.OPEN && check_video.checked)
         webSocket.send('"TryGetFrame"');
     let upd_limit = settings.frame_update_limit();
     if (upd_limit > 0)
@@ -560,9 +590,6 @@ function init(access_code: string, websocket_port: number) {
     let is_connected = false;
     handle_messages(webSocket, video, () => {
         if (!is_connected) {
-            video.onwheel = (event) => {
-                webSocket.send(JSON.stringify({ "WheelEvent": new WEvent(event) }));
-            }
             new KeyboardHandler(webSocket);
             new PointerHandler(webSocket);
             frame_timer(webSocket);
