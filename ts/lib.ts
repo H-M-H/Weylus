@@ -62,8 +62,8 @@ function frame_update_scale_inv(x: number) {
 
 function calc_max_video_resolution(scale: number) {
     return [
-        Math.round(scale * window.screen.availWidth * window.devicePixelRatio),
-        Math.round(scale * window.screen.availHeight * window.devicePixelRatio)
+        Math.round(scale * window.innerWidth * window.devicePixelRatio),
+        Math.round(scale * window.innerHeight * window.devicePixelRatio)
     ];
 }
 
