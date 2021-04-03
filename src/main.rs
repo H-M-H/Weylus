@@ -42,7 +42,9 @@ mod tests {
         let mut x11ctx = capturable::x11::X11Context::new().unwrap();
         let root = x11ctx.capturables().unwrap().remove(0);
         let mut r = root.recorder(false).unwrap();
-        b.iter(|| { r.capture().unwrap(); });
+        b.iter(|| {
+            r.capture().unwrap();
+        });
     }
 
     #[cfg(target_os = "linux")]
@@ -53,11 +55,15 @@ mod tests {
         let mut r = root.recorder(false).unwrap();
         let (width, height) = r.capture().unwrap().size();
 
+        let opts = video::EncoderOptions {
+            try_vaapi: true,
+            try_nvenc: true,
+            try_videotoolbox: false,
+            try_mediafoundation: false,
+        };
         let mut encoder =
-            video::VideoEncoder::new(width, height, width, height, |_| {}, true, true).unwrap();
-        b.iter(|| {
-            encoder.encode(r.capture().unwrap())
-        });
+            video::VideoEncoder::new(width, height, width, height, |_| {}, opts).unwrap();
+        b.iter(|| encoder.encode(r.capture().unwrap()));
     }
 
     #[cfg(target_os = "linux")]
@@ -67,7 +73,9 @@ mod tests {
         let root = capturable::pipewire::get_capturables().unwrap().remove(0);
         let mut r = root.recorder(false).unwrap();
         let _ = r.capture();
-        b.iter(|| { r.capture().unwrap(); });
+        b.iter(|| {
+            r.capture().unwrap();
+        });
     }
 
     #[cfg(target_os = "linux")]
@@ -78,11 +86,15 @@ mod tests {
         let mut r = root.recorder(false).unwrap();
         let (width, height) = r.capture().unwrap().size();
 
+        let opts = video::EncoderOptions {
+            try_vaapi: true,
+            try_nvenc: true,
+            try_videotoolbox: false,
+            try_mediafoundation: false,
+        };
         let mut encoder =
-            video::VideoEncoder::new(width, height, width, height, |_| {}, true, true).unwrap();
-        b.iter(|| {
-            encoder.encode(r.capture().unwrap())
-        });
+            video::VideoEncoder::new(width, height, width, height, |_| {}, opts).unwrap();
+        b.iter(|| encoder.encode(r.capture().unwrap()));
     }
 
     #[cfg(target_os = "linux")]
@@ -98,8 +110,43 @@ mod tests {
             }
         }
 
+        let opts = video::EncoderOptions {
+            try_vaapi: true,
+            try_nvenc: false,
+            try_videotoolbox: false,
+            try_mediafoundation: false,
+        };
         let mut encoder =
-            video::VideoEncoder::new(WIDTH, HEIGHT, WIDTH, HEIGHT, |_| {}, true, false).unwrap();
+            video::VideoEncoder::new(WIDTH, HEIGHT, WIDTH, HEIGHT, |_| {}, opts).unwrap();
+        const SIZE: usize = WIDTH * HEIGHT * 4;
+        let mut i = 0;
+        b.iter(|| {
+            encoder.encode(video::PixelProvider::BGR0(WIDTH, HEIGHT, &bufs[i % N]));
+            i += 1;
+        });
+    }
+
+    #[cfg(target_os = "linux")]
+    #[bench]
+    fn bench_video_x264(b: &mut Bencher) {
+        const WIDTH: usize = 1920*4;
+        const HEIGHT: usize = 1080*4;
+        const N: usize = 60;
+        let mut bufs = vec![vec![0u8; SIZE]; N];
+        for i in 0..N {
+            for j in 0..SIZE {
+                bufs[i][j] = ((i * SIZE + j) % 256) as u8;
+            }
+        }
+
+        let opts = video::EncoderOptions {
+            try_vaapi: false,
+            try_nvenc: false,
+            try_videotoolbox: false,
+            try_mediafoundation: false,
+        };
+        let mut encoder =
+            video::VideoEncoder::new(WIDTH, HEIGHT, WIDTH, HEIGHT, |_| {}, opts).unwrap();
         const SIZE: usize = WIDTH * HEIGHT * 4;
         let mut i = 0;
         b.iter(|| {
