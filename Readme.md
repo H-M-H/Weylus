@@ -10,13 +10,17 @@ Weylus in action with [Xournal++](https://github.com/xournalpp/xournalpp):
 ## Table of Contents
 * [Features](#features)
 * [Installation](#installation)
+    * [Packages](#packages)
 * [Running](#running)
     * [Fullscreen](#fullscreen)
     * [Linux](#linux)
+        * [Wayland](#wayland)
         * [Hardware Acceleration](#hardware-acceleration)
         * [Weylus as Second Screen](#weylus-as-second-screen)
     * [macOS](#macos)
+        * [Hardware Acceleration](#hardware-acceleration-1)
     * [Windows](#windows)
+        * [Hardware Acceleration](#hardware-acceleration-2)
 * [Building](#building)
     * [Docker](#docker)
 * [How does this work?](#how-does-this-work)
@@ -27,6 +31,8 @@ Weylus in action with [Xournal++](https://github.com/xournalpp/xournalpp):
 ## Features
 - Control your mouse with your tablet
 - Mirror your screen to your tablet
+- Send keyboard input
+- Hardware accelerated video encoding
 
 The above features are available on all Operating Systems but Weylus works best on Linux. Additional
 features on Linux are:
@@ -34,7 +40,6 @@ features on Linux are:
 - Multi-touch: Try it with software that supports multi-touch, like Krita, and see for yourself!
 - Capturing specific windows and only drawing to them
 - Faster screen mirroring
-- Hardware accelerated video encoding
 - Tablet as second screen
 
 ## Installation
@@ -96,6 +101,19 @@ sudo rm /etc/udev/rules.d/60-weylus.rules
 
 This allows your user to synthesize input events system-wide, even when another user is logged in.
 Therefore, untrusted users should not be added to the uinput group.
+
+#### Wayland
+Weylus offers experimental support for Wayland. Installing `pipewire` and `xdg-desktop-portal` as
+well as one of:
+- `xdg-desktop-portal-gtk` for GNOME
+- `xdg-desktop-portal-kde` for KDE
+- `xdg-desktop-portal-wlr` for wlroots-based compositors like Sway
+is required.
+
+There are still some things that do not work:
+- input mapping for windows
+- displaying proper window names
+- capturing the cursor
 
 #### Hardware Acceleration
 On Linux Weylus supports hardware accelerated video encoding through the Video Acceleration API
@@ -168,8 +186,16 @@ Weylus needs some permissions to work properly, make sure you enable:
 - Screen capturing
 - Controlling your desktop
 
+#### Hardware Acceleration
+Weylus can make use of the Videotoolbox framework on macOS for hardware acceleration. In my tests
+the video quality has been considerably worse than that using software encoding and thus
+Videotoolbox is disabled by default.
+
 ### Windows
-I am afraid but as of now Weylus has not been tested on Windows.
+
+#### Hardware Acceleration
+Weylus can make use of Nvidias NVENC as well as Microsoft's MediaFoundation for hardware accelerated
+video encoding. Due to widely varying quality it is disable by default.
 
 ## Building
 To build Weylus you need to install Rust, Typescript, make, git, a C compiler, nasm and bash. `cargo
@@ -234,11 +260,12 @@ stylus and touch input devices.
 Either the generic backend is used which is less efficient and only captures the whole screen or on
 Linux xlib is used to connect to the X-server and do the necessary work of getting window
 information and capturing the window/screen. To make things fast the "MIT-SHM - The MIT Shared
-Memory Extension" is used to create shared memory images using `XShmCreateImage`. The images
-captured are then encoded to a video stream using ffmpeg. Fragmented MP4 is used as container format
-to enable browsers to play the stream via the Media Source Extensions API. The video codec used is
-H.264 as this is widely supported and allows very fast encoding as opposed to formats like AV1. To
-minimize dependencies ffmpeg is statically linked into Weylus.
+Memory Extension" is used to create shared memory images using `XShmCreateImage`. If Wayland instead
+of X11 is running, PipeWire and GStreamer is used to capture the screen. The images captured are
+then encoded to a video stream using ffmpeg. Fragmented MP4 is used as container format to enable
+browsers to play the stream via the Media Source Extensions API. The video codec used is H.264 as
+this is widely supported and allows very fast encoding as opposed to formats like AV1. To minimize
+dependencies ffmpeg is statically linked into Weylus.
 
 ## FAQ
 Q: Why does the page not load on my tablet and instead I get a timeout?<br>
