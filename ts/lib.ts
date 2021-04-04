@@ -135,6 +135,7 @@ class Settings {
 
         this.checks.get("enable_video").onchange = (e) => {
             document.getElementById("video").classList.toggle("vanish", !(e.target as HTMLInputElement).checked);
+            document.getElementById("canvas").classList.toggle("vanish", (e.target as HTMLInputElement).checked);
             this.save_settings();
         }
 
@@ -209,6 +210,7 @@ class Settings {
 
             if (!this.checks.get("enable_video").checked) {
                 document.getElementById("video").classList.add("vanish");
+                document.getElementById("canvas").classList.remove("vanish");
             }
 
         } catch {
