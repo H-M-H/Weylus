@@ -351,6 +351,168 @@ class WEvent {
     }
 }
 
+// in milliseconds
+const fade_time = 5000;
+
+const vs_source = `
+  attribute vec3 aVertex;
+  uniform float uTime;
+  varying lowp vec4 vColor;
+
+  void main() {
+    float dt = uTime - aVertex[2];
+    gl_Position = vec4(aVertex[0], aVertex[1], 1.0, 1.0);
+    vColor = vec4(0.0, 170.0/255.0, 1.0, 1.0) * max(1.0 - dt/${fade_time}.0, 0.0);
+  }
+`;
+
+const fs_source = `
+  varying lowp vec4 vColor;
+
+  void main() {
+    gl_FragColor = vColor;
+  }
+`;
+
+class Painter {
+    canvas: HTMLCanvasElement;
+    gl: WebGLRenderingContext;
+    lines_active: Map<number, [[number, number, number, number], number[]]>
+    lines_old: number[][];
+    vertex_attr: GLint;
+    vertex_buffer: WebGLBuffer;
+    time_attr: WebGLUniformLocation;
+
+    constructor(canvas: HTMLCanvasElement) {
+        this.canvas = canvas;
+        canvas.width = window.innerWidth * window.devicePixelRatio;
+        canvas.height = window.innerHeight * window.devicePixelRatio;
+        this.gl = canvas.getContext("webgl");
+        if (this.gl) {
+            this.lines_active = new Map();
+            this.lines_old = [];
+            this.setupWebGL();
+        }
+    }
+
+    loadShader(type, source): WebGLShader {
+        let gl = this.gl;
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            log(LogLevel.WARN, "Failed to compile shaders: " + gl.getShaderInfoLog(shader));
+            gl.deleteShader(shader);
+            return null;
+        }
+        return shader;
+    }
+
+    setupWebGL() {
+        let gl = this.gl;
+        gl.enable(gl.BLEND);
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        const vertex_shader = this.loadShader(gl.VERTEX_SHADER, vs_source);
+        const fragment_shader = this.loadShader(gl.FRAGMENT_SHADER, fs_source);
+        if (!vertex_shader || !fragment_shader)
+            return;
+        const shader_program = gl.createProgram();
+        gl.attachShader(shader_program, vertex_shader);
+        gl.attachShader(shader_program, fragment_shader);
+        gl.linkProgram(shader_program);
+
+        if (!gl.getProgramParameter(shader_program, gl.LINK_STATUS)) {
+            log(LogLevel.WARN, "Unable to initialize the shader program: " + gl.getProgramInfoLog(shader_program));
+            return;
+        }
+        this.vertex_attr = gl.getAttribLocation(shader_program, "aVertex");
+        this.time_attr = gl.getUniformLocation(shader_program, "uTime");
+        this.vertex_buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vertex_buffer);
+        gl.vertexAttribPointer(this.vertex_attr, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(this.vertex_attr);
+        gl.useProgram(shader_program);
+        requestAnimationFrame(() => this.render());
+    }
+
+    render() {
+        if (!check_video.checked && (this.lines_active.size > 0 || this.lines_old.length > 0)) {
+            if (this.lines_old.length > 0) {
+                if (performance.now() - this.lines_old[0][this.lines_old[0].length - 1] > fade_time)
+                    this.lines_old.shift();
+            }
+            let gl = this.gl;
+            gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.uniform1f(this.time_attr, performance.now());
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.vertex_buffer);
+            for (let vertices of this.lines_old) {
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
+                gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertices.length / 3)
+            }
+            for (let [_, vertices] of this.lines_active.values()) {
+                if (vertices.length == 0)
+                    continue;
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
+                gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertices.length / 3)
+            }
+        }
+        requestAnimationFrame(() => this.render());
+    }
+
+    appendEventToLine(event: PointerEvent) {
+        let line = this.lines_active.get(event.pointerId);
+        if (!line) {
+            line = [null, []];
+            this.lines_active.set(event.pointerId, line)
+        }
+        let max_pixels = Math.max(this.canvas.width, this.canvas.height);
+        let x = event.clientX * window.devicePixelRatio / this.canvas.width * 2 - 1;
+        let y = 1 - event.clientY * window.devicePixelRatio / this.canvas.height * 2;
+        let delta = 2 * event.pressure + 0.4;
+        let t = performance.now();
+        if (line[0]) {
+            let [x0, y0, delta0, t0] = line[0];
+            let dx = (y - y0);
+            let dy = -(x - x0);
+            let dd = Math.sqrt(dx ** 2 + dy ** 2);
+            if (dd == 0) {
+                return;
+            }
+            dx = dx / dd * max_pixels / this.canvas.width * 0.004;
+            dy = dy / dd * max_pixels / this.canvas.height * 0.004;
+            if (line[1].length == 0)
+                line[1].push(
+                    x0 + delta0 * dx, y0 + delta0 * dy, t0, x0 - delta0 * dx, y0 - delta0 * dy, t0,
+                );
+            line[1].push(
+                x + delta * dx, y + delta * dy, t, x - delta * dx, y - delta * dy, t
+            )
+        }
+        line[0] = [x, y, delta, t];
+    }
+
+    onstart(event: PointerEvent) {
+        this.appendEventToLine(event);
+    }
+
+    onmove(event: PointerEvent) {
+        if (this.lines_active.has(event.pointerId))
+            this.appendEventToLine(event);
+    }
+
+    onstop(event: PointerEvent) {
+        let lines = this.lines_active.get(event.pointerId);
+        if (lines) {
+            if (lines[1].length > 0)
+                this.lines_old.push(lines[1]);
+            this.lines_active.delete(event.pointerId);
+        }
+    }
+}
+
 class PointerHandler {
     webSocket: WebSocket;
     pointerTypes: string[];
@@ -360,11 +522,19 @@ class PointerHandler {
         let canvas = document.getElementById("canvas");
         this.webSocket = webSocket;
         this.pointerTypes = settings.pointer_types();
+
+        video.onpointerdown = (e) => this.onEvent(e, "pointerdown");
+        video.onpointerup = (e) => this.onEvent(e, "pointerup");
+        video.onpointercancel = (e) => this.onEvent(e, "pointercancel");
+        video.onpointermove = (e) => this.onEvent(e, "pointermove");
+
+        let painter = new Painter(canvas as HTMLCanvasElement);
+        canvas.onpointerdown = (e) => { this.onEvent(e, "pointerdown"); painter.onstart(e); };
+        canvas.onpointerup = (e) => { this.onEvent(e, "pointerup"); painter.onstop(e); };
+        canvas.onpointercancel = (e) => { this.onEvent(e, "pointercancel"); painter.onstop(e); };
+        canvas.onpointermove = (e) => { this.onEvent(e, "pointermove"); painter.onmove(e); };
+
         for (let elem of [video, canvas]) {
-            elem.onpointerdown = (e) => this.onEvent(e, "pointerdown");
-            elem.onpointerup = (e) => this.onEvent(e, "pointerup");
-            elem.onpointercancel = (e) => this.onEvent(e, "pointercancel");
-            elem.onpointermove = (e) => this.onEvent(e, "pointermove");
             elem.onwheel = (e) => {
                 this.webSocket.send(JSON.stringify({ "WheelEvent": new WEvent(e) }));
             }
@@ -590,6 +760,9 @@ function init(access_code: string, websocket_port: number) {
     webSocket.onclose = () => handle_disconnect("Connection closed.");
     window.onresize = () => {
         stretch_video();
+        let canvas = document.getElementById("canvas") as HTMLCanvasElement;
+        canvas.width = window.innerWidth * window.devicePixelRatio;
+        canvas.height = window.innerHeight * window.devicePixelRatio;
         let [w, h] = calc_max_video_resolution(settings.scale_video_input.valueAsNumber);
         settings.scale_video_output.value = w + "x" + h;
         if (authed)
