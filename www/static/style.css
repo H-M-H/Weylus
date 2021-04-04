@@ -45,7 +45,7 @@ video {
     width: auto;
     height: auto;
     display: block;
-    margin: 0 auto;
+    margin: auto auto;
 }
 canvas {
     position: absolute;

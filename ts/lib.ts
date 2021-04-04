@@ -618,6 +618,7 @@ function stretch_video() {
     if (settings.stretched_video()) {
         video.style.transform = "scaleX(" + document.body.clientWidth / video.clientWidth + ") scaleY(" + document.body.clientHeight / video.clientHeight + ")";
     } else {
-        video.style.transform = "none"
+        let scale = Math.min(document.body.clientWidth / video.clientWidth, document.body.clientHeight / video.clientHeight);
+        video.style.transform = "scale(" + scale + ")";
     }
 }
