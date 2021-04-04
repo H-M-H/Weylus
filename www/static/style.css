@@ -42,10 +42,10 @@ body, html {
 video {
     max-width: 100%;
     max-height: 100%;
-    width: 100%;
+    width: auto;
     height: auto;
     display: block;
-    margin: auto auto;
+    margin: 0 auto;
 }
 canvas {
     position: absolute;
