@@ -42,7 +42,7 @@ body, html {
 video {
     max-width: 100%;
     max-height: 100%;
-    width: auto;
+    width: 100%;
     height: auto;
     display: block;
     margin: auto auto;
