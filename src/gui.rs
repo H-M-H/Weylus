@@ -238,6 +238,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
 
     let mut is_server_running = false;
 
+    let config_clone = config.clone();
     let mut toggle_server = move || {
         if let Err(err) = || -> Result<(), Box<dyn std::error::Error>> {
             let but_toggle_ref = but_toggle_ref.clone();
@@ -374,23 +375,29 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                 }
                 output_server_addr.show();
                 but.set_label("Stop");
-                let config = Config {
-                    access_code: access_code.map(|s| s.to_string()),
-                    web_port,
-                    websocket_port: ws_port,
-                    bind_address: bind_addr,
-                    #[cfg(target_os = "linux")]
-                    try_vaapi: check_native_hw_accel.is_checked(),
-                    #[cfg(target_os = "macos")]
-                    try_videotoolbox: check_native_hw_accel.is_checked(),
-                    #[cfg(target_os = "windows")]
-                    try_mediafoundation: check_native_hw_accel.is_checked(),
-                    #[cfg(any(target_os = "linux", target_os = "windows"))]
-                    try_nvenc: check_nvenc.is_checked(),
-                    auto_start: check_auto_start.is_checked(),
-                    #[cfg(target_os = "linux")]
-                    wayland_support: check_wayland.is_checked(),
-                };
+                let mut config = config_clone.clone();
+                config.access_code = access_code.map(|s| s.to_string());
+                config.web_port = web_port;
+                config.websocket_port = ws_port;
+                config.bind_address = bind_addr;
+                config.auto_start = check_auto_start.is_checked();
+                #[cfg(target_os = "linux")]
+                {
+                    config.try_vaapi = check_native_hw_accel.is_checked();
+                    config.wayland_support = check_wayland.is_checked();
+                }
+                #[cfg(any(target_os = "linux", target_os = "windows"))]
+                {
+                    config.try_nvenc = check_nvenc.is_checked();
+                }
+                #[cfg(target_os = "macos")]
+                {
+                    config.try_videotoolbox = check_native_hw_accel.is_checked();
+                }
+                #[cfg(target_os = "windows")]
+                {
+                    config.try_mediafoundation = check_native_hw_accel.is_checked();
+                }
                 write_config(&config);
             } else {
                 if let Some(mut sender_gui2web) = sender_gui2web.clone() {

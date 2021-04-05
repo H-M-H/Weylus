@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 use tracing::warn;
 
-#[derive(Serialize, Deserialize, StructOpt, Debug)]
+#[derive(Serialize, Deserialize, StructOpt, Debug, Clone)]
 #[structopt(name = "weylus")]
 pub struct Config {
     #[structopt(long, help = "Access code")]
@@ -47,6 +47,19 @@ pub struct Config {
     #[structopt(long, help = "Wayland/PipeWire Support.")]
     #[serde(default)]
     pub wayland_support: bool,
+
+    #[structopt(long, help = "Print template of index.html served by Weylus.")]
+    #[serde(skip)]
+    pub print_index_html: bool,
+    #[structopt(long, help = "Print access.html served by Weylus.")]
+    #[serde(skip)]
+    pub print_access_html: bool,
+    #[structopt(long, help = "Print style.css served by Weylus.")]
+    #[serde(skip)]
+    pub print_style_css: bool,
+    #[structopt(long, help = "Print lib.js served by Weylus.")]
+    #[serde(skip)]
+    pub print_lib_js: bool,
 }
 
 pub fn read_config() -> Option<Config> {

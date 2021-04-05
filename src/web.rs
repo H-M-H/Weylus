@@ -8,7 +8,12 @@ use std::sync::mpsc;
 use std::sync::mpsc::SendError;
 use std::sync::Arc;
 use tokio::sync::mpsc as mpsc_tokio;
-use tracing::{error, info, warn, debug};
+use tracing::{debug, error, info, warn};
+
+pub const INDEX_HTML: &str = std::include_str!("../www/templates/index.html");
+pub const ACCESS_HTML: &str = std::include_str!("../www/static/access_code.html");
+pub const STYLE_CSS: &str = std::include_str!("../www/static/style.css");
+pub const LIB_JS: &str = std::include_str!("../www/static/lib.js");
 
 #[derive(Serialize)]
 struct WebConfig {
@@ -68,10 +73,7 @@ async fn serve(
     match req.uri().path() {
         "/" => {
             if !authed {
-                return Ok(response_from_str(
-                    std::include_str!("../www/static/access_code.html"),
-                    "text/html; charset=utf-8",
-                ));
+                return Ok(response_from_str(ACCESS_HTML, "text/html; charset=utf-8"));
             }
             info!("Client connected: {}", &addr);
             let config = WebConfig {
@@ -87,14 +89,8 @@ async fn serve(
                 "text/html; charset=utf-8",
             ))
         }
-        "/style.css" => Ok(response_from_str(
-            std::include_str!("../www/static/style.css"),
-            "text/css; charset=utf-8",
-        )),
-        "/lib.js" => Ok(response_from_str(
-            std::include_str!("../www/static/lib.js"),
-            "text/javascript; charset=utf-8",
-        )),
+        "/style.css" => Ok(response_from_str(STYLE_CSS, "text/css; charset=utf-8")),
+        "/lib.js" => Ok(response_from_str(LIB_JS, "text/javascript; charset=utf-8")),
         _ => Ok(response_not_found()),
     }
 }
@@ -129,7 +125,7 @@ pub fn run(
 ) {
     let mut templates = Handlebars::new();
     templates
-        .register_template_string("index", std::include_str!("../www/templates/index.html"))
+        .register_template_string("index", INDEX_HTML)
         .unwrap();
 
     let access_code = match access_code {
@@ -171,8 +167,8 @@ async fn run_server(
     let server = Server::bind(&addr).serve(service);
     let server = server.with_graceful_shutdown(async move {
         match receiver.recv().await {
-            Some(Gui2WebMessage::Shutdown) => {},
-            None => {},
+            Some(Gui2WebMessage::Shutdown) => {}
+            None => {}
         }
     });
     info!("Webserver listening at {}...", addr);

@@ -26,6 +26,22 @@ fn main() {
     log::setup_logging(sender);
 
     let conf = get_config();
+    if conf.print_index_html {
+        print!("{}", web::INDEX_HTML);
+        return;
+    }
+    if conf.print_access_html {
+        print!("{}", web::ACCESS_HTML);
+        return;
+    }
+    if conf.print_style_css {
+        print!("{}", web::STYLE_CSS);
+        return;
+    }
+    if conf.print_lib_js {
+        print!("{}", web::LIB_JS);
+        return;
+    }
     gui::run(&conf, receiver);
 }
 
@@ -129,8 +145,8 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[bench]
     fn bench_video_x264(b: &mut Bencher) {
-        const WIDTH: usize = 1920*4;
-        const HEIGHT: usize = 1080*4;
+        const WIDTH: usize = 1920 * 4;
+        const HEIGHT: usize = 1080 * 4;
         const N: usize = 60;
         let mut bufs = vec![vec![0u8; SIZE]; N];
         for i in 0..N {
