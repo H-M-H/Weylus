@@ -529,10 +529,17 @@ class PointerHandler {
         video.onpointermove = (e) => this.onEvent(e, "pointermove");
 
         let painter = new Painter(canvas as HTMLCanvasElement);
-        canvas.onpointerdown = (e) => { this.onEvent(e, "pointerdown"); painter.onstart(e); };
-        canvas.onpointerup = (e) => { this.onEvent(e, "pointerup"); painter.onstop(e); };
-        canvas.onpointercancel = (e) => { this.onEvent(e, "pointercancel"); painter.onstop(e); };
-        canvas.onpointermove = (e) => { this.onEvent(e, "pointermove"); painter.onmove(e); };
+        if (painter.gl) {
+            canvas.onpointerdown = (e) => { this.onEvent(e, "pointerdown"); painter.onstart(e); };
+            canvas.onpointerup = (e) => { this.onEvent(e, "pointerup"); painter.onstop(e); };
+            canvas.onpointercancel = (e) => { this.onEvent(e, "pointercancel"); painter.onstop(e); };
+            canvas.onpointermove = (e) => { this.onEvent(e, "pointermove"); painter.onmove(e); };
+        } else {
+            canvas.onpointerdown = (e) => this.onEvent(e, "pointerdown");
+            canvas.onpointerup = (e) => this.onEvent(e, "pointerup");
+            canvas.onpointercancel = (e) => this.onEvent(e, "pointercancel");
+            canvas.onpointermove = (e) => this.onEvent(e, "pointermove");
+        }
 
         for (let elem of [video, canvas]) {
             elem.onwheel = (e) => {
