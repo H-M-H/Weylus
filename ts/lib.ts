@@ -473,7 +473,7 @@ class Painter {
         let max_pixels = Math.max(this.canvas.width, this.canvas.height);
         let x = event.clientX * window.devicePixelRatio / this.canvas.width * 2 - 1;
         let y = 1 - event.clientY * window.devicePixelRatio / this.canvas.height * 2;
-        let delta = 2 * event.pressure + 0.4;
+        let delta = event.pressure + 0.4;
         let t = performance.now();
         if (line[0]) {
             let [x0, y0, delta0, t0] = line[0];
