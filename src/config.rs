@@ -60,6 +60,20 @@ pub struct Config {
     #[structopt(long, help = "Print lib.js served by Weylus.")]
     #[serde(skip)]
     pub print_lib_js: bool,
+
+
+    #[structopt(long, help = "Use custom template of index.html to be served by Weylus.")]
+    #[serde(skip)]
+    pub custom_index_html: Option<String>,
+    #[structopt(long, help = "Use custom access.html to be served by Weylus.")]
+    #[serde(skip)]
+    pub custom_access_html: Option<String>,
+    #[structopt(long, help = "Use custom style.css to be served by Weylus.")]
+    #[serde(skip)]
+    pub custom_style_css: Option<String>,
+    #[structopt(long, help = "Use custom lib.js to be served by Weylus.")]
+    #[serde(skip)]
+    pub custom_lib_js: Option<String>,
 }
 
 pub fn read_config() -> Option<Config> {

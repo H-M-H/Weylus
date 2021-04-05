@@ -243,6 +243,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         if let Err(err) = || -> Result<(), Box<dyn std::error::Error>> {
             let but_toggle_ref = but_toggle_ref.clone();
             let mut but = but_toggle_ref.try_borrow_mut()?;
+            let mut config = config_clone.clone();
 
             if !is_server_running {
                 let access_code_string = input_access_code.value();
@@ -295,6 +296,10 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     &web_sock,
                     ws_port,
                     access_code,
+                    config.custom_index_html.clone(),
+                    config.custom_access_html.clone(),
+                    config.custom_style_css.clone(),
+                    config.custom_lib_js.clone(),
                 );
 
                 #[cfg(not(target_os = "windows"))]
@@ -375,7 +380,6 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                 }
                 output_server_addr.show();
                 but.set_label("Stop");
-                let mut config = config_clone.clone();
                 config.access_code = access_code.map(|s| s.to_string());
                 config.web_port = web_port;
                 config.websocket_port = ws_port;
