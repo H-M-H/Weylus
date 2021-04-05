@@ -382,6 +382,7 @@ class Painter {
     vertex_attr: GLint;
     vertex_buffer: WebGLBuffer;
     time_attr: WebGLUniformLocation;
+    initialized: boolean;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -434,6 +435,7 @@ class Painter {
         gl.vertexAttribPointer(this.vertex_attr, 3, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(this.vertex_attr);
         gl.useProgram(shader_program);
+        this.initialized = true;
         requestAnimationFrame(() => this.render());
     }
 
@@ -529,7 +531,7 @@ class PointerHandler {
         video.onpointermove = (e) => this.onEvent(e, "pointermove");
 
         let painter = new Painter(canvas as HTMLCanvasElement);
-        if (painter.gl) {
+        if (painter.initialized) {
             canvas.onpointerdown = (e) => { this.onEvent(e, "pointerdown"); painter.onstart(e); };
             canvas.onpointerup = (e) => { this.onEvent(e, "pointerup"); painter.onstop(e); };
             canvas.onpointercancel = (e) => { this.onEvent(e, "pointercancel"); painter.onstop(e); };
