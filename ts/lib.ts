@@ -78,6 +78,7 @@ class Settings {
     frame_update_limit_output: HTMLOutputElement;
     scale_video_input: HTMLInputElement;
     scale_video_output: HTMLOutputElement;
+    range_min_pressure: HTMLInputElement;
     visible: boolean;
     settings: HTMLElement;
 
@@ -91,6 +92,7 @@ class Settings {
         this.frame_update_limit_output = this.frame_update_limit_input.nextElementSibling as HTMLOutputElement;
         this.scale_video_input = document.getElementById("scale_video") as HTMLInputElement;
         this.scale_video_output = this.scale_video_input.nextElementSibling as HTMLOutputElement;
+        this.range_min_pressure = document.getElementById("min_pressure") as HTMLInputElement;
         this.frame_update_limit_input.oninput = (e) => {
             this.frame_update_limit_output.value = Math.round(frame_update_scale(this.frame_update_limit_input.valueAsNumber)).toString();
         }
@@ -145,6 +147,7 @@ class Settings {
         this.checks.get("enable_touch").onchange = upd_pointer_filter;
 
         this.frame_update_limit_input.onchange = () => this.save_settings();
+        this.range_min_pressure.onchange = () => this.save_settings();
 
         // server
         let upd_server_config = () => { this.save_settings(); this.send_server_config() };
@@ -175,6 +178,7 @@ class Settings {
             settings[key] = elem.checked;
         settings["frame_update_limit"] = frame_update_scale(this.frame_update_limit_input.valueAsNumber).toString();
         settings["scale_video"] = this.scale_video_input.value;
+        settings["min_pressure"] = this.range_min_pressure.value;
         localStorage.setItem("settings", JSON.stringify(settings));
     }
 
@@ -203,6 +207,10 @@ class Settings {
                 this.scale_video_input.value = scale_video;
             let [w, h] = calc_max_video_resolution(this.scale_video_input.valueAsNumber)
             this.scale_video_output.value = w + "x" + h
+
+            let min_pressure = settings["min_pressure"];
+            if (min_pressure)
+                this.range_min_pressure.value = min_pressure;
 
             if (this.checks.get("lefty").checked) {
                 this.settings.classList.add("lefty");
@@ -307,7 +315,7 @@ class PEvent {
         this.y = (event.clientY - targetRect.top) / targetRect.height;
         this.movement_x = event.movementX ? event.movementX : 0;
         this.movement_y = event.movementY ? event.movementY : 0;
-        this.pressure = event.pressure;
+        this.pressure = Math.max(event.pressure, settings.range_min_pressure.valueAsNumber);
         this.tilt_x = event.tiltX;
         this.tilt_y = event.tiltY;
         this.width = event.width / diag_len;
