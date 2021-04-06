@@ -640,16 +640,18 @@ class KeyboardHandler {
 }
 
 function frame_timer(webSocket: WebSocket) {
-    if (webSocket.readyState > webSocket.OPEN)  // Closing or closed, so no more frames
+    // Closing or closed, so no more frames
+    if (webSocket.readyState > webSocket.OPEN)
         return;
+
+    if (document.hidden) {
+        requestAnimationFrame(() => frame_timer(webSocket));
+        return;
+    }
 
     if (webSocket.readyState === webSocket.OPEN && check_video.checked)
         webSocket.send('"TryGetFrame"');
-    let upd_limit = settings.frame_update_limit();
-    if (upd_limit > 0)
-        setTimeout(() => frame_timer(webSocket), upd_limit);
-    else
-        requestAnimationFrame(() => frame_timer(webSocket));
+    setTimeout(() => frame_timer(webSocket), settings.frame_update_limit());
 }
 
 function handle_messages(
