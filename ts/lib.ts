@@ -735,12 +735,8 @@ function handle_messages(
             frame_count = 0;
             last_fps_calc = performance.now();
         }
-        if (video.seekable.length > 0 &&
-            // only seek if there is data available, some browsers choke otherwise
-            (video.readyState >= 3 ||
-                // seek to end if we are more than half a second off, this may happen if a tab is
-                // moved to the background
-                video.seekable.end(video.seekable.length - 1) - video.currentTime > 0.5)) {
+        // only seek if there is data available, some browsers choke otherwise
+        if (video.seekable.length > 0 && video.readyState >= 3) {
             let seek_time = video.seekable.end(video.seekable.length - 1);
             if (isFinite(seek_time))
                 video.currentTime = seek_time;
