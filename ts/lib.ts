@@ -377,7 +377,20 @@ const fs_source = `
 class Painter {
     canvas: HTMLCanvasElement;
     gl: WebGLRenderingContext;
+
+    /* Store lines currently being drawn.
+     *
+     * Keys are pointerIds, values are an array of the last position (x, y), thickness and event
+     * time and another array with vertices to be used by webgl. Each vertex is made of 3 floats, x
+     * and y coordinates and the event time. Vertices always come in pairs of two. Two such vertices
+     * describe the edges of the line to be drawn with regard to it's thickness. TRIANGLE_STRIP is
+     * then used to connect them and draw an actual line with some thickness depending on the
+     * pressure applied.
+     */
     lines_active: Map<number, [[number, number, number, number], number[]]>
+
+    // Array of vertices that are not actively drawn anymore and do not need updates, except
+    // removing them after they faded away.
     lines_old: number[][];
     vertex_attr: GLint;
     vertex_buffer: WebGLBuffer;
@@ -440,6 +453,7 @@ class Painter {
     }
 
     render() {
+        // only do work if necessary
         if (!check_video.checked && (this.lines_active.size > 0 || this.lines_old.length > 0)) {
             if (this.lines_old.length > 0) {
                 if (performance.now() - this.lines_old[0][this.lines_old[0].length - 1] > fade_time)
@@ -455,6 +469,8 @@ class Painter {
                 gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertices.length / 3)
             }
             for (let [_, vertices] of this.lines_active.values()) {
+                // sometimes there are no linesegments because there has been only a single
+                // PointerEvent
                 if (vertices.length == 0)
                     continue;
                 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
@@ -475,8 +491,11 @@ class Painter {
         let y = 1 - event.clientY * window.devicePixelRatio / this.canvas.height * 2;
         let delta = event.pressure + 0.4;
         let t = performance.now();
+        // to draw a line segment, there has to be some previous position
         if (line[0]) {
             let [x0, y0, delta0, t0] = line[0];
+            // get vector perpendicular to the linesegment to calculate quadrangel around the
+            // segment with appropriate thickness
             let dx = (y - y0);
             let dy = -(x - x0);
             let dd = Math.sqrt(dx ** 2 + dy ** 2);
@@ -485,6 +504,7 @@ class Painter {
             }
             dx = dx / dd * max_pixels / this.canvas.width * 0.004;
             dy = dy / dd * max_pixels / this.canvas.height * 0.004;
+
             if (line[1].length == 0)
                 line[1].push(
                     x0 + delta0 * dx, y0 + delta0 * dy, t0, x0 - delta0 * dx, y0 - delta0 * dy, t0,
