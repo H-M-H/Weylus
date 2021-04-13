@@ -102,12 +102,17 @@ input[type='range']::-webkit-slider-runnable-track, input[type="range"]::-moz-ra
     display: none !important;
 }
 #settings h2 {
-    font-size: 1em;
+    font-size: 1.2em;
     margin: 0;
     text-align: center;
 }
+#settings h3 {
+    font-size: 1em;
+    margin-top: 0.2;
+    text-align: center;
+}
 #settings section {
-    margin-top: 1em;
+    margin-bottom: 1em;
 }
 #settings section label, section button {
     display: block;
