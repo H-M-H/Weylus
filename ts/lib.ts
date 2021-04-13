@@ -79,6 +79,7 @@ class Settings {
     scale_video_input: HTMLInputElement;
     scale_video_output: HTMLOutputElement;
     range_min_pressure: HTMLInputElement;
+    check_aggressive_seek: HTMLInputElement;
     visible: boolean;
     settings: HTMLElement;
 
@@ -132,6 +133,11 @@ class Settings {
 
         this.checks.get("stretch").onchange = (e) => {
             stretch_video();
+            this.save_settings();
+        };
+
+        this.check_aggressive_seek = this.checks.get("aggressive_seeking");
+        this.check_aggressive_seek.onchange = (e) => {
             this.save_settings();
         };
 
@@ -736,7 +742,7 @@ function handle_messages(
             last_fps_calc = performance.now();
         }
         // only seek if there is data available, some browsers choke otherwise
-        if (video.seekable.length > 0 && video.readyState >= 3) {
+        if (video.seekable.length > 0 && video.readyState >= (settings.check_aggressive_seek.checked ? 3 : 4)) {
             let seek_time = video.seekable.end(video.seekable.length - 1);
             if (isFinite(seek_time))
                 video.currentTime = seek_time;
