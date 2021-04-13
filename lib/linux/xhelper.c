@@ -228,15 +228,6 @@ int create_capturables(Display* disp, Capturable** capturables, int size, Error*
 			title_utf8 = malloc(32);
 			snprintf(title_utf8, 32, "UNKNOWN %lu", j);
 		}
-		unsigned long* desktop;
-
-		/* desktop ID */
-		if ((desktop = (unsigned long*)get_property(
-				 disp, client_list[j], XA_CARDINAL, "_NET_WM_DESKTOP", NULL, NULL)) == NULL)
-		{
-			desktop = (unsigned long*)get_property(
-				disp, client_list[j], XA_CARDINAL, "_WIN_WORKSPACE", NULL, NULL);
-		}
 
 		Capturable* c = malloc(sizeof(Capturable));
 		capturables[i] = c;
@@ -247,7 +238,6 @@ int create_capturables(Display* disp, Capturable** capturables, int size, Error*
 		c->c.winfo.win = client_list[j];
 		c->c.winfo.is_regular_window = 1;
 		free(title_utf8);
-		free(desktop);
 	}
 	free(client_list);
 	XRRFreeMonitors(monitors);
