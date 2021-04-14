@@ -193,6 +193,8 @@ class Settings {
         if (settings_string === null) {
             this.frame_update_limit_input.value = frame_update_scale_inv(33).toString();
             this.frame_update_limit_output.value = (33).toString();
+            let [w, h] = calc_max_video_resolution(this.scale_video_input.valueAsNumber)
+            this.scale_video_output.value = w + "x" + h;
             return;
         }
         try {
@@ -211,8 +213,8 @@ class Settings {
             let scale_video = settings["scale_video"];
             if (scale_video)
                 this.scale_video_input.value = scale_video;
-            let [w, h] = calc_max_video_resolution(this.scale_video_input.valueAsNumber)
-            this.scale_video_output.value = w + "x" + h
+            let [w, h] = calc_max_video_resolution(this.scale_video_input.valueAsNumber);
+            this.scale_video_output.value = w + "x" + h;
 
             let min_pressure = settings["min_pressure"];
             if (min_pressure)
