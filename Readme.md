@@ -17,6 +17,9 @@ Weylus in action with [Xournal++](https://github.com/xournalpp/xournalpp):
         * [Wayland](#wayland)
         * [Hardware Acceleration](#hardware-acceleration)
         * [Weylus as Second Screen](#weylus-as-second-screen)
+            * [Intel GPU on Xorg with Intel drivers](#intel-gpu-on-xorg-with-intel-drivers)
+            * [Dummy Plugs](#dummy-plugs)
+            * [Other Options](#other-options)
     * [macOS](#macos)
         * [Hardware Acceleration](#hardware-acceleration-1)
     * [Windows](#windows)
@@ -134,7 +137,10 @@ GeForce GTX 1050 Mobile GPU) but more recent GPUs should provide higher quality.
 nvidia drivers need to be installed.
 
 #### Weylus as Second Screen
-On Linux Weylus can be used to turn your tablet into a second screen if your hardware supports it.
+There are a few possibilities to use Weylus to turn your tablet into a second screen.
+
+##### Intel GPU on Xorg with Intel drivers
+Intel's drivers support creating virtual outputs that can be configured via xrandr.
 
 But first a word of warning: The following configuration may break starting the X server. This means
 you might end up without a graphical login or X may get stuck and just display a black screen. So
@@ -179,6 +185,25 @@ monitor and for example set its position relative to your primary monitor.
 
 After setting up the virtual monitor start Weylus and select it in the capture menu. You may want to
 enable displaying the cursor in this case. That is it!
+
+##### Dummy Plugs
+Weylus detects if you use multiple monitors and you can select the one you want to mirror. So if you
+want to use Weylus as a second screen you could just buy another monitor. Obviously this is
+pointless as if you already bought that monitor, there is no need to use Weylus! This is where so
+called **HDMI/Displayport/VGA Dummy Plugs** come in handy. These are small devices that pretend to
+be a monitor but only cost a fraction of the price of an actual monitor.
+
+Once you have bought one and plugged it into your computer you can configure an additional screen
+just like you would do with an actual one and then use Weylus to mirror this virtual screen.
+
+##### Other Options
+The following is untested/incomplete, feel free to do more research and open a pull request to
+expand documentation on this!
+- On Wayland with sway there is `create_output` which can be used to [create headless
+  outputs](https://github.com/swaywm/sway/releases/tag/1.5), unfortunately it is not documented how
+  to actually do that: https://github.com/swaywm/sway/issues/5553
+- On Wayland with GNOME recently there has been added an option to [create virtual monitors with
+  mutter](https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/1698)
 
 ### macOS
 Weylus needs some permissions to work properly, make sure you enable:
