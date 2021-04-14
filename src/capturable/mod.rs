@@ -7,6 +7,7 @@ use tracing::warn;
 pub mod pipewire;
 #[cfg(target_os = "linux")]
 pub mod pipewire_dbus;
+pub mod testsrc;
 #[cfg(target_os = "linux")]
 pub mod x11;
 
@@ -51,13 +52,14 @@ impl Clone for Box<dyn Capturable> {
 
 pub fn get_capturables(
     #[cfg(target_os = "linux")] wayland_support: bool,
+    #[cfg(target_os = "linux")] capture_cursor: bool,
 ) -> Vec<Box<dyn Capturable>> {
     let mut capturables: Vec<Box<dyn Capturable>> = vec![];
     #[cfg(target_os = "linux")]
     {
         if wayland_support {
             use crate::capturable::pipewire::get_capturables as get_capturables_pw;
-            match get_capturables_pw() {
+            match get_capturables_pw(capture_cursor) {
                 Ok(captrs) => {
                     for c in captrs {
                         capturables.push(Box::new(c));
@@ -85,5 +87,24 @@ pub fn get_capturables(
     }
     use crate::capturable::autopilot::AutoPilotCapturable;
     capturables.push(Box::new(AutoPilotCapturable::new()));
+
+    if crate::log::get_log_level() >= tracing::Level::DEBUG {
+        for (width, height) in [
+            (200, 200),
+            (800, 600),
+            (1080, 720),
+            (1920, 1080),
+            (3840, 2160),
+            (15360, 2160),
+        ]
+        .iter()
+        {
+            capturables.push(Box::new(testsrc::TestCapturable {
+                width: *width,
+                height: *height,
+            }));
+        }
+    }
+
     capturables
 }

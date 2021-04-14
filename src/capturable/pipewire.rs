@@ -337,7 +337,9 @@ fn streams_from_response(response: OrgFreedesktopPortalRequestResponse) -> Vec<P
 }
 
 // mostly inspired by https://gitlab.gnome.org/snippets/19
-fn request_screen_cast() -> Result<(SyncConnection, OwnedFd, Vec<PwStreamInfo>), Box<dyn Error>> {
+fn request_screen_cast(
+    capture_cursor: bool,
+) -> Result<(SyncConnection, OwnedFd, Vec<PwStreamInfo>), Box<dyn Error>> {
     let conn = SyncConnection::new_session()?;
     let portal = get_portal(&conn);
     let mut args: PropMap = HashMap::new();
@@ -370,10 +372,17 @@ fn request_screen_cast() -> Result<(SyncConnection, OwnedFd, Vec<PwStreamInfo>),
             args.insert("multiple".into(), Variant(Box::new(true)));
             args.insert("types".into(), Variant(Box::new(1u32 | 2u32)));
 
-            // Do not capture the cursor for now, this crashes kwin_wayland and tears down the
-            // plasma desktop, see:
-            // https://bugs.kde.org/show_bug.cgi?id=435042
-            args.insert("cursor_mode".into(), Variant(Box::new(1u32)));
+            let cursor_mode = if capture_cursor { 2u32 } else { 1u32 };
+            let plasma = std::env::var("DESKTOP_SESSION").map_or(false, |s| s.contains("plasma"));
+            if plasma && capture_cursor {
+                // Warn the user if capturing the cursor is tried on kde as this can crash
+                // kwin_wayland and tear down the plasma desktop, see:
+                // https://bugs.kde.org/show_bug.cgi?id=435042
+                warn!("You are attempting to capture the cursor under KDE Plasma, this may crash your \
+                    desktop, see https://bugs.kde.org/show_bug.cgi?id=435042 for details! \
+                    You have been warned.");
+            }
+            args.insert("cursor_mode".into(), Variant(Box::new(cursor_mode)));
             let session: dbus::Path = r
                 .results
                 .get("session_handle")
@@ -456,8 +465,8 @@ fn request_screen_cast() -> Result<(SyncConnection, OwnedFd, Vec<PwStreamInfo>),
     }
 }
 
-pub fn get_capturables() -> Result<Vec<PipeWireCapturable>, Box<dyn Error>> {
-    let (conn, fd, streams) = request_screen_cast()?;
+pub fn get_capturables(capture_cursor: bool) -> Result<Vec<PipeWireCapturable>, Box<dyn Error>> {
+    let (conn, fd, streams) = request_screen_cast(capture_cursor)?;
     let conn = Arc::new(conn);
     Ok(streams
         .into_iter()

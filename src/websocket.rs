@@ -19,7 +19,7 @@ use crate::protocol::{
 };
 
 use crate::cerror::CErrorCode;
-use crate::video::{VideoEncoder, EncoderOptions};
+use crate::video::{EncoderOptions, VideoEncoder};
 
 type WsWriter = Arc<Mutex<websocket::sender::Writer<std::net::TcpStream>>>;
 type WsClients = Arc<Mutex<HashMap<SocketAddr, Arc<Mutex<Writer<TcpStream>>>>>>;
@@ -260,8 +260,7 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, confi
                 let scale =
                     (max_width as f64 / width_in as f64).max(max_height as f64 / height_in as f64);
                 // limit video to 4K
-                let scale_max =
-                    (3840.0 / width_in as f64).min(2160.0 / height_in as f64);
+                let scale_max = (3840.0 / width_in as f64).min(2160.0 / height_in as f64);
                 let scale = scale.min(scale_max);
                 let mut width_out = width_in;
                 let mut height_out = height_in;
@@ -352,6 +351,8 @@ struct WsHandler {
     capturables: Vec<Box<dyn Capturable>>,
     gui_sender: mpsc::Sender<Ws2GuiMessage>,
     ws_config: WsConfig,
+    #[cfg(target_os = "linux")]
+    capture_cursor: bool,
 }
 
 impl WsHandler {
@@ -378,6 +379,8 @@ impl WsHandler {
             capturables: vec![],
             gui_sender,
             ws_config: config,
+            #[cfg(target_os = "linux")]
+            capture_cursor: false,
         }
     }
 
@@ -428,6 +431,8 @@ impl WsHandler {
         self.capturables = get_capturables(
             #[cfg(target_os = "linux")]
             self.ws_config.wayland_support,
+            #[cfg(target_os = "linux")]
+            self.capture_cursor,
         );
         self.capturables.iter().for_each(|c| {
             windows.push(c.name());
@@ -438,6 +443,11 @@ impl WsHandler {
     fn setup(&mut self, config: ClientConfiguration) {
         if config.capturable_id < self.capturables.len() {
             let capturable = self.capturables[config.capturable_id].clone();
+
+            #[cfg(target_os = "linux")]
+            {
+                self.capture_cursor = config.capture_cursor;
+            }
 
             #[cfg(target_os = "linux")]
             if config.uinput_support {
