@@ -136,7 +136,7 @@ nvidia drivers need to be installed.
 #### Weylus as Second Screen
 On Linux Weylus can be used to turn your tablet into a second screen if your hardware supports it.
 
-But first a word of waring: The following configuration may break starting the X server. This means
+But first a word of warning: The following configuration may break starting the X server. This means
 you might end up without a graphical login or X may get stuck and just display a black screen. So
 make sure you know what you are doing or are at least able to recover from a broken X server.
 
