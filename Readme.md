@@ -230,7 +230,8 @@ Debian or Ubuntu they can be installed via:
 ```sh
 apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev \
 libxfixes-dev libxtst-dev libxrandr-dev libxcomposite-dev libxi-dev libxv-dev autoconf libtool-bin \
-nvidia-cuda-dev pkg-config libdrm-dev libpango1.0-dev
+nvidia-cuda-dev pkg-config libdrm-dev libpango1.0-dev libgstreamer1.0-dev \
+libgstreamer-plugins-base1.0-dev libdbus-1-dev
 ```
 Note that building for the first time may take a while as ffmpeg needs to be build. On windows only
 msvc is supported as C compiler.
