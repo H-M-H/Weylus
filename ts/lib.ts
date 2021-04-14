@@ -27,14 +27,13 @@ function run(access_code: string, websocket_port: number, level: string) {
             if ((e as ErrorEvent).error) {
                 let err = e as ErrorEvent;
                 log(LogLevel.ERROR, err.filename + ":L" + err.lineno + ":" + err.colno + ": " + err.message + " Error object: " + JSON.stringify(err.error));
-            } else if ((e as UIEvent).detail) {
-                let ev = e as UIEvent;
-                let src = (e.target as any).src;
-                log(LogLevel.ERROR, "Failed to obtain resource, target: " + ev.target + " type: " + ev.type + " src: " + src + " Error object: " + JSON.stringify(ev));
-            } else if ((e as Event).target) {
+            } else if ((e as Event | UIEvent).target) {
                 let ev = e as Event;
                 let src = (e.target as any).src;
-                log(LogLevel.ERROR, "Failed to obtain resource, target: " + ev.target + " type: " + ev.type + " src: " + src + " Error object: " + JSON.stringify(ev));
+                if (ev.target instanceof HTMLVideoElement)
+                    log(LogLevel.ERROR, "Failed to decode video, try reducing resolution or disabling hardware acceleration and reload the page. Error src: " + src);
+                else
+                    log(LogLevel.ERROR, "Failed to obtain resource, target: " + ev.target + " type: " + ev.type + " src: " + src + " Error object: " + JSON.stringify(ev));
             } else {
                 log(LogLevel.WARN, "Got unknown event: " + JSON.stringify(e));
             }
