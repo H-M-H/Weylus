@@ -48,9 +48,9 @@ features on Linux are:
 ## Installation
 Just grab the latest release for your OS from the
 [releases page](https://github.com/H-M-H/Weylus/releases) and install it on your computer. No apps
-except a modern browser are required on your tablet. **If you run Linux make sure to follow the
-instructions described [here](#linux) to enable uinput for features like pressure sensitivity and
-multitouch!**
+except a modern browser (Firefox 80+, iOS/iPadOS 13+) are required on your tablet. **If you run
+Linux make sure to follow the instructions described [here](#linux) to enable uinput for features
+like pressure sensitivity and multitouch!**
 
 ### Packages
 AUR packages for Weylus are available here:
