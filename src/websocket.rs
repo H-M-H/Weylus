@@ -258,7 +258,7 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, confi
                 let pixel_data = pixel_data.unwrap();
                 let (width_in, height_in) = pixel_data.size();
                 let scale =
-                    (max_width as f64 / width_in as f64).max(max_height as f64 / height_in as f64);
+                    (max_width as f64 / width_in as f64).min(max_height as f64 / height_in as f64);
                 // limit video to 4K
                 let scale_max = (3840.0 / width_in as f64).min(2160.0 / height_in as f64);
                 let scale = scale.min(scale_max);
