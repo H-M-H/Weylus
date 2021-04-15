@@ -18,7 +18,7 @@ jobs:
         os: [ubuntu-latest]
         include:
         - os: ubuntu-latest
-          build-cmd: cargo build --release --features=va-static && mv target/release/weylus target/release/weylus_va_static && cargo deb && dpkg -i target/debian/Weylus*.deb
+          build-cmd: cargo deb --  --features=va-static && dpkg -i target/debian/Weylus*.deb && mv target/release/weylus target/release/weylus_va_static && cargo build --release
           package-files: |
             target/release/linux.zip
             target/debian/Weylus*.deb

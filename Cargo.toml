@@ -51,7 +51,9 @@ identifier = "io.github.h-m-h.weylus"
 
 [package.metadata.deb]
 name = "Weylus"
-depends = "$auto"
+# Until https://github.com/mmstick/cargo-deb/issues/170 is resolved
+# specify depends manually.
+depends = "libc6 (>= 2.18), libdbus-1-3 (>= 1.9.14), libdrm2 (>= 2.4.60), libfontconfig1 (>= 2.11), libgcc1 (>= 1:4.2), libglib2.0-0 (>= 2.18.0), libgstreamer-plugins-base1.0-0 (>= 1.10.0), libgstreamer1.0-0 (>= 1.0.0), libx11-6 (>= 2:1.4.99.1), libxcomposite1 (>= 1:0.3-1), libxcursor1 (>> 1.1.2), libxext6, libxfixes3, libxft2 (>> 2.1.1), libxi6 (>= 2:1.2.99.4), libxinerama1, libxrandr2 (>= 2:1.5.0), libxrender1, libxtst6"
 section = "graphics"
 priority = "optional"
 assets = [
