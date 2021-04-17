@@ -1,7 +1,5 @@
-use std::cell::RefCell;
 use std::iter::Iterator;
 use std::net::{IpAddr, SocketAddr};
-use std::rc::Rc;
 
 use std::sync::{mpsc, Arc, Mutex};
 use tokio::sync::mpsc as mpsc_tokio;
@@ -147,7 +145,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         check_nvenc.hide();
     }
 
-    let but_toggle = Button::default()
+    let mut but_toggle = Button::default()
         .with_size(width, height)
         .below_of(&check_native_hw_accel, 2 * padding)
         .with_label("Start");
@@ -176,8 +174,6 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     wind.end();
     wind.show();
 
-    let but_toggle_ref = Rc::new(RefCell::new(but_toggle));
-    let but_toggle_ref2 = but_toggle_ref.clone();
     let output_server_addr = Arc::new(Mutex::new(output_server_addr));
     let output_buf = Arc::new(Mutex::new(output_buf));
 
@@ -239,10 +235,8 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     let mut is_server_running = false;
 
     let config_clone = config.clone();
-    let mut toggle_server = move || {
+    let mut toggle_server = move |but: &mut Button| {
         if let Err(err) = || -> Result<(), Box<dyn std::error::Error>> {
-            let but_toggle_ref = but_toggle_ref.clone();
-            let mut but = but_toggle_ref.try_borrow_mut()?;
             let mut config = config_clone.clone();
 
             if !is_server_running {
@@ -422,10 +416,10 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     };
 
     if config.auto_start {
-        toggle_server();
+        toggle_server(&mut but_toggle);
     }
 
-    but_toggle_ref2.borrow_mut().set_callback(toggle_server);
+    but_toggle.set_callback(toggle_server);
 
     #[cfg(target_os = "linux")]
     if let Err(err) = gstreamer::init() {
