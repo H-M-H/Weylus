@@ -53,6 +53,7 @@ pub fn get_log_level() -> tracing::Level {
 pub fn setup_logging(sender: mpsc::SyncSender<String>) {
     let logger = tracing_subscriber::fmt()
         .with_max_level(get_log_level())
+        .with_writer(std::io::stderr)
         .finish()
         .with(
             tracing_subscriber::fmt::Layer::default()
