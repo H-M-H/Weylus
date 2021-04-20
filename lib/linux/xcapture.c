@@ -130,7 +130,7 @@ void stop_capture(CaptureContext* ctx, Error* err)
 	free(ctx);
 }
 
-void capture_sceen(CaptureContext* ctx, struct Image* img, int capture_cursor, Error* err)
+void capture_screen(CaptureContext* ctx, struct Image* img, int capture_cursor, Error* err)
 {
 	Window root = DefaultRootWindow(ctx->cap.disp);
 	int x, y;

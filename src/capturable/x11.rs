@@ -40,7 +40,7 @@ extern "C" {
         err: *mut CError,
     );
     fn start_capture(handle: *const c_void, ctx: *mut c_void, err: *mut CError) -> *mut c_void;
-    fn capture_sceen(
+    fn capture_screen(
         handle: *mut c_void,
         img: *mut CImage,
         capture_cursor: c_int,
@@ -292,7 +292,7 @@ impl Recorder for RecorderX11 {
         let mut err = CError::new();
         fltk::app::lock().unwrap();
         unsafe {
-            capture_sceen(
+            capture_screen(
                 self.handle,
                 &mut self.img,
                 self.capture_cursor.into(),
