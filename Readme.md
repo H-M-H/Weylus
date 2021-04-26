@@ -157,10 +157,9 @@ Section "Device"
     Option "VirtualHeads" "2"
 
     # if your screen is flickering one of the following options might help
-    Option "TripleBuffer" "true"
-    Option "TearFree"     "true"
-
-    Option "DRI"          "false"
+    # Option "TripleBuffer" "true"
+    # Option "TearFree"     "true"
+    # Option "DRI"          "false"
 EndSection
 ```
 After a reboot `xrandr` will show two additional monitors `VIRTUAL1` and `VIRTUAL2` and can be used
