@@ -6,7 +6,7 @@ use tracing::warn;
 
 use crate::input::device::{InputDevice, InputDeviceType};
 use crate::protocol::{
-    Button, KeyboardEvent, KeyboardEventType, PointerEvent, PointerEventType, WheelEvent,
+    Button, KeyboardEvent, KeyboardEventType, PointerEvent, WheelEvent,
 };
 
 use crate::capturable::Capturable;
@@ -50,17 +50,15 @@ impl InputDevice for AutoPilotDevice {
         )) {
             warn!("Could not move mouse: {}", err);
         }
-        match event.event_type {
-            PointerEventType::DOWN => match event.button {
-                Button::PRIMARY => mouse::toggle(mouse::Button::Left, true),
-                Button::AUXILARY => mouse::toggle(mouse::Button::Middle, true),
-                Button::SECONDARY => mouse::toggle(mouse::Button::Right, true),
-                _ => (),
-            },
-            PointerEventType::UP => {
-                mouse::toggle(mouse::Button::Left, false);
-                mouse::toggle(mouse::Button::Middle, false);
-                mouse::toggle(mouse::Button::Right, false);
+        match event.button {
+            Button::PRIMARY => {
+                mouse::toggle(mouse::Button::Left, event.buttons.contains(event.button))
+            }
+            Button::AUXILARY => {
+                mouse::toggle(mouse::Button::Middle, event.buttons.contains(event.button))
+            }
+            Button::SECONDARY => {
+                mouse::toggle(mouse::Button::Right, event.buttons.contains(event.button))
             }
             _ => (),
         }
