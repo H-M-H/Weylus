@@ -3049,7 +3049,7 @@ checksum = "d8b77fdfd5a253be4ab714e4ffa3c49caf146b4de743e97510c0656cf90f1e8e"
 
 [[package]]
 name = "weylus"
-version = "0.11.0"
+version = "0.11.1"
 dependencies = [
  "autopilot",
  "bitflags 1.2.1",
