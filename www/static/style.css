@@ -24,6 +24,9 @@
         color: #111;
     }
 }
+* {
+    touch-action: none;
+}
 body, html {
     width: 100%;
     height: 100%;
@@ -31,7 +34,6 @@ body, html {
     padding: 0;
     overflow: hidden;
     display: flex;
-    touch-action: none;
     user-select: none;
     -webkit-touch-callout: none;
     -webkit-user-select: none;
@@ -70,6 +72,9 @@ input[type='range']::-webkit-slider-runnable-track, input[type="range"]::-moz-ra
     padding: 1em;
     font-family: sans-serif;
     transition: transform 0.5s, opacity 0.5s;
+}
+#settings * {
+    touch-action: pan-y;
 }
 #settings.lefty {
     left: 0;
@@ -164,7 +169,7 @@ label input:disabled + span {
 #log {
     max-width: 15em;
     overflow-x: auto;
-    touch-action: auto;
+    touch-action: pan-x pan-y;
     user-select: text;
     -webkit-touch-callout: default;
     -webkit-user-select: text;
