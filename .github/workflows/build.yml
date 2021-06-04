@@ -76,10 +76,10 @@ jobs:
              npm install -g typescript
              brew install nasm
              cargo install cargo-bundle
-          build-cmd: MACOSX_DEPLOYMENT_TARGET=10.13 cargo bundle --release
-          package-files: target/release/bundle/osx/macOS.zip
-          exec-file: target/release/bundle/osx/macOS.zip
-          pkg-cmd: cd target/release/bundle/osx/ && zip -r macOS.zip Weylus.app
+          build-cmd: MACOSX_DEPLOYMENT_TARGET=10.13 cargo bundle
+          package-files: target/debug/bundle/osx/macOS.zip
+          exec-file: target/debug/bundle/osx/macOS.zip
+          pkg-cmd: cd target/debug/bundle/osx/ && zip -r macOS.zip Weylus.app
 
         - os: windows-latest
           install-deps: |
