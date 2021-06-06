@@ -22,7 +22,7 @@ extern "C" {
     fn encode_video_frame(handle: *mut c_void, micros: c_int, err: *mut CError);
 
     fn fill_rgb(ctx: *mut c_void, data: *const u8, err: *mut CError);
-    fn fill_bgra(ctx: *mut c_void, data: *const u8, err: *mut CError);
+    fn fill_bgra(ctx: *mut c_void, data: *const u8, stride: c_int, err: *mut CError);
 }
 
 // this is used as callback in lib/encode_video.c via ffmpegs AVIOContext
@@ -39,6 +39,8 @@ pub enum PixelProvider<'a> {
     // 8 bits per color
     RGB(usize, usize, &'a [u8]),
     BGR0(usize, usize, &'a [u8]),
+    // width, height, stride
+    BGR0S(usize, usize, usize, &'a [u8]),
 }
 
 impl<'a> PixelProvider<'a> {
@@ -46,6 +48,7 @@ impl<'a> PixelProvider<'a> {
         match self {
             PixelProvider::RGB(w, h, _) => (*w, *h),
             PixelProvider::BGR0(w, h, _) => (*w, *h),
+            PixelProvider::BGR0S(w, h, _, _) => (*w, *h),
         }
     }
 }
@@ -112,8 +115,11 @@ impl VideoEncoder {
     pub fn encode(&mut self, pixel_provider: PixelProvider) {
         let mut err = CError::new();
         match pixel_provider {
-            PixelProvider::BGR0(_, _, bgra) => unsafe {
-                fill_bgra(self.handle, bgra.as_ptr(), &mut err);
+            PixelProvider::BGR0(w, _, bgra) => unsafe {
+                fill_bgra(self.handle, bgra.as_ptr(), (w*4) as c_int, &mut err);
+            },
+            PixelProvider::BGR0S(_, _, stride, bgra) => unsafe {
+                fill_bgra(self.handle, bgra.as_ptr(), stride as c_int, &mut err);
             },
             PixelProvider::RGB(_, _, rgb) => unsafe {
                 fill_rgb(self.handle, rgb.as_ptr(), &mut err);

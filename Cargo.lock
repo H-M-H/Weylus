@@ -88,7 +88,7 @@ checksum = "3a2fd0359d0cd30b15419bcce7e6641a3cbe2046c612b3900216dc64bc989558"
 dependencies = [
  "cocoa",
  "core-foundation 0.7.0",
- "core-graphics",
+ "core-graphics 0.19.2",
  "image 0.22.5",
  "libc",
  "pkg-config",
@@ -291,7 +291,7 @@ dependencies = [
  "bitflags 1.2.1",
  "block",
  "core-foundation 0.7.0",
- "core-graphics",
+ "core-graphics 0.19.2",
  "foreign-types",
  "libc",
  "objc",
@@ -349,6 +349,31 @@ checksum = "b3889374e6ea6ab25dba90bb5d96202f61108058361f6dc72e8b03e6f8bbe923"
 dependencies = [
  "bitflags 1.2.1",
  "core-foundation 0.7.0",
+ "foreign-types",
+ "libc",
+]
+
+[[package]]
+name = "core-graphics"
+version = "0.22.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "269f35f69b542b80e736a20a89a05215c0ce80c2c03c514abb2e318b78379d86"
+dependencies = [
+ "bitflags 1.2.1",
+ "core-foundation 0.9.1",
+ "core-graphics-types",
+ "foreign-types",
+ "libc",
+]
+
+[[package]]
+name = "core-graphics-types"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a68b68b3446082644c91ac778bf50cd4104bfb002b5a6a7c44cca5a2c70788b"
+dependencies = [
+ "bitflags 1.2.1",
+ "core-foundation 0.9.1",
  "foreign-types",
  "libc",
 ]
@@ -3054,6 +3079,8 @@ dependencies = [
  "autopilot",
  "bitflags 1.2.1",
  "cc",
+ "core-foundation 0.9.1",
+ "core-graphics 0.22.2",
  "dbus",
  "dirs",
  "fltk",

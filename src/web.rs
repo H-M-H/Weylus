@@ -100,7 +100,7 @@ async fn serve(
                 access_code: context.access_code.clone(),
                 websocket_port: context.ws_port,
                 uinput_enabled: cfg!(target_os = "linux"),
-                capture_cursor_enabled: cfg!(target_os = "linux"),
+                capture_cursor_enabled: cfg!(not(target_os = "windows")),
                 log_level: crate::log::get_log_level().to_string(),
             };
 

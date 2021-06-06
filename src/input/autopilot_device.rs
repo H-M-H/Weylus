@@ -1,3 +1,4 @@
+use autopilot::geometry::Size;
 use autopilot::mouse;
 use autopilot::mouse::ScrollDirection;
 use autopilot::screen::size as screen_size;
@@ -5,9 +6,7 @@ use autopilot::screen::size as screen_size;
 use tracing::warn;
 
 use crate::input::device::{InputDevice, InputDeviceType};
-use crate::protocol::{
-    Button, KeyboardEvent, KeyboardEventType, PointerEvent, WheelEvent,
-};
+use crate::protocol::{Button, KeyboardEvent, KeyboardEventType, PointerEvent, WheelEvent};
 
 use crate::capturable::Capturable;
 
@@ -44,9 +43,19 @@ impl InputDevice for AutoPilotDevice {
             return;
         }
         let (x_rel, y_rel, width_rel, height_rel) = geometry.unwrap();
+        #[cfg(not(target_os = "macos"))]
+        let Size { width, height } = screen_size();
+        #[cfg(target_os = "macos")]
+        let (_, _, width, height) = match crate::capturable::core_graphics::screen_coordsys() {
+            Ok(bounds) => bounds,
+            Err(err) => {
+                warn!("Could determine global coordinate system: {}", err);
+                return;
+            }
+        };
         if let Err(err) = mouse::move_to(autopilot::geometry::Point::new(
-            (event.x * width_rel + x_rel) * screen_size().width,
-            (event.y * height_rel + y_rel) * screen_size().height,
+            (event.x * width_rel + x_rel) * width,
+            (event.y * height_rel + y_rel) * height,
         )) {
             warn!("Could not move mouse: {}", err);
         }

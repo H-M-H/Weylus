@@ -499,7 +499,7 @@ void alloc_frame_buffer_hw(VideoContext* ctx, Error* err)
 	ctx->frame_hw_allocated = 1;
 }
 
-void fill_bgra(VideoContext* ctx, const void* data, Error* err)
+void fill_bgra(VideoContext* ctx, const void* data, int stride, Error* err)
 {
 	if (ctx->frame->format == AV_PIX_FMT_BGR0 && ctx->width_in == ctx->width_out &&
 		ctx->height_in == ctx->height_out)
@@ -507,13 +507,13 @@ void fill_bgra(VideoContext* ctx, const void* data, Error* err)
 		if (ctx->frame_allocated)
 			dealloc_frame_buffer(ctx);
 		ctx->frame->data[0] = (uint8_t*)data;
-		ctx->frame->linesize[0] = ctx->width_in * 4;
+		ctx->frame->linesize[0] = stride;
 	}
 	else
 	{
 		const uint8_t* const* src = (const uint8_t* const*)&data;
 		// 4 colors per pixel
-		const int src_stride[] = {ctx->width_in * 4, 0, 0, 0};
+		const int src_stride[] = {stride, 0, 0, 0};
 		if (!ctx->frame_allocated)
 		{
 			alloc_frame_buffer(ctx, err);

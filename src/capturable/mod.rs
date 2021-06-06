@@ -3,6 +3,8 @@ use std::boxed::Box;
 use std::error::Error;
 use tracing::warn;
 
+#[cfg(target_os = "macos")]
+pub mod core_graphics;
 #[cfg(target_os = "linux")]
 pub mod pipewire;
 #[cfg(target_os = "linux")]
@@ -85,6 +87,30 @@ pub fn get_capturables(
             }
         };
     }
+
+    #[cfg(target_os = "macos")]
+    {
+        use crate::capturable::core_graphics::get_displays as get_displays_cg;
+        use crate::capturable::core_graphics::get_windows as get_windows_cg;
+        match get_displays_cg() {
+            Ok(captrs) => {
+                for c in captrs {
+                    capturables.push(Box::new(c));
+                }
+            }
+            Err(err) => warn!("Failed to get list of displays via CoreGraphics: {}", err),
+        }
+
+        match get_windows_cg() {
+            Ok(captrs) => {
+                for c in captrs {
+                    capturables.push(Box::new(c));
+                }
+            }
+            Err(err) => warn!("Failed to get list of windows via CoreGraphics: {}", err),
+        }
+    }
+
     use crate::capturable::autopilot::AutoPilotCapturable;
     capturables.push(Box::new(AutoPilotCapturable::new()));
 
