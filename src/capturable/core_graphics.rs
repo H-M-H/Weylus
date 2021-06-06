@@ -53,7 +53,14 @@ impl Capturable for CGDisplayCapturable {
         )
     }
     fn geometry_relative(&self) -> Result<(f64, f64, f64, f64), Box<dyn Error>> {
-        Ok((0.0, 0.0, 1.0, 1.0))
+        let bounds = self.display.bounds();
+        let (x0, y0, w, h) = screen_coordsys()?;
+        Ok((
+            (bounds.origin.x - x0) / w,
+            (bounds.origin.y - y0) / h,
+            bounds.size.width / w,
+            bounds.size.height / h,
+        ))
     }
     fn before_input(&mut self) -> Result<(), Box<dyn Error>> {
         Ok(())
