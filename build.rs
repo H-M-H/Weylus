@@ -26,6 +26,8 @@ fn build_ffmpeg() {
 }
 
 fn main() {
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+
     if env::var("CARGO_FEATURE_FFMPEG_SYSTEM").is_err() {
         build_ffmpeg();
     }
@@ -67,14 +69,18 @@ fn main() {
     let mut cc_video = cc::Build::new();
     cc_video.file("lib/encode_video.c");
     cc_video.include("deps/dist/include");
-    #[cfg(any(target_os = "linux", target_os = "windows"))]
-    cc_video.define("HAS_NVENC", None);
-    #[cfg(target_os = "linux")]
-    cc_video.define("HAS_VAAPI", None);
-    #[cfg(target_os = "macos")]
-    cc_video.define("HAS_VIDEOTOOLBOX", None);
-    #[cfg(target_os = "windows")]
-    cc_video.define("HAS_MEDIAFOUNDATION", None);
+    if ["linux", "windows"].contains(&target_os.as_str()) {
+        cc_video.define("HAS_NVENC", None);
+    }
+    if target_os == "linux" {
+        cc_video.define("HAS_VAAPI", None);
+    }
+    if target_os == "macos" {
+        cc_video.define("HAS_VIDEOTOOLBOX", None);
+    }
+    if target_os == "windows" {
+        cc_video.define("HAS_MEDIAFOUNDATION", None);
+    }
     cc_video.compile("video");
     let ffmpeg_link_kind =
         // https://github.com/rust-lang/rust/pull/72785
@@ -98,17 +104,16 @@ fn main() {
         println!("cargo:rustc-link-search=deps/dist/lib");
     }
 
-    #[cfg(target_os = "linux")]
-    linux();
+    if target_os == "linux" {
+        linux();
+    }
 
-    #[cfg(target_os = "macos")]
-    {
+    if target_os == "macos" {
         println!("cargo:rustc-link-lib=framework=VideoToolbox");
         println!("cargo:rustc-link-lib=framework=CoreMedia");
     }
 
-    #[cfg(target_os = "windows")]
-    {
+    if target_os == "windows" {
         println!("cargo:rustc-link-lib=dylib=mfplat");
         println!("cargo:rustc-link-lib=dylib=mfuuid");
         println!("cargo:rustc-link-lib=dylib=ole32");
@@ -116,7 +121,6 @@ fn main() {
     }
 }
 
-#[cfg(target_os = "linux")]
 fn linux() {
     println!("cargo:rerun-if-changed=lib/linux/uniput.c");
     println!("cargo:rerun-if-changed=lib/linux/xcapture.c");
