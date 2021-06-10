@@ -10,7 +10,8 @@ cd x264
 	--enable-pic \
 	--enable-strip \
 	--disable-cli \
-	--disable-opencl
+	--disable-opencl \
+	$X264_EXTRA_ARGS
 
 make -j$NPROCS
 make install

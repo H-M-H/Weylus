@@ -118,6 +118,8 @@ fn main() {
         println!("cargo:rustc-link-lib=dylib=mfuuid");
         println!("cargo:rustc-link-lib=dylib=ole32");
         println!("cargo:rustc-link-lib=dylib=strmiids");
+        println!("cargo:rustc-link-lib=dylib=vfw32");
+        println!("cargo:rustc-link-lib=dylib=shlwapi");
     }
 }
 
