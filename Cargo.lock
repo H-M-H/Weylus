@@ -85,7 +85,7 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 [[package]]
 name = "autopilot"
 version = "0.4.0"
-source = "git+https://github.com/autopilot-rs/autopilot-rs.git#d659a7429ef4f6d12b88ab55c0f47e622c3ae5cf"
+source = "git+https://github.com/H-M-H/autopilot-rs.git?rev=63eed09c715bfb665bb23172a3930a528e11691c#63eed09c715bfb665bb23172a3930a528e11691c"
 dependencies = [
  "cocoa",
  "core-foundation 0.7.0",
