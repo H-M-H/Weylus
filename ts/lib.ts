@@ -743,12 +743,16 @@ function handle_messages(
             last_fps_calc = performance.now();
         }
         // only seek if there is data available, some browsers choke otherwise
-        if (video.seekable.length > 0 && video.readyState >= (settings.check_aggressive_seek.checked ? 3 : 4)) {
+        if (video.seekable.length > 0) {
             let seek_time = video.seekable.end(video.seekable.length - 1);
-            if (isFinite(seek_time))
-                video.currentTime = seek_time;
-            else
-                log(LogLevel.WARN, "Failed to seek to end of video.")
+            if (video.readyState >= (settings.check_aggressive_seek.checked ? 3 : 4)
+                // but make sure to catch up if the video is more than 5 seconds behind
+                || seek_time - video.currentTime > 5) {
+                if (isFinite(seek_time))
+                    video.currentTime = seek_time;
+                else
+                    log(LogLevel.WARN, "Failed to seek to end of video.")
+            }
 
         }
     }
