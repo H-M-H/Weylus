@@ -748,8 +748,8 @@ function handle_messages(
         if (video.seekable.length > 0) {
             let seek_time = video.seekable.end(video.seekable.length - 1);
             if (video.readyState >= (settings.check_aggressive_seek.checked ? 3 : 4)
-                // but make sure to catch up if the video is more than 5 seconds behind
-                || seek_time - video.currentTime > 5) {
+                // but make sure to catch up if the video is more than 3 seconds behind
+                || seek_time - video.currentTime > 3) {
                 if (isFinite(seek_time))
                     video.currentTime = seek_time;
                 else
