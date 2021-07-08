@@ -327,7 +327,7 @@ fn streams_from_response(response: OrgFreedesktopPortalRequestResponse) -> Vec<P
                         .collect::<HashMap<String, &dyn RefArg>>();
                     Some(PwStreamInfo {
                         path,
-                        source_type: attributes.get("source_type")?.as_u64()?,
+                        source_type: attributes.get("source_type").map_or(Some(0), |v| v.as_u64())?,
                     })
                 })
                 .collect::<Vec<PwStreamInfo>>(),
