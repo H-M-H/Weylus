@@ -570,6 +570,12 @@ class PointerHandler {
             canvas.onpointermove = (e) => this.onEvent(e, "pointermove");
         }
 
+        // This is a workaround for the following Safari/WebKit bug:
+        // https://bugs.webkit.org/show_bug.cgi?id=217430
+        // I have no idea why this works but it does.
+        video.ontouchmove = (e) => e.preventDefault();
+        canvas.ontouchmove = (e) => e.preventDefault();
+
         for (let elem of [video, canvas]) {
             elem.onwheel = (e) => {
                 this.webSocket.send(JSON.stringify({ "WheelEvent": new WEvent(e) }));
