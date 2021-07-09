@@ -53,19 +53,19 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         input_access_code.set_value(code);
     }
 
-    let input_bind_addr = Input::default()
+    let mut input_bind_addr = Input::default()
         .with_size(width, height)
         .below_of(&input_access_code, padding)
         .with_label("Bind Address");
     input_bind_addr.set_value(&config.bind_address.to_string());
 
-    let input_port = IntInput::default()
+    let mut input_port = IntInput::default()
         .with_size(width, height)
         .below_of(&input_bind_addr, padding)
         .with_label("Port");
     input_port.set_value(&config.web_port.to_string());
 
-    let input_ws_port = IntInput::default()
+    let mut input_ws_port = IntInput::default()
         .with_size(width, height)
         .below_of(&input_port, padding)
         .with_label("Websocket Port");

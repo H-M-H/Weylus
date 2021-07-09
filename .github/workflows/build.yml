@@ -89,9 +89,9 @@ jobs:
              rm 'C:\Windows\System32\bash.exe'
              # make sure to only use msvc's link.exe
              rm 'C:\Program Files\Git\usr\bin\link.exe'
-             curl -LO https://www.nasm.us/pub/nasm/releasebuilds/2.14.02/win64/nasm-2.14.02-win64.zip
-             7z x nasm-2.14.02-win64.zip
-             cp nasm-2.14.02/nasm.exe /usr/bin/nasm.exe
+             curl -LO https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/nasm-2.15.05-win64.zip
+             7z x nasm-2.15.05-win64.zip
+             cp nasm-2.15.05/nasm.exe /usr/bin/nasm.exe
              npm install typescript
              # default pkg-config is broken, fortunately this one comes first in PATH
              choco install pkgconfiglite
