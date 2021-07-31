@@ -798,11 +798,18 @@ function init(access_code: string, websocket_port: number) {
 
     let toggle_fullscreen_btn = document.getElementById("fullscreen") as HTMLButtonElement;
 
-    toggle_fullscreen_btn.onclick = () => {
-        if (!document.fullscreenElement)
-            document.body.requestFullscreen({ navigationUI: "hide" });
-        else
-            document.exitFullscreen();
+    if (document.exitFullscreen) {
+        toggle_fullscreen_btn.onclick = () => {
+            if (!document.fullscreenElement)
+                document.body.requestFullscreen({ navigationUI: "hide" });
+            else
+                document.exitFullscreen();
+        }
+    } else {
+        // if document.exitFullscreen is not present we are probably running on iOS/iPadOS.
+        // As input is broken in fullscreen mode on these, do not offer fullscreen in the first
+        // place.
+        toggle_fullscreen_btn.parentElement.removeChild(toggle_fullscreen_btn);
     }
 
     let handle_disconnect = (msg: string) => {
