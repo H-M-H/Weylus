@@ -788,12 +788,22 @@ function init(access_code: string, websocket_port: number) {
     settings = new Settings(webSocket);
 
     let video = document.getElementById("video") as HTMLVideoElement;
+    let canvas = document.getElementById("canvas") as HTMLCanvasElement;
 
     video.oncontextmenu = function(event) {
         event.preventDefault();
         event.stopPropagation();
         return false;
     };
+
+    let toggle_fullscreen_btn = document.getElementById("fullscreen") as HTMLButtonElement;
+
+    toggle_fullscreen_btn.onclick = () => {
+        if (!document.fullscreenElement)
+            document.body.requestFullscreen({ navigationUI: "hide" });
+        else
+            document.exitFullscreen();
+    }
 
     let handle_disconnect = (msg: string) => {
         document.body.onclick = video.onclick = (e) => {
@@ -806,7 +816,6 @@ function init(access_code: string, websocket_port: number) {
     webSocket.onclose = () => handle_disconnect("Connection closed.");
     window.onresize = () => {
         stretch_video();
-        let canvas = document.getElementById("canvas") as HTMLCanvasElement;
         canvas.width = window.innerWidth * window.devicePixelRatio;
         canvas.height = window.innerHeight * window.devicePixelRatio;
         let [w, h] = calc_max_video_resolution(settings.scale_video_input.valueAsNumber);
