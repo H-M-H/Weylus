@@ -8,7 +8,24 @@
 #include <string.h>
 
 #include "../error.h"
+#include "../log.h"
 #include "xhelper.h"
+
+int x11_error_handler(Display* disp, XErrorEvent* err)
+{
+	char buf1[128], buf2[128], message_selector[64];
+	XGetErrorText(disp, err->error_code, buf1, sizeof(buf1));
+	snprintf(message_selector, sizeof(message_selector), "XRequest.%d", err->request_code);
+	XGetErrorDatabaseText(disp, "", message_selector, message_selector, buf2, sizeof(buf2));
+	log_debug("X11 error: %s: %s 0x%lx", buf1, buf2, err->resourceid);
+	return 0;
+}
+
+void x11_set_error_handler() {
+	// setting an error handler is required as otherwise xlib may just exit the process, even though
+	// the error was recoverable.
+	XSetErrorHandler(x11_error_handler);
+}
 
 int locale_to_utf8(char* src, char* dest, size_t size)
 {

@@ -2,7 +2,6 @@ use std::iter::Iterator;
 use std::net::{IpAddr, SocketAddr};
 
 use std::sync::{mpsc, Arc, Mutex};
-use tokio::sync::mpsc as mpsc_tokio;
 use tracing::{error, info};
 
 use fltk::{
@@ -20,15 +19,9 @@ use fltk::{
 use pnet::datalink;
 
 use crate::config::{write_config, Config};
-use crate::video::EncoderOptions;
-use crate::web::{Gui2WebMessage, Web2GuiMessage};
-use crate::websocket::{Gui2WsMessage, Ws2GuiMessage, WsConfig};
+use crate::websocket::Ws2UiMessage;
 
 pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
-    // this makes sure XInitThreads is called before any threading is done
-    fltk::app::lock().unwrap();
-    fltk::app::unlock();
-
     let width = 200;
     let height = 30;
     let padding = 10;
@@ -174,11 +167,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     wind.end();
     wind.show();
 
-    let output_server_addr = Arc::new(Mutex::new(output_server_addr));
     let output_buf = Arc::new(Mutex::new(output_buf));
-
-    let (sender_ws2gui, receiver_ws2gui) = mpsc::channel();
-    let (sender_web2gui, receiver_web2gui) = mpsc::channel();
 
     std::thread::spawn(move || {
         while let Ok(log_message) = log_receiver.recv() {
@@ -187,114 +176,80 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         }
     });
 
-    {
-        let output_server_addr = output_server_addr.clone();
-        std::thread::spawn(move || {
-            while let Ok(message) = receiver_web2gui.recv() {
-                match message {
-                    Web2GuiMessage::Shutdown => {
-                        let mut output_server_addr = output_server_addr.lock().unwrap();
-                        output_server_addr.hide();
-                    }
-                }
-            }
-        });
-    }
-
-    {
-        std::thread::spawn(move || {
-            while let Ok(message) = receiver_ws2gui.recv() {
-                match message {
-                    Ws2GuiMessage::UInputInaccessible => {
-                        let w = 500;
-                        let h = 300;
-                        let mut pop_up = Window::default()
-                            .with_size(w, h)
-                            .center_screen()
-                            .with_label("Weylus - UInput inaccessible!");
-
-                        let buf = TextBuffer::default();
-                        let mut pop_up_text = TextDisplay::default().with_size(w, h);
-                        pop_up_text.set_buffer(buf);
-                        pop_up_text.wrap_mode(fltk::text::WrapMode::AtBounds, 5);
-                        let mut buf = pop_up_text.buffer().unwrap();
-                        buf.set_text(std::include_str!("strings/uinput_error.txt"));
-
-                        pop_up.end();
-                        pop_up.make_modal(true);
-                        pop_up.show();
-                    }
-                }
-            }
-        });
-    }
-
-    let mut sender_gui2ws: Option<mpsc::Sender<Gui2WsMessage>> = None;
-    let mut sender_gui2web: Option<mpsc_tokio::Sender<Gui2WebMessage>> = None;
-
+    let mut weylus = crate::weylus::Weylus::new();
     let mut is_server_running = false;
+    let auto_start = config.auto_start;
+    let mut config = config.clone();
 
-    let config_clone = config.clone();
     let mut toggle_server = move |but: &mut Button| {
         if let Err(err) = || -> Result<(), Box<dyn std::error::Error>> {
-            let mut config = config_clone.clone();
-
             if !is_server_running {
-                let access_code_string = input_access_code.value();
-                let access_code = match access_code_string.as_str() {
-                    "" => None,
-                    code => Some(code),
-                };
-                let bind_addr: IpAddr = input_bind_addr.value().parse()?;
-                let web_port: u16 = input_port.value().parse()?;
-                let ws_port: u16 = input_ws_port.value().parse()?;
+                {
+                    let access_code_string = input_access_code.value();
+                    let access_code = match access_code_string.as_str() {
+                        "" => None,
+                        code => Some(code),
+                    };
+                    let bind_addr: IpAddr = input_bind_addr.value().parse()?;
+                    let web_port: u16 = input_port.value().parse()?;
+                    let ws_port: u16 = input_ws_port.value().parse()?;
 
-                let (sender_gui2ws_tmp, receiver_gui2ws) = mpsc::channel();
-                sender_gui2ws = Some(sender_gui2ws_tmp);
-                let encoder_options = EncoderOptions {
+                    config.access_code = access_code.map(|s| s.to_string());
+                    config.web_port = web_port;
+                    config.websocket_port = ws_port;
+                    config.bind_address = bind_addr;
+                    config.auto_start = check_auto_start.is_checked();
                     #[cfg(target_os = "linux")]
-                    try_vaapi: check_native_hw_accel.is_checked(),
-                    #[cfg(not(target_os = "linux"))]
-                    try_vaapi: false,
-
+                    {
+                        config.try_vaapi = check_native_hw_accel.is_checked();
+                        config.wayland_support = check_wayland.is_checked();
+                    }
                     #[cfg(any(target_os = "linux", target_os = "windows"))]
-                    try_nvenc: check_nvenc.is_checked(),
-                    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-                    try_nvenc: false,
-
+                    {
+                        config.try_nvenc = check_nvenc.is_checked();
+                    }
                     #[cfg(target_os = "macos")]
-                    try_videotoolbox: check_native_hw_accel.is_checked(),
-                    #[cfg(not(target_os = "macos"))]
-                    try_videotoolbox: false,
-
+                    {
+                        config.try_videotoolbox = check_native_hw_accel.is_checked();
+                    }
                     #[cfg(target_os = "windows")]
-                    try_mediafoundation: check_native_hw_accel.is_checked(),
-                    #[cfg(not(target_os = "windows"))]
-                    try_mediafoundation: false,
-                };
-                let ws_config = WsConfig {
-                    address: SocketAddr::new(bind_addr, ws_port),
-                    access_code: access_code.map(|s| s.into()),
-                    encoder_options,
-                    #[cfg(target_os = "linux")]
-                    wayland_support: check_wayland.is_checked(),
-                };
-                crate::websocket::run(sender_ws2gui.clone(), receiver_gui2ws, ws_config);
+                    {
+                        config.try_mediafoundation = check_native_hw_accel.is_checked();
+                    }
+                }
+                if !weylus.start(
+                    &config,
+                    |_| {},
+                    |message| match message {
+                        Ws2UiMessage::UInputInaccessible => {
+                            let w = 500;
+                            let h = 300;
+                            let mut pop_up = Window::default()
+                                .with_size(w, h)
+                                .center_screen()
+                                .with_label("Weylus - UInput inaccessible!");
 
-                let (sender_gui2web_tmp, receiver_gui2web) = mpsc_tokio::channel(100);
-                sender_gui2web = Some(sender_gui2web_tmp);
-                let mut web_sock = SocketAddr::new(bind_addr, web_port);
-                crate::web::run(
-                    sender_web2gui.clone(),
-                    receiver_gui2web,
-                    &web_sock,
-                    ws_port,
-                    access_code,
-                    config.custom_index_html.clone(),
-                    config.custom_access_html.clone(),
-                    config.custom_style_css.clone(),
-                    config.custom_lib_js.clone(),
-                );
+                            let buf = TextBuffer::default();
+                            let mut pop_up_text = TextDisplay::default().with_size(w, h);
+                            pop_up_text.set_buffer(buf);
+                            pop_up_text.wrap_mode(fltk::text::WrapMode::AtBounds, 5);
+                            let mut buf = pop_up_text.buffer().unwrap();
+                            buf.set_text(std::include_str!("strings/uinput_error.txt"));
+
+                            pop_up.end();
+                            pop_up.make_modal(true);
+                            pop_up.show();
+                        }
+                        _ => {}
+                    },
+                ) {
+                    return Ok(());
+                }
+                is_server_running = true;
+
+                write_config(&config);
+
+                let mut web_sock = SocketAddr::new(config.bind_address, config.web_port);
 
                 #[cfg(not(target_os = "windows"))]
                 {
@@ -322,12 +277,11 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                             info!("Found more than one IP address for browsers to connect to,");
                             info!("other urls are:");
                             for ip in &ips[1..] {
-                                info!("http://{}", SocketAddr::new(*ip, web_port));
+                                info!("http://{}", SocketAddr::new(*ip, config.web_port));
                             }
                         }
                     }
                 }
-                let mut output_server_addr = output_server_addr.lock()?;
 
                 #[cfg(not(target_os = "windows"))]
                 {
@@ -335,9 +289,8 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     use qrcode::QrCode;
                     let addr_string = format!("http://{}", web_sock.to_string());
                     output_server_addr.set_value(&addr_string);
-                    let access_code = access_code.map(|s| s.to_string());
                     let mut url_string = addr_string;
-                    if let Some(access_code) = &access_code {
+                    if let Some(access_code) = &config.access_code {
                         url_string.push_str("?access_code=");
                         url_string.push_str(
                             &percent_encoding::utf8_percent_encode(
@@ -374,61 +327,24 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                 }
                 output_server_addr.show();
                 but.set_label("Stop");
-                config.access_code = access_code.map(|s| s.to_string());
-                config.web_port = web_port;
-                config.websocket_port = ws_port;
-                config.bind_address = bind_addr;
-                config.auto_start = check_auto_start.is_checked();
-                #[cfg(target_os = "linux")]
-                {
-                    config.try_vaapi = check_native_hw_accel.is_checked();
-                    config.wayland_support = check_wayland.is_checked();
-                }
-                #[cfg(any(target_os = "linux", target_os = "windows"))]
-                {
-                    config.try_nvenc = check_nvenc.is_checked();
-                }
-                #[cfg(target_os = "macos")]
-                {
-                    config.try_videotoolbox = check_native_hw_accel.is_checked();
-                }
-                #[cfg(target_os = "windows")]
-                {
-                    config.try_mediafoundation = check_native_hw_accel.is_checked();
-                }
-                write_config(&config);
             } else {
-                if let Some(mut sender_gui2web) = sender_gui2web.clone() {
-                    sender_gui2web.try_send(Gui2WebMessage::Shutdown)?;
-                }
-
-                if let Some(sender_gui2ws) = sender_gui2ws.clone() {
-                    sender_gui2ws.send(Gui2WsMessage::Shutdown)?;
-                }
+                weylus.stop();
                 but.set_label("Start");
+                output_server_addr.hide();
                 qr_frame.hide();
+                is_server_running = false;
             }
-            is_server_running = !is_server_running;
             Ok(())
         }() {
             error!("{}", err);
         };
     };
 
-    if config.auto_start {
+    if auto_start {
         toggle_server(&mut but_toggle);
     }
 
     but_toggle.set_callback(toggle_server);
-
-    #[cfg(target_os = "linux")]
-    if let Err(err) = gstreamer::init() {
-        error!(
-            "Failed to initialize gstreamer, screen capturing will most likely not work \
-            on Wayland: {}",
-            err
-        );
-    }
 
     app.run().expect("Failed to run Gui!");
 }

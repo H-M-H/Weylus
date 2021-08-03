@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::net::{SocketAddr, TcpStream};
+use std::sync::mpsc::SendError;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     mpsc, Arc, Mutex,
@@ -24,11 +25,13 @@ use crate::video::{EncoderOptions, VideoEncoder};
 type WsWriter = Arc<Mutex<websocket::sender::Writer<std::net::TcpStream>>>;
 type WsClients = Arc<Mutex<HashMap<SocketAddr, Arc<Mutex<Writer<TcpStream>>>>>>;
 
-pub enum Ws2GuiMessage {
+pub enum Ws2UiMessage {
+    Start,
     UInputInaccessible,
+    Error(String),
 }
 
-pub enum Gui2WsMessage {
+pub enum Ui2WsMessage {
     Shutdown,
 }
 
@@ -41,11 +44,17 @@ pub struct WsConfig {
     pub wayland_support: bool,
 }
 
+fn log_send_error<T>(res: Result<(), SendError<T>>) {
+    if let Err(err) = res {
+        warn!("Websocket: Failed to send message to ui: {}", err);
+    }
+}
+
 pub fn run(
-    sender: mpsc::Sender<Ws2GuiMessage>,
-    receiver: mpsc::Receiver<Gui2WsMessage>,
+    sender: mpsc::Sender<Ws2UiMessage>,
+    receiver: mpsc::Receiver<Ui2WsMessage>,
     config: WsConfig,
-) {
+) -> std::thread::JoinHandle<()> {
     let clients = Arc::new(Mutex::new(HashMap::<
         SocketAddr,
         Arc<Mutex<Writer<TcpStream>>>,
@@ -55,29 +64,32 @@ pub fn run(
     let shutdown2 = shutdown.clone();
 
     spawn(move || match receiver.recv() {
-        Err(_) | Ok(Gui2WsMessage::Shutdown) => {
+        Err(_) | Ok(Ui2WsMessage::Shutdown) => {
             let clients = clients.lock().unwrap();
             for client in clients.values() {
                 let client = client.lock().unwrap();
                 if let Err(err) = client.shutdown_all() {
-                    error!("Could not shutdown websocket: {}", err);
+                    error!("Could not shutdown websocket client: {}", err);
                 }
             }
             shutdown.store(true, Ordering::Relaxed);
         }
     });
-    spawn(move || listen_websocket(config, clients2, shutdown2, sender));
+    spawn(move || listen_websocket(config, clients2, shutdown2, sender))
 }
 
 fn listen_websocket(
     config: WsConfig,
     clients: WsClients,
     shutdown: Arc<AtomicBool>,
-    sender: mpsc::Sender<Ws2GuiMessage>,
+    sender: mpsc::Sender<Ws2UiMessage>,
 ) {
     let server = Server::bind(config.address);
     if let Err(err) = server {
-        error!("Failed binding to socket: {}", err);
+        log_send_error(sender.send(Ws2UiMessage::Error(format!(
+            "Failed binding to socket: {}",
+            err
+        ))));
         return;
     }
     let mut server = server.unwrap();
@@ -87,6 +99,8 @@ fn listen_websocket(
             err
         );
     }
+
+    log_send_error(sender.send(Ws2UiMessage::Start));
 
     loop {
         std::thread::sleep(std::time::Duration::from_millis(10));
@@ -114,7 +128,7 @@ fn handle_connection(
     request: WsUpgrade<TcpStream, Option<WsBuffer>>,
     clients: WsClients,
     config: WsConfig,
-    gui_sender: mpsc::Sender<Ws2GuiMessage>,
+    gui_sender: mpsc::Sender<Ws2UiMessage>,
 ) {
     let client = request.accept();
     if let Err((_, err)) = client {
@@ -349,7 +363,7 @@ struct WsHandler {
     video_sender: mpsc::Sender<VideoCommands>,
     input_device: Option<Box<dyn InputDevice>>,
     capturables: Vec<Box<dyn Capturable>>,
-    gui_sender: mpsc::Sender<Ws2GuiMessage>,
+    gui_sender: mpsc::Sender<Ws2UiMessage>,
     ws_config: WsConfig,
     #[cfg(target_os = "linux")]
     capture_cursor: bool,
@@ -360,7 +374,7 @@ impl WsHandler {
         sender: WsWriter,
         client_addr: &SocketAddr,
         config: WsConfig,
-        gui_sender: mpsc::Sender<Ws2GuiMessage>,
+        gui_sender: mpsc::Sender<Ws2UiMessage>,
     ) -> Self {
         let (video_sender, video_receiver) = mpsc::channel::<VideoCommands>();
         {
@@ -464,7 +478,7 @@ impl WsHandler {
                         error!("Failed to create uinput device: {}", err);
                         if let CErrorCode::UInputNotAccessible = err.to_enum() {
                             if let Err(err) =
-                                self.gui_sender.send(Ws2GuiMessage::UInputInaccessible)
+                                self.gui_sender.send(Ws2UiMessage::UInputInaccessible)
                             {
                                 warn!("Failed to send message to gui thread: {}!", err);
                             }

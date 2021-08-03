@@ -61,7 +61,7 @@ async fn serve(
     addr: SocketAddr,
     req: Request<Body>,
     context: Arc<Context<'_>>,
-    _sender: mpsc::Sender<Web2GuiMessage>,
+    _sender: mpsc::Sender<Web2UiMessage>,
 ) -> Result<Response<Body>, hyper::Error> {
     debug!("Got request: {:?}", req);
     let mut authed = false;
@@ -139,14 +139,15 @@ async fn serve(
 }
 
 #[derive(Debug)]
-pub enum Gui2WebMessage {
+pub enum Ui2WebMessage {
     Shutdown,
 }
-pub enum Web2GuiMessage {
-    Shutdown,
+pub enum Web2UiMessage {
+    Start,
+    Error(String),
 }
 
-fn log_gui_send_error<T>(res: Result<(), SendError<T>>) {
+fn log_send_error<T>(res: Result<(), SendError<T>>) {
     if let Err(err) = res {
         warn!("Webserver: Failed to send message to gui: {}", err);
     }
@@ -164,8 +165,8 @@ struct Context<'a> {
 }
 
 pub fn run(
-    sender: mpsc::Sender<Web2GuiMessage>,
-    receiver: mpsc_tokio::Receiver<Gui2WebMessage>,
+    sender: mpsc::Sender<Web2UiMessage>,
+    receiver: mpsc_tokio::Receiver<Ui2WebMessage>,
     bind_addr: &SocketAddr,
     ws_port: u16,
     access_code: Option<&str>,
@@ -173,7 +174,7 @@ pub fn run(
     custom_access_html: Option<String>,
     custom_style_css: Option<String>,
     custom_lib_js: Option<String>,
-) {
+) -> std::thread::JoinHandle<()> {
     let mut templates = Handlebars::new();
     templates
         .register_template_string("index", INDEX_HTML)
@@ -194,14 +195,14 @@ pub fn run(
         custom_lib_js,
         templates,
     };
-    std::thread::spawn(move || run_server(context, sender, receiver));
+    std::thread::spawn(move || run_server(context, sender, receiver))
 }
 
 #[tokio::main]
 async fn run_server(
     context: Context<'static>,
-    sender: mpsc::Sender<Web2GuiMessage>,
-    mut receiver: mpsc_tokio::Receiver<Gui2WebMessage>,
+    sender: mpsc::Sender<Web2UiMessage>,
+    mut receiver: mpsc_tokio::Receiver<Ui2WebMessage>,
 ) {
     let addr = context.bind_addr;
     let context = Arc::new(context);
@@ -219,17 +220,27 @@ async fn run_server(
             }))
         }
     });
-    let server = Server::bind(&addr).serve(service);
+    let server = match Server::try_bind(&addr) {
+        Ok(builder) => builder.serve(service),
+        Err(err) => {
+            log_send_error(sender2.send(Web2UiMessage::Error(format!(
+                "Failed to start webserver: {}",
+                err
+            ))));
+            return;
+        }
+    };
     let server = server.with_graceful_shutdown(async move {
-        match receiver.recv().await {
-            Some(Gui2WebMessage::Shutdown) => {}
-            None => {}
+        loop {
+            match receiver.recv().await {
+                Some(Ui2WebMessage::Shutdown) => break,
+                None => break,
+            }
         }
     });
     info!("Webserver listening at {}...", addr);
-    match server.await {
-        Ok(_) => info!("Webserver shutdown!"),
-        Err(err) => error!("Webserver exited error: {}", err),
+    log_send_error(sender2.send(Web2UiMessage::Start));
+    if let Err(err) = server.await {
+        error!("Webserver exited error: {}", err)
     };
-    log_gui_send_error(sender2.send(Web2GuiMessage::Shutdown));
 }

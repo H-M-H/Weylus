@@ -43,6 +43,9 @@ pub struct Config {
     #[structopt(long, help = "Start Weylus server immediately on program start.")]
     #[serde(default)]
     pub auto_start: bool,
+    #[structopt(long, help = "Run Weylus without gui and start immediately.")]
+    #[serde(default)]
+    pub no_gui: bool,
     #[cfg(target_os = "linux")]
     #[structopt(long, help = "Wayland/PipeWire Support.")]
     #[serde(default)]

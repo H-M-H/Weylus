@@ -12,6 +12,11 @@ use tracing::debug;
 extern "C" {
     fn XOpenDisplay(name: *const c_char) -> *mut c_void;
     fn XCloseDisplay(disp: *mut c_void) -> c_int;
+    fn XInitThreads() -> c_int;
+    fn XLockDisplay(disp: *mut c_void);
+    fn XUnlockDisplay(disp: *mut c_void);
+
+    fn x11_set_error_handler();
 
     fn create_capturables(
         disp: *mut c_void,
@@ -47,6 +52,13 @@ extern "C" {
         err: *mut CError,
     );
     fn stop_capture(handle: *mut c_void, err: *mut CError);
+}
+
+pub fn x11_init() {
+    unsafe {
+        XInitThreads();
+        x11_set_error_handler();
+    }
 }
 
 pub struct X11Capturable {
@@ -88,7 +100,7 @@ impl Capturable for X11Capturable {
         let mut width: c_float = 0.0;
         let mut height: c_float = 0.0;
         let mut err = CError::new();
-        fltk::app::lock().unwrap();
+        self.disp.lock();
         unsafe {
             get_geometry_relative(
                 self.handle,
@@ -99,7 +111,7 @@ impl Capturable for X11Capturable {
                 &mut err,
             );
         }
-        fltk::app::unlock();
+        self.disp.unlock();
         if err.is_err() {
             return Err(Box::new(err));
         }
@@ -108,9 +120,9 @@ impl Capturable for X11Capturable {
 
     fn before_input(&mut self) -> Result<(), Box<dyn Error>> {
         let mut err = CError::new();
-        fltk::app::lock().unwrap();
+        self.disp.lock();
         unsafe { capturable_before_input(self.handle, &mut err) };
-        fltk::app::unlock();
+        self.disp.unlock();
         if err.is_err() {
             Err(Box::new(err))
         } else {
@@ -152,13 +164,21 @@ impl XDisplay {
         }
         Some(Self { handle })
     }
+
+    pub fn lock(&self) {
+        unsafe { XLockDisplay(self.handle) }
+    }
+
+    pub fn unlock(&self) {
+        unsafe { XUnlockDisplay(self.handle) }
+    }
 }
 
 impl Drop for XDisplay {
     fn drop(&mut self) {
-        fltk::app::lock().unwrap();
+        self.lock();
         unsafe { XCloseDisplay(self.handle) };
-        fltk::app::unlock();
+        self.unlock();
     }
 }
 
@@ -177,7 +197,7 @@ impl X11Context {
     pub fn capturables(&mut self) -> Result<Vec<X11Capturable>, CError> {
         let mut err = CError::new();
         let mut handles = [std::ptr::null_mut::<c_void>(); 128];
-        fltk::app::lock().unwrap();
+        self.disp.lock();
         let size = unsafe {
             create_capturables(
                 self.disp.handle,
@@ -186,7 +206,7 @@ impl X11Context {
                 &mut err,
             )
         };
-        fltk::app::unlock();
+        self.disp.unlock();
         if err.is_err() {
             if err.code() == 2 {
                 debug!("{}", err);
@@ -204,9 +224,9 @@ impl X11Context {
     }
 
     pub fn map_input_device_to_entire_screen(&mut self, device_name: &str, pen: bool) -> CError {
-        fltk::app::lock().unwrap();
         let mut err = CError::new();
         let device_name_c_str = CString::new(device_name).unwrap();
+        self.disp.lock();
         unsafe {
             map_input_device_to_entire_screen(
                 self.disp.handle,
@@ -215,7 +235,7 @@ impl X11Context {
                 &mut err,
             )
         };
-        fltk::app::unlock();
+        self.disp.unlock();
         if err.is_err() {
             debug!("Failed to map input device to screen: {}", &err);
         }
@@ -260,9 +280,9 @@ pub struct RecorderX11 {
 impl RecorderX11 {
     pub fn new(mut capturable: X11Capturable, capture_cursor: bool) -> Result<Self, CError> {
         let mut err = CError::new();
-        fltk::app::lock().unwrap();
+        capturable.disp.lock();
         let handle = unsafe { start_capture(capturable.handle(), std::ptr::null_mut(), &mut err) };
-        fltk::app::unlock();
+        capturable.disp.unlock();
         if err.is_err() {
             Err(err)
         } else {
@@ -279,18 +299,18 @@ impl RecorderX11 {
 impl Drop for RecorderX11 {
     fn drop(&mut self) {
         let mut err = CError::new();
-        fltk::app::lock().unwrap();
+        self.capturable.disp.lock();
         unsafe {
             stop_capture(self.handle, &mut err);
         }
-        fltk::app::unlock();
+        self.capturable.disp.unlock();
     }
 }
 
 impl Recorder for RecorderX11 {
     fn capture(&mut self) -> Result<PixelProvider, Box<dyn Error>> {
         let mut err = CError::new();
-        fltk::app::lock().unwrap();
+        self.capturable.disp.lock();
         unsafe {
             capture_screen(
                 self.handle,
@@ -299,7 +319,7 @@ impl Recorder for RecorderX11 {
                 &mut err,
             );
         }
-        fltk::app::unlock();
+        self.capturable.disp.unlock();
         if err.is_err() {
             self.img.data = std::ptr::null();
             Err(err.into())

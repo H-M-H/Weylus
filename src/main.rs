@@ -5,6 +5,8 @@ extern crate test;
 #[macro_use]
 extern crate bitflags;
 
+use tracing::{error, warn};
+
 use std::sync::mpsc;
 
 use config::get_config;
@@ -19,6 +21,7 @@ mod protocol;
 mod video;
 mod web;
 mod websocket;
+mod weylus;
 
 fn main() {
     let (sender, receiver) = mpsc::sync_channel::<String>(100);
@@ -42,7 +45,36 @@ fn main() {
         print!("{}", web::LIB_JS);
         return;
     }
-    gui::run(&conf, receiver);
+
+    #[cfg(target_os = "linux")]
+    {
+        // make sure XInitThreads is called before any threading is done
+        crate::capturable::x11::x11_init();
+
+        if let Err(err) = gstreamer::init() {
+            error!(
+                "Failed to initialize gstreamer, screen capturing will most likely not work \
+                 on Wayland: {}",
+                err
+            );
+        }
+    }
+
+    if !conf.no_gui {
+        gui::run(&conf, receiver);
+    } else {
+        let mut weylus = crate::weylus::Weylus::new();
+        weylus.start(
+            &conf,
+            |_| {},
+            |msg| {
+                if let crate::websocket::Ws2UiMessage::UInputInaccessible = msg {
+                    warn!(std::include_str!("strings/uinput_error.txt"));
+                }
+            },
+        );
+        weylus.wait();
+    }
 }
 
 #[cfg(feature = "bench")]
@@ -86,7 +118,9 @@ mod tests {
     #[bench]
     fn bench_capture_wayland(b: &mut Bencher) {
         gstreamer::init().unwrap();
-        let root = capturable::pipewire::get_capturables(false).unwrap().remove(0);
+        let root = capturable::pipewire::get_capturables(false)
+            .unwrap()
+            .remove(0);
         let mut r = root.recorder(false).unwrap();
         let _ = r.capture();
         b.iter(|| {
@@ -98,7 +132,9 @@ mod tests {
     #[bench]
     fn bench_video_wayland(b: &mut Bencher) {
         gstreamer::init().unwrap();
-        let root = capturable::pipewire::get_capturables(false).unwrap().remove(0);
+        let root = capturable::pipewire::get_capturables(false)
+            .unwrap()
+            .remove(0);
         let mut r = root.recorder(false).unwrap();
         let (width, height) = r.capture().unwrap().size();
 
