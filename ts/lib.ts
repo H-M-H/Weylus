@@ -69,6 +69,34 @@ function calc_max_video_resolution(scale: number) {
     ];
 }
 
+function fresh_canvas() {
+    let canvas_old = document.getElementById("canvas");
+    let canvas = document.createElement("canvas");
+    canvas.id = canvas_old.id;
+    canvas_old.classList.forEach((cls) => canvas.classList.add(cls));
+    canvas_old.replaceWith(canvas);
+    return canvas;
+}
+
+function toggle_energysaving(energysaving: boolean) {
+    let canvas = fresh_canvas();
+    if (energysaving) {
+        let ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    if (settings) {
+        if (energysaving) {
+            settings.checks.get("enable_video").checked = false;
+            settings.checks.get("enable_video").disabled = true;
+            settings.checks.get("enable_video").dispatchEvent(new Event("change"));
+        } else
+            settings.checks.get("enable_video").disabled = false;
+        new PointerHandler(settings.webSocket);
+    }
+}
+
 class Settings {
     webSocket: WebSocket;
     checks: Map<string, HTMLInputElement>;
@@ -146,10 +174,18 @@ class Settings {
             this.save_settings();
         }
 
-        let upd_pointer_filter = () => { this.save_settings(); new PointerHandler(this.webSocket); }
-        this.checks.get("enable_mouse").onchange = upd_pointer_filter;
-        this.checks.get("enable_stylus").onchange = upd_pointer_filter;
-        this.checks.get("enable_touch").onchange = upd_pointer_filter;
+        let upd_pointer = () => {
+            this.save_settings();
+            new PointerHandler(this.webSocket);
+        }
+        this.checks.get("enable_mouse").onchange = upd_pointer;
+        this.checks.get("enable_stylus").onchange = upd_pointer;
+        this.checks.get("enable_touch").onchange = upd_pointer;
+
+        this.checks.get("energysaving").onchange = (e) => {
+            this.save_settings();
+            toggle_energysaving((e.target as HTMLInputElement).checked);
+        };
 
         this.frame_update_limit_input.onchange = () => this.save_settings();
         this.range_min_pressure.onchange = () => this.save_settings();
@@ -223,9 +259,16 @@ class Settings {
                 this.settings.classList.add("lefty");
             }
 
-            if (!this.checks.get("enable_video").checked) {
+            if (!this.checks.get("enable_video").checked || this.checks.get("energysaving").checked) {
+                this.checks.get("enable_video").checked = false;
+                if (this.checks.get("energysaving").checked)
+                    this.checks.get("enable_video").disabled = true;
                 document.getElementById("video").classList.add("vanish");
                 document.getElementById("canvas").classList.remove("vanish");
+            }
+
+            if (this.checks.get("energysaving").checked) {
+                toggle_energysaving(true);
             }
 
         } catch {
@@ -557,8 +600,11 @@ class PointerHandler {
         video.onpointercancel = (e) => this.onEvent(e, "pointercancel");
         video.onpointermove = (e) => this.onEvent(e, "pointermove");
 
-        let painter = new Painter(canvas as HTMLCanvasElement);
-        if (painter.initialized) {
+        let painter: Painter;
+        if (!settings.checks.get("energysaving").checked)
+            painter = new Painter(canvas as HTMLCanvasElement);
+
+        if (painter && painter.initialized) {
             canvas.onpointerdown = (e) => { this.onEvent(e, "pointerdown"); painter.onstart(e); };
             canvas.onpointerup = (e) => { this.onEvent(e, "pointerup"); painter.onstop(e); };
             canvas.onpointercancel = (e) => { this.onEvent(e, "pointercancel"); painter.onstop(e); };
