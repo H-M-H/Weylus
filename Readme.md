@@ -13,6 +13,7 @@ Weylus in action with [Xournal++](https://github.com/xournalpp/xournalpp):
     * [Packages](#packages)
 * [Running](#running)
     * [Fullscreen](#fullscreen)
+    * [Keyboard Input](#keyboard-input)
     * [Linux](#linux)
         * [Wayland](#wayland)
         * [Hardware Acceleration](#hardware-acceleration)
@@ -34,7 +35,7 @@ Weylus in action with [Xournal++](https://github.com/xournalpp/xournalpp):
 ## Features
 - Control your mouse with your tablet
 - Mirror your screen to your tablet
-- Send keyboard input
+- Send keyboard input using physical keyboards
 - Hardware accelerated video encoding
 
 The above features are available on all Operating Systems but Weylus works best on Linux. Additional
@@ -71,12 +72,17 @@ sudo ufw allow 1701/tcp
 sudo ufw allow 9001/tcp
 ```
 
-Currently there is no .desktop file included with Weylus, so you need to start it from the
-terminal by running `weylus`.
+Please only run Weylus in networks you trust as there is no encryption to enable minimal latencies.
 
 ### Fullscreen
 You may want to add a bookmark to your home screen on your tablet as this enables running Weylus in
-full screen mode (on iOS/iPadOS this needs to be done with Safari).
+full screen mode (on iOS/iPadOS this needs to be done with Safari). If you are not on iOS/iPadOS
+there is a button to toggle full screen mode.
+
+### Keyboard Input
+Weylus supports keyboard input for physical keyboards, so if you have a Bluetooth keyboard, just
+connect it to your tablet and start typing. Due to technical limitations onscreen keyboards are not
+supported.
 
 ### Linux
 Weylus uses the `uinput` interface to simulate input events on Linux. **To enable stylus and
