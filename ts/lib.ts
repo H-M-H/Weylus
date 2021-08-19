@@ -828,7 +828,8 @@ function init(access_code: string, websocket_port: number) {
     check_apis();
 
     let authed = false;
-    let webSocket = new WebSocket("ws://" + window.location.hostname + ":" + websocket_port);
+    let protocol = document.location.protocol == "https:" ? "wss://" : "ws://";
+    let webSocket = new WebSocket(protocol + window.location.hostname + ":" + websocket_port);
     webSocket.binaryType = "arraybuffer";
 
     settings = new Settings(webSocket);
