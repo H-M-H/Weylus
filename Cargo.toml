@@ -9,22 +9,22 @@ description = "Use your iPad or Android tablet as graphic tablet."
 [dependencies]
 hyper = "^0.13"
 url = "^2.2"
-tokio = { version = "0.2", features = ["full"] }
-handlebars = "^3.5"
-websocket = "^0.26"
+tokio = { version = "0.2", features = ["macros"] }
+handlebars = "^4.1"
+websocket = { version = "^0.26", features = ["sync"], default-features = false }
 autopilot = { git = "https://github.com/H-M-H/autopilot-rs.git", rev = "63eed09c715bfb665bb23172a3930a528e11691c" }
 serde = { version = "^1.0", features = ["derive"] }
 serde_json = "^1.0"
 tracing = "^0.1"
-tracing-subscriber = "^0.2"
+tracing-subscriber = { version = "^0.2", features = ["ansi"], default-features = false }
 bitflags = "^1.2"
-image_autopilot = { package = "image", version = "0.22.5" }
-image = "^0.23"
-fltk = { version = "^1", features = ["no-pango"]}
+image_autopilot = { package = "image", version = "0.22.5", features = [], default-features = false }
+image = { version = "^0.23", features = ["png"], default-features = false }
+fltk = { version = "^1", features = ["no-pango"] }
 qrcode = "0.12.0"
 percent-encoding = "2.1.0"
 toml = "^0.5"
-structopt = "^0.3"
+structopt = { version = "^0.3", features = [], default-features = false }
 dirs = "^3.0"
 
 [build-dependencies]
