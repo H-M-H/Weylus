@@ -14,11 +14,26 @@ pub struct TestRecorder {
     i: usize,
 }
 
+fn set_default_pixel(buf: &mut [u8], w: usize, x: usize, y: usize) {
+    let pos = (x + y * w) * 4;
+    let i = x * 8 / w;
+    buf[pos] = if i & 1 != 0 { 255 } else { 0 };
+    buf[pos + 1] = if i & 2 != 0 { 255 } else { 0 };
+    buf[pos + 2] = if i & 4 != 0 { 255 } else { 0 };
+}
+
 impl TestRecorder {
     fn new(capturable: TestCapturable) -> Self {
+        let mut buf = vec![0; capturable.width * capturable.height * 4];
+        let buf_ref = buf.as_mut();
+        for y in 0..capturable.height {
+            for x in 0..capturable.width {
+                set_default_pixel(buf_ref, capturable.width, x, y);
+            }
+        }
         Self {
             capturable,
-            buf: vec![0; capturable.width * capturable.height * 4],
+            buf,
             i: 0,
         }
     }
@@ -41,20 +56,24 @@ impl Capturable for TestCapturable {
 
 impl Recorder for TestRecorder {
     fn capture(&mut self) -> Result<PixelProvider, Box<dyn Error>> {
-        let i = self.i;
-        let dw = (self.capturable.width / 256 * 2).max(1);
-        let dh = (self.capturable.height / 256 * 2).max(1);
-        for y in 0..self.capturable.height {
-            for x in 0..self.capturable.width {
-                let pos = x * y * 4;
-                let xr = x / dw;
-                let yr = y / dh;
-                self.buf[pos] = ((xr + yr + i) % 256) as u8;
-                self.buf[pos + 1] = ((xr + yr + i / 2) % 256) as u8;
-                self.buf[pos + 2] = ((xr + yr + 2 * i) % 256) as u8;
+        const N: usize = 120;
+        let dh = self.capturable.height / N;
+        let buf_ref = self.buf.as_mut();
+        let w = self.capturable.width;
+        for y in self.i * dh..(self.i + 1) * dh {
+            for x in 0..w {
+                set_default_pixel(buf_ref, w, x, y);
             }
         }
-        self.i += 1;
+        self.i = (self.i + 1) % N;
+        for y in self.i * dh..(self.i + 1) * dh {
+            for x in 0..w {
+                let pos = (x + y * w) * 4;
+                buf_ref[pos] = ((self.i + N * x / w) % N * 256 / N) as u8;
+                buf_ref[pos + 1] = ((self.i + N * x / w + N / 3) % N * 256 / N) as u8;
+                buf_ref[pos + 2] = ((self.i + N * x / w + 2 * N / 3) % N * 256 / N) as u8;
+            }
+        }
         Ok(PixelProvider::BGR0(
             self.capturable.width,
             self.capturable.height,
