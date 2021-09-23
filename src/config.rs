@@ -77,6 +77,10 @@ pub struct Config {
     #[structopt(long, help = "Use custom lib.js to be served by Weylus.")]
     #[serde(skip)]
     pub custom_lib_js: Option<String>,
+
+    #[structopt(long, help = "Print shell completions for given shell.")]
+    #[serde(skip)]
+    pub completions: Option<structopt::clap::Shell>,
 }
 
 pub fn read_config() -> Option<Config> {

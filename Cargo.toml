@@ -24,7 +24,7 @@ fltk = { version = "^1", features = ["no-pango"] }
 qrcode = "0.12.0"
 percent-encoding = "2.1.0"
 toml = "^0.5"
-structopt = { version = "^0.3", features = [], default-features = false }
+structopt = { version = "^0.3", features = ["color", "suggestions"], default-features = false }
 dirs = "^3.0"
 
 [build-dependencies]

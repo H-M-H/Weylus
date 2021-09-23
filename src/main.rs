@@ -9,7 +9,8 @@ use tracing::{error, warn};
 
 use std::sync::mpsc;
 
-use config::get_config;
+use config::{get_config, Config};
+use structopt::StructOpt;
 
 mod capturable;
 mod cerror;
@@ -29,6 +30,12 @@ fn main() {
     log::setup_logging(sender);
 
     let conf = get_config();
+
+    if let Some(shell) = conf.completions {
+        Config::clap().gen_completions_to("weylus", shell, &mut std::io::stdout());
+        return;
+    }
+
     if conf.print_index_html {
         print!("{}", web::INDEX_HTML);
         return;
