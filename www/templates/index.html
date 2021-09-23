@@ -14,8 +14,10 @@
     </head>
 
     <body>
-        <video id="video" autoplay muted defaultMuted playsinline></video>
-        <canvas id="canvas" class="vanish"></canvas>
+        <main id="main">
+            <video id="video" autoplay muted defaultMuted playsinline></video>
+            <canvas id="canvas" class="vanish"></canvas>
+        </main>
         <div id="settings">
             <div id="handle">⠿</div>
             <div id="settings_scroll">
@@ -28,7 +30,7 @@
                 <h3>Video</h3>
                 <section>
                     <label><input type="checkbox" id="enable_video" checked /> <span>Enable Video</span></label>
-                    <label><input type="checkbox" id="energysaving" /> <span>Energy Saving<br>(no video, black screen)</span></label>
+                    <label><input type="checkbox" id="energysaving" /> <span>Energy Saving (no video, black screen)</span></label>
                     <label><input type="checkbox" id="stretch" checked /> <span>Stretch Video</span></label>
                     <button id="fullscreen">Toggle Fullscreen</button>
                     <label {{#if (not capture_cursor_enabled)}}class="hide"{{/if}}>
@@ -49,6 +51,9 @@
                         <span>Enable uinput</span>
                     </label>
                     <label>Min pressure to generate: <br><input type="range" id="min_pressure" min="0" max="1" step="0.01" value="0"/></label>
+                </section>
+                <section {{#if (not uinput_enabled)}}class="hide"{{/if}}>
+                    <label><span>Name: </span><input type="text" id="client_name" /><span>Optional, useful to distinguish multiple devices.</span></label>
                 </section>
                 <section id="displayoptions">
                     <label id="leftylabel"><input type="checkbox" id="lefty" />Swap</label>

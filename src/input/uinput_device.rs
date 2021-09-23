@@ -49,16 +49,20 @@ pub struct UInputDevice {
 }
 
 impl UInputDevice {
-    pub fn new(capturable: Box<dyn Capturable>, id: String) -> Result<Self, CError> {
+    pub fn new(capturable: Box<dyn Capturable>, id: &Option<String>) -> Result<Self, CError> {
+        let mut suffix = String::new();
+        if let Some(id) = id {
+            suffix = format!(" - {}", id);
+        }
         let mut err = CError::new();
-        let name_stylus = format!("Weylus Stylus - {}", id);
+        let name_stylus = format!("Weylus Stylus{}", suffix);
         let name_stylus_c_str = CString::new(name_stylus.as_bytes()).unwrap();
         let stylus_fd = unsafe { init_uinput_stylus(name_stylus_c_str.as_ptr(), &mut err) };
         if err.is_err() {
             return Err(err);
         }
 
-        let name_mouse = format!("Weylus Mouse - {}", id);
+        let name_mouse = format!("Weylus Mouse{}", suffix);
         let name_mouse_c_str = CString::new(name_mouse.as_bytes()).unwrap();
         let mouse_fd = unsafe { init_uinput_mouse(name_mouse_c_str.as_ptr(), &mut err) };
         if err.is_err() {
@@ -66,7 +70,7 @@ impl UInputDevice {
             return Err(err);
         }
 
-        let name_touch = format!("Weylus Touch - {}", id);
+        let name_touch = format!("Weylus Touch{}", suffix);
         let name_touch_c_str = CString::new(name_touch.as_bytes()).unwrap();
         let touch_fd = unsafe { init_uinput_touch(name_touch_c_str.as_ptr(), &mut err) };
         if err.is_err() {
@@ -75,7 +79,7 @@ impl UInputDevice {
             return Err(err);
         }
 
-        let name_keyboard = format!("Weylus Keyboard - {}", id);
+        let name_keyboard = format!("Weylus Keyboard{}", suffix);
         let name_keyboard_c_str = CString::new(name_keyboard.as_bytes()).unwrap();
         let keyboard_fd = unsafe { init_uinput_keyboard(name_keyboard_c_str.as_ptr(), &mut err) };
         if err.is_err() {

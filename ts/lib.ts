@@ -107,6 +107,7 @@ class Settings {
     scale_video_output: HTMLOutputElement;
     range_min_pressure: HTMLInputElement;
     check_aggressive_seek: HTMLInputElement;
+    client_name_input: HTMLInputElement;
     visible: boolean;
     settings: HTMLElement;
 
@@ -121,6 +122,7 @@ class Settings {
         this.scale_video_input = document.getElementById("scale_video") as HTMLInputElement;
         this.scale_video_output = this.scale_video_input.nextElementSibling as HTMLOutputElement;
         this.range_min_pressure = document.getElementById("min_pressure") as HTMLInputElement;
+        this.client_name_input = document.getElementById("client_name") as HTMLInputElement;
         this.frame_update_limit_input.oninput = (e) => {
             this.frame_update_limit_output.value = Math.round(frame_update_scale(this.frame_update_limit_input.valueAsNumber)).toString();
         }
@@ -195,6 +197,7 @@ class Settings {
         this.checks.get("uinput_support").onchange = upd_server_config;
         this.checks.get("capture_cursor").onchange = upd_server_config;
         this.scale_video_input.onchange = upd_server_config;
+        this.client_name_input.onchange = upd_server_config;
 
         document.getElementById("refresh").onclick = () => this.webSocket.send('"GetCapturableList"');
         this.capturable_select.onchange = () => this.send_server_config();
@@ -210,6 +213,8 @@ class Settings {
         let [w, h] = calc_max_video_resolution(this.scale_video_input.valueAsNumber);
         config["max_width"] = w;
         config["max_height"] = h;
+        if (this.client_name_input.value)
+            config["client_name"] = this.client_name_input.value;
         this.webSocket.send(JSON.stringify({ "Config": config }));
     }
 
@@ -220,6 +225,7 @@ class Settings {
         settings["frame_update_limit"] = frame_update_scale(this.frame_update_limit_input.valueAsNumber).toString();
         settings["scale_video"] = this.scale_video_input.value;
         settings["min_pressure"] = this.range_min_pressure.value;
+        settings["client_name"] = this.client_name_input.value;
         localStorage.setItem("settings", JSON.stringify(settings));
     }
 
@@ -270,6 +276,10 @@ class Settings {
             if (this.checks.get("energysaving").checked) {
                 toggle_energysaving(true);
             }
+
+            let client_name = settings["client_name"];
+            if (client_name)
+                this.client_name_input.value = client_name;
 
         } catch {
             log(LogLevel.DEBUG, "Failed to load settings.")
@@ -677,13 +687,15 @@ class KeyboardHandler {
     constructor(webSocket: WebSocket) {
         this.webSocket = webSocket;
 
-        window.onkeydown = (e) => {
+        let m = document.getElementById("main");
+
+        m.onkeydown = (e) => {
             if (e.repeat)
                 return this.onEvent(e, "repeat");
             return this.onEvent(e, "down");
         };
-        window.onkeyup = (e) => { return this.onEvent(e, "up") };
-        window.onkeypress = (e) => {
+        m.onkeyup = (e) => { return this.onEvent(e, "up") };
+        m.onkeypress = (e) => {
             e.preventDefault();
             e.stopPropagation();
             return false;

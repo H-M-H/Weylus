@@ -159,7 +159,7 @@ fn handle_connection(
         clients.insert(peer_addr, ws_sender.clone());
     }
 
-    let mut ws_handler = WsHandler::new(ws_sender, &peer_addr, config.clone(), gui_sender);
+    let mut ws_handler = WsHandler::new(ws_sender, config.clone(), gui_sender);
 
     let mut authed = config.access_code.is_none();
     let access_code = config.access_code.unwrap_or_else(|| "".into());
@@ -359,7 +359,6 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, confi
 
 struct WsHandler {
     sender: WsWriter,
-    client_addr: SocketAddr,
     video_sender: mpsc::Sender<VideoCommands>,
     input_device: Option<Box<dyn InputDevice>>,
     capturables: Vec<Box<dyn Capturable>>,
@@ -367,15 +366,11 @@ struct WsHandler {
     ws_config: WsConfig,
     #[cfg(target_os = "linux")]
     capture_cursor: bool,
+    client_name: Option<String>,
 }
 
 impl WsHandler {
-    fn new(
-        sender: WsWriter,
-        client_addr: &SocketAddr,
-        config: WsConfig,
-        gui_sender: mpsc::Sender<Ws2UiMessage>,
-    ) -> Self {
+    fn new(sender: WsWriter, config: WsConfig, gui_sender: mpsc::Sender<Ws2UiMessage>) -> Self {
         let (video_sender, video_receiver) = mpsc::channel::<VideoCommands>();
         {
             let sender = sender.clone();
@@ -387,7 +382,6 @@ impl WsHandler {
 
         Self {
             sender,
-            client_addr: *client_addr,
             video_sender,
             input_device: None,
             capturables: vec![],
@@ -395,6 +389,7 @@ impl WsHandler {
             ws_config: config,
             #[cfg(target_os = "linux")]
             capture_cursor: false,
+            client_name: None,
         }
     }
 
@@ -455,6 +450,12 @@ impl WsHandler {
     }
 
     fn setup(&mut self, config: ClientConfiguration) {
+        let client_name_changed = if self.client_name != config.client_name {
+            self.client_name = config.client_name;
+            true
+        } else {
+            false
+        };
         if config.capturable_id < self.capturables.len() {
             let capturable = self.capturables[config.capturable_id].clone();
 
@@ -465,20 +466,17 @@ impl WsHandler {
 
             #[cfg(target_os = "linux")]
             if config.uinput_support {
-                if self
-                    .input_device
-                    .as_ref()
-                    .map_or(true, |d| d.device_type() != InputDeviceType::UInputDevice)
-                {
+                if self.input_device.as_ref().map_or(true, |d| {
+                    client_name_changed || d.device_type() != InputDeviceType::UInputDevice
+                }) {
                     let device = crate::input::uinput_device::UInputDevice::new(
                         capturable.clone(),
-                        self.client_addr.to_string(),
+                        &self.client_name,
                     );
                     if let Err(err) = device {
                         error!("Failed to create uinput device: {}", err);
                         if let CErrorCode::UInputNotAccessible = err.to_enum() {
-                            if let Err(err) =
-                                self.gui_sender.send(Ws2UiMessage::UInputInaccessible)
+                            if let Err(err) = self.gui_sender.send(Ws2UiMessage::UInputInaccessible)
                             {
                                 warn!("Failed to send message to gui thread: {}!", err);
                             }

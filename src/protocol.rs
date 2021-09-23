@@ -8,6 +8,7 @@ pub struct ClientConfiguration {
     pub capture_cursor: bool,
     pub max_width: usize,
     pub max_height: usize,
+    pub client_name: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

@@ -34,22 +34,22 @@
         border: 0.5em solid #f7f7f7;
     }
 }
-* {
+main {
     touch-action: none;
-}
-body, html {
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-    display: flex;
     user-select: none;
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     -khtml-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
+}
+body, html, main {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
 }
 video {
     max-width: 100%;
@@ -63,6 +63,15 @@ canvas {
     position: absolute;
     width: 100%;
     height: 100%;
+}
+input[type='text'] {
+    touch-action: auto !important;
+    user-select: text;
+    -webkit-touch-callout: default;
+    -webkit-user-select: text;
+    -khtml-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
 }
 input[type='range']::-webkit-slider-runnable-track, input[type="range"]::-moz-range-track {
       background-color: #00aaff;
@@ -84,6 +93,7 @@ form, form input {
     height: 100%;
 }
 #settings {
+    width: 16em;
     display: block;
     position: absolute;
     right: 0;
@@ -93,9 +103,6 @@ form, form input {
     padding: 1em;
     font-family: sans-serif;
     transition: transform 0.5s, opacity 0.5s;
-}
-#settings * {
-    touch-action: pan-y;
 }
 #settings.lefty {
     left: 0;
