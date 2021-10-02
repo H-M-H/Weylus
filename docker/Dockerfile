@@ -9,7 +9,7 @@ RUN apt-get update && \
 RUN apt-add-repository contrib
 RUN apt-add-repository non-free
 RUN apt-get update && apt-get install -y nvidia-cuda-dev
-RUN curl -sL https://deb.nodesource.com/setup_15.x | bash - && \
+RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - && \
     apt-get install -y nodejs && \
     npm install -g typescript
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
