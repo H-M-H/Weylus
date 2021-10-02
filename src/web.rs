@@ -75,7 +75,7 @@ async fn serve(
                 if let Some(code) = params.get("access_code") {
                     if code == access_code {
                         authed = true;
-                        info!("Web-Client authenticated: {}.", &addr);
+                        debug!(address = ?addr, "Web-Client authenticated.");
                     }
                 }
             }
@@ -95,7 +95,7 @@ async fn serve(
                     "text/html; charset=utf-8",
                 ));
             }
-            info!("Client connected: {}", &addr);
+            debug!(address = ?addr, "Client connected.");
             let config = WebConfig {
                 access_code: context.access_code.clone(),
                 websocket_port: context.ws_port,

@@ -157,9 +157,10 @@ fn handle_connection(
     {
         let mut clients = clients.lock().unwrap();
         clients.insert(peer_addr, ws_sender.clone());
+        info!(address = ?peer_addr, "Client connected.");
     }
 
-    let mut ws_handler = WsHandler::new(ws_sender, config.clone(), gui_sender);
+    let mut ws_handler = WsHandler::new(ws_sender, config.clone(), gui_sender, peer_addr);
 
     let mut authed = config.access_code.is_none();
     let access_code = config.access_code.unwrap_or_else(|| "".into());
@@ -170,11 +171,12 @@ fn handle_connection(
                     if let OwnedMessage::Text(pw) = &msg {
                         if pw == &access_code {
                             authed = true;
-                            info!("WS-Client authenticated: {}!", peer_addr);
+                            info!(address = ?peer_addr, "WS-Client authenticated!");
                         } else {
                             warn!(
-                                "Authentication failed: {} sent wrong access code: '{}'",
-                                peer_addr, pw
+                                address = ?peer_addr,
+                                access_code = %pw,
+                                "Authentication failed, wrong access code",
                             );
                             let mut clients = clients.lock().unwrap();
                             clients.remove(&peer_addr);
@@ -186,6 +188,7 @@ fn handle_connection(
                 }
                 if msg.is_close() {
                     let mut clients = clients.lock().unwrap();
+                    info!(address = ?peer_addr, "Client disconnected.");
                     clients.remove(&peer_addr);
                     return;
                 }
@@ -367,10 +370,16 @@ struct WsHandler {
     #[cfg(target_os = "linux")]
     capture_cursor: bool,
     client_name: Option<String>,
+    client_address: SocketAddr,
 }
 
 impl WsHandler {
-    fn new(sender: WsWriter, config: WsConfig, gui_sender: mpsc::Sender<Ws2UiMessage>) -> Self {
+    fn new(
+        sender: WsWriter,
+        config: WsConfig,
+        gui_sender: mpsc::Sender<Ws2UiMessage>,
+        client_address: SocketAddr,
+    ) -> Self {
         let (video_sender, video_receiver) = mpsc::channel::<VideoCommands>();
         {
             let sender = sender.clone();
@@ -390,6 +399,7 @@ impl WsHandler {
             #[cfg(target_os = "linux")]
             capture_cursor: false,
             client_name: None,
+            client_address,
         }
     }
 
@@ -532,29 +542,30 @@ impl WsHandler {
             OwnedMessage::Text(s) => {
                 let message: Result<MessageInbound, _> = serde_json::from_str(&s);
                 match message {
-                    Ok(message) => match message {
-                        MessageInbound::WheelEvent(event) => {
-                            trace!("Got: {:?}", &event);
-                            self.process_wheel_event(&event);
+                    Ok(message) => {
+                        if let MessageInbound::TryGetFrame = message {
+                        } else {
+                            debug!(
+                                client_message = %s,
+                                address = ?self.client_address,
+                                "Got message from client."
+                            );
                         }
-                        MessageInbound::PointerEvent(event) => {
-                            trace!("Got: {:?}", &event);
-                            self.process_pointer_event(&event);
+                        match message {
+                            MessageInbound::WheelEvent(event) => {
+                                self.process_wheel_event(&event);
+                            }
+                            MessageInbound::PointerEvent(event) => {
+                                self.process_pointer_event(&event);
+                            }
+                            MessageInbound::KeyboardEvent(event) => {
+                                self.process_keyboard_event(&event);
+                            }
+                            MessageInbound::TryGetFrame => self.queue_try_send_video_frame(),
+                            MessageInbound::GetCapturableList => self.send_capturable_list(),
+                            MessageInbound::Config(config) => self.setup(config),
                         }
-                        MessageInbound::KeyboardEvent(event) => {
-                            trace!("Got: {:?}", &event);
-                            self.process_keyboard_event(&event);
-                        }
-                        MessageInbound::TryGetFrame => self.queue_try_send_video_frame(),
-                        MessageInbound::GetCapturableList => {
-                            trace!("Got: GetCapturableList");
-                            self.send_capturable_list()
-                        }
-                        MessageInbound::Config(config) => {
-                            trace!("Got: {:?}", &config);
-                            self.setup(config)
-                        }
-                    },
+                    }
                     Err(err) => {
                         warn!("Unable to parse message: {} ({})", s, err);
                         self.send_msg(&MessageOutbound::Error(

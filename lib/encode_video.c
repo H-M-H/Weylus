@@ -60,6 +60,55 @@ typedef struct VideoContext
 // this is a rust function and lives in src/video.rs
 int write_video_packet(void* rust_ctx, uint8_t* buf, int buf_size);
 
+void log_callback(__attribute__((unused)) void* _ptr, int level, const char* fmt_orig, va_list args)
+{
+	char fmt[256];
+	strncpy(fmt, fmt_orig, sizeof(fmt));
+	int done = 0;
+	// strip whitespaces from end
+	for (int i = sizeof(fmt) - 1; i >= 0 && !done; --i)
+		switch (fmt[i])
+		{
+		case ' ':
+		case '\n':
+		case '\t':
+		case '\r':
+			fmt[i] = '\0';
+			break;
+		case '\0':
+			break;
+		default:
+			done = 1;
+		}
+	char buf[2048];
+	vsnprintf(buf, sizeof(buf), fmt, args);
+	switch (level)
+	{
+	case AV_LOG_FATAL:
+	case AV_LOG_ERROR:
+	case AV_LOG_PANIC:
+		log_error(fmt, buf);
+		break;
+	case AV_LOG_INFO:
+		log_info(fmt, buf);
+		break;
+	case AV_LOG_WARNING:
+		log_warn(fmt, buf);
+		break;
+	case AV_LOG_QUIET:
+		break;
+	case AV_LOG_VERBOSE:
+		log_debug(fmt, buf);
+		break;
+	case AV_LOG_DEBUG:
+		log_trace(fmt, buf);
+		break;
+	}
+}
+
+// called in src/log.rs
+void init_ffmpeg_logger() { av_log_set_callback(log_callback); }
+
 void set_codec_params(VideoContext* ctx)
 {
 	/* resolution must be a multiple of two */
@@ -352,7 +401,6 @@ void open_video(VideoContext* ctx, Error* err)
 	if (!ctx->oc->pb)
 		ERROR(err, 1, "Failed to allocate avio context");
 
-	av_dump_format(ctx->oc, 0, NULL, 1);
 	AVDictionary* opt = NULL;
 	// enable writing fragmented mp4
 	av_dict_set(&opt, "movflags", "frag_custom+empty_moov+default_base_moof", 0);
