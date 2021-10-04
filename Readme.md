@@ -225,7 +225,7 @@ Videotoolbox is disabled by default.
 
 #### Hardware Acceleration
 Weylus can make use of Nvidias NVENC as well as Microsoft's MediaFoundation for hardware accelerated
-video encoding. Due to widely varying quality it is disable by default.
+video encoding. Due to widely varying quality it is disabled by default.
 
 ## Building
 To build Weylus you need to install Rust, Typescript, make, git, a C compiler, nasm and bash. `cargo
