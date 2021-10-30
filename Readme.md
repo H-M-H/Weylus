@@ -21,6 +21,7 @@ Weylus in action with [Xournal++](https://github.com/xournalpp/xournalpp):
             * [Intel GPU on Xorg with Intel drivers](#intel-gpu-on-xorg-with-intel-drivers)
             * [Dummy Plugs](#dummy-plugs)
             * [Other Options](#other-options)
+        * [Encryption](#encryption)
     * [macOS](#macos)
         * [Hardware Acceleration](#hardware-acceleration-1)
     * [Windows](#windows)
