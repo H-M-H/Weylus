@@ -238,14 +238,22 @@ libxfixes-dev libxtst-dev libxrandr-dev libxcomposite-dev libxi-dev libxv-dev au
 nvidia-cuda-dev pkg-config libdrm-dev libpango1.0-dev libgstreamer1.0-dev \
 libgstreamer-plugins-base1.0-dev libdbus-1-dev
 ```
-Note that building for the first time may take a while as ffmpeg needs to be build. On windows only
-msvc is supported as C compiler.
+Note that building for the first time may take a while as by default ffmpeg needs to be build. On
+Windows only msvc is supported as C compiler; it is, however, possible to cross compile on Linux for
+Windows using minGW.
 
-In case you do not want to build ffmpeg and libx264 via the supplied build script you have to create
-the directory `deps/dist` yourself and copy static ffmpeg libraries built with support for libx264
-and a static version of libx264 into `deps/dist/lib`. Additional `deps/dist/include` needs to be
-filled with ffmpeg's include header files. The build script will only try to build ffmpeg if the
-directory `deps/dist` does not exist.
+In case you do not want to build ffmpeg and libx264 via the supplied build script you can create the
+directory `deps/dist` yourself and copy static ffmpeg libraries built with support for libx264 and a
+static version of libx264 into `deps/dist/lib`. Additional `deps/dist/include` needs to be filled
+with ffmpeg's include header files. For hardware acceleration to work ffmpeg needs to be built with
+additional flags depending on your OS: Consult the variable `FFMPEG_EXTRA_ARGS` in `deps/build.sh`
+for details. Furthermore, for VAAPI on Linux a static version of libva is required as well.
+
+The build script will only try to build ffmpeg if the directory `deps/dist` does not exist.
+
+Alternatively passing `--features ffmpeg-system` to cargo will build Weylus using the system's
+version of ffmpeg. This is disabled by default for compatibility reasons, on newer systems this
+should not pose a problem and using the system libraries is advised.
 
 ### Docker
 It is also possible to build the Linux version inside a docker container. The Dockerfile used is
