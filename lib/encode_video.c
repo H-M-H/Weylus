@@ -66,8 +66,8 @@ void log_callback(__attribute__((unused)) void* _ptr, int level, const char* fmt
 void log_callback(void* _ptr, int level, const char* fmt_orig, va_list args)
 #endif
 {
-	char fmt[256];
-	strncpy(fmt, fmt_orig, sizeof(fmt));
+	char fmt[256] = {0};
+	strncpy(fmt, fmt_orig, sizeof(fmt) - 1);
 	int done = 0;
 	// strip whitespaces from end
 	for (int i = sizeof(fmt) - 1; i >= 0 && !done; --i)

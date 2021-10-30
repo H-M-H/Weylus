@@ -6,7 +6,7 @@ use std::sync::{
     mpsc, Arc, Mutex,
 };
 use std::thread::spawn;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, warn};
 
 use websocket::sender::Writer;
 use websocket::server::upgrade::{sync::Buffer as WsBuffer, WsUpgrade};
