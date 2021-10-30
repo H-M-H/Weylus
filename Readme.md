@@ -210,6 +210,26 @@ expand documentation on this!
 - On Wayland with GNOME recently there has been added an option to [create virtual monitors with
   mutter](https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/1698)
 
+#### Encryption
+By default Weylus comes without encryption and should only be run on networks you trust. If this is
+not the case it's strongly advised to set up a TLS proxy. One option is to use
+[hitch](https://hitch-tls.org/), an example script that sets up encryption is located at
+`weylus_tls.sh`.
+But any TLS proxy should work just fine.
+
+Note that the mentioned script works by creating a self-signed certificate. This means your browser
+will most likely display a scary looking but completely unfounded message telling you how incredibly
+dangerous it is to trust the certificate you yourself just created; this can be safely ignored!
+
+In case you are using Firefox: There is a [bug](https://bugzilla.mozilla.org/show_bug.cgi?id=1187666)
+that prevents users from accepting self-signed certificates for websocket connections. A workaround
+is to directly open the websocket connection via the URL bar and accept the certificate there. After
+accepting the connection will of course fail as the browser expects https and not wss as protocol.
+
+Sadly this solution is anything but frictionless and I am unhappy with the current state of affairs.
+This is also another reason why encryption is not enabled by default, self-signed certificates are
+just too painful to handle nowadays. I'd gladly welcome any proposals to improve the situation!
+
 ### macOS
 Weylus needs some permissions to work properly, make sure you enable:
 - Incoming connections
