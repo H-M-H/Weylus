@@ -134,9 +134,11 @@ environment variable `LIBVA_DRIVER_NAME`. You can find possible values with the 
 not reside in `/usr/lib/dri` but for example in `/usr/lib/x86_64-linux-gnu/dri` and may not be found
 by Weylus. To force Weylus to search another directory for drivers, the environment variable
 `LIBVA_DRIVERS_PATH` can be set.
-Additionally you can specify the VAAPI
-device to use by setting `WEYLUS_VAAPI_DEVICE`; by default devices can be found in `/dev/dri`. Note
-that you may need to install the driver(s) first.
+Additionally you can specify the VAAPI device to use by setting `WEYLUS_VAAPI_DEVICE`; by default
+devices can be found in `/dev/dri`. On some systems this is not optional and this variable must be
+set. If VAAPI doesn't work out of the box for you, have a look into `/dev/dri`, often setting
+`WEYLUS_VAAPI_DEVICE=/dev/dri/renderD129` is already the solution. Note that you may need to install
+the driver(s) first.
 
 Nvidias NVENC is very fast but delivers a video stream of noticeably lower quality (at least on my
 GeForce GTX 1050 Mobile GPU) but more recent GPUs should provide higher quality. For this to work
