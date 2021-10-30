@@ -14,6 +14,7 @@ Weylus in action with [Xournal++](https://github.com/xournalpp/xournalpp):
 * [Running](#running)
     * [Fullscreen](#fullscreen)
     * [Keyboard Input](#keyboard-input)
+    * [Automation](#automation)
     * [Linux](#linux)
         * [Wayland](#wayland)
         * [Hardware Acceleration](#hardware-acceleration)
@@ -84,6 +85,13 @@ there is a button to toggle full screen mode.
 Weylus supports keyboard input for physical keyboards, so if you have a Bluetooth keyboard, just
 connect it to your tablet and start typing. Due to technical limitations onscreen keyboards are not
 supported.
+
+### Automation
+Weylus provides some features to make automation as convenient as possible. There is a command-line
+interface; `--no-gui` for example starts Weylus in headless mode without a gui. For more options see
+`weylus --help`. If you want to run a specific script e.g., once a client connects to your computer
+you can do so by parsing the log Weylus generates. Set the environment variable `WEYLUS_LOG_JSON` to
+`true` to enable easily parseable JSON logging.
 
 ### Linux
 Weylus uses the `uinput` interface to simulate input events on Linux. **To enable stylus and
