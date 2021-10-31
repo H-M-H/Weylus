@@ -91,21 +91,21 @@ void log_callback(void* _ptr, int level, const char* fmt_orig, va_list args)
 	case AV_LOG_FATAL:
 	case AV_LOG_ERROR:
 	case AV_LOG_PANIC:
-		log_error(fmt, buf);
+		log_error("%s", buf);
 		break;
 	case AV_LOG_INFO:
-		log_info(fmt, buf);
+		log_info("%s", buf);
 		break;
 	case AV_LOG_WARNING:
-		log_warn(fmt, buf);
+		log_warn("%s", buf);
 		break;
 	case AV_LOG_QUIET:
 		break;
 	case AV_LOG_VERBOSE:
-		log_debug(fmt, buf);
+		log_debug("%s", buf);
 		break;
 	case AV_LOG_DEBUG:
-		log_trace(fmt, buf);
+		log_trace("%s", buf);
 		break;
 	}
 }
