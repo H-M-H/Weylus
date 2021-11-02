@@ -149,7 +149,6 @@ fn linux() {
     };
     println!("cargo:rustc-link-lib={}=va", va_link_kind);
     println!("cargo:rustc-link-lib={}=va-drm", va_link_kind);
-    println!("cargo:rustc-link-lib={}=va-glx", va_link_kind);
     println!("cargo:rustc-link-lib={}=va-x11", va_link_kind);
     println!("cargo:rustc-link-lib=drm");
 }
