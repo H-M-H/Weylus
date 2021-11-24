@@ -129,6 +129,8 @@ jobs:
         name: ${{ runner.os }}
         path: |
           ${{ matrix.exec-file }}
+          deps/dist
+          www/static/lib.js
     - name: ArtifactsDebug
       if: failure()
       uses: actions/upload-artifact@v2
