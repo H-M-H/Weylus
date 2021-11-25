@@ -26,6 +26,8 @@ percent-encoding = "2.1.0"
 toml = "^0.5"
 structopt = { version = "^0.3", features = ["color", "suggestions"], default-features = false }
 dirs = "^3.0"
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winuser"] }
 
 [build-dependencies]
 cc = "^1.0"
