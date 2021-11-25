@@ -31,6 +31,9 @@ websocket = { version = "=0.26.2", features = ["sync"], default-features = false
 cc = "^1.0"
 num_cpus = "^1.13"
 
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winuser"] }
+
 [target.'cfg(target_os = "linux")'.dependencies]
 dbus = "^0.9"
 gstreamer = "^0.18"
