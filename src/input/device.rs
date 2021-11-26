@@ -1,10 +1,11 @@
-use crate::protocol::{WheelEvent, PointerEvent, KeyboardEvent};
 use crate::capturable::Capturable;
+use crate::protocol::{KeyboardEvent, PointerEvent, WheelEvent};
 
 #[derive(PartialEq, Eq)]
 pub enum InputDeviceType {
     AutoPilotDevice,
     UInputDevice,
+    WindowsInput,
 }
 
 pub trait InputDevice {
