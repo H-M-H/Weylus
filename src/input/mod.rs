@@ -1,4 +1,5 @@
 pub mod autopilot_device;
+pub mod autopilot_device_win;
 pub mod device;
 
 #[cfg(target_os = "linux")]
