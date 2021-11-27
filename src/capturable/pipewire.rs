@@ -107,6 +107,14 @@ impl Capturable for PipeWireCapturable {
     fn recorder(&self, capture_cursor: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
         Ok(Box::new(PipeWireRecorder::new(self.clone())?))
     }
+
+    fn geometry(&self) -> Result<(u32, u32), Box<dyn Error>> {
+        Ok((0, 0))
+    }
+
+    fn geometry_offset(&self) -> Result<(i32, i32), Box<dyn Error>> {
+        Ok((0, 0))
+    }
 }
 
 pub struct PipeWireRecorder {
@@ -327,7 +335,9 @@ fn streams_from_response(response: OrgFreedesktopPortalRequestResponse) -> Vec<P
                         .collect::<HashMap<String, &dyn RefArg>>();
                     Some(PwStreamInfo {
                         path,
-                        source_type: attributes.get("source_type").map_or(Some(0), |v| v.as_u64())?,
+                        source_type: attributes
+                            .get("source_type")
+                            .map_or(Some(0), |v| v.as_u64())?,
                     })
                 })
                 .collect::<Vec<PwStreamInfo>>(),

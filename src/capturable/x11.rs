@@ -136,6 +136,14 @@ impl Capturable for X11Capturable {
             Err(err) => Err(Box::new(err)),
         }
     }
+
+    fn geometry(&self) -> Result<(u32, u32), Box<dyn Error>> {
+        Ok((0, 0))
+    }
+
+    fn geometry_offset(&self) -> Result<(i32, i32), Box<dyn Error>> {
+        Ok((0, 0))
+    }
 }
 
 impl fmt::Display for X11Capturable {
