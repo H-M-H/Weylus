@@ -52,6 +52,12 @@ impl Capturable for TestCapturable {
     fn recorder(&self, _: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
         Ok(Box::new(TestRecorder::new(*self)))
     }
+    fn geometry(&self) -> Result<(u32, u32), Box<dyn Error>> {
+        Ok((0, 0))
+    }
+    fn geometry_offset(&self) -> Result<(i32, i32), Box<dyn Error>> {
+        Ok((0, 0))
+    }
 }
 
 impl Recorder for TestRecorder {

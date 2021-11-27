@@ -1,4 +1,5 @@
 pub mod autopilot;
+
 use std::boxed::Box;
 use std::error::Error;
 use tracing::warn;
@@ -10,9 +11,13 @@ pub mod pipewire;
 #[cfg(target_os = "linux")]
 pub mod pipewire_dbus;
 pub mod testsrc;
+
+#[cfg(target_os = "windows")]
+pub mod captrs_capture;
+#[cfg(target_os = "windows")]
+pub mod win_ctx;
 #[cfg(target_os = "linux")]
 pub mod x11;
-
 pub trait Recorder {
     fn capture(&mut self) -> Result<crate::video::PixelProvider, Box<dyn Error>>;
 }
@@ -44,6 +49,8 @@ pub trait Capturable: Send + BoxCloneCapturable {
 
     /// Return a Recorder that can record the current capturable.
     fn recorder(&self, capture_cursor: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>>;
+    fn geometry(&self) -> Result<(u32, u32), Box<dyn Error>>;
+    fn geometry_offset(&self) -> Result<(i32, i32), Box<dyn Error>>;
 }
 
 impl Clone for Box<dyn Capturable> {
@@ -112,8 +119,22 @@ pub fn get_capturables(
         }
     }
 
-    use crate::capturable::autopilot::AutoPilotCapturable;
-    capturables.push(Box::new(AutoPilotCapturable::new()));
+    #[cfg(target_os = "windows")]
+    {
+        use crate::capturable::captrs_capture::CaptrsCapturable;
+        use crate::capturable::win_ctx::WinCtx;
+        let winctx = WinCtx::new();
+        for (i, o) in winctx.get_outputs().iter().enumerate() {
+            let captr = CaptrsCapturable::new(
+                i as u8,
+                (o.right - o.left) as u32,
+                (o.bottom - o.top) as u32,
+                o.left - winctx.get_union_rect().left,
+                o.top - winctx.get_union_rect().top,
+            );
+            capturables.push(Box::new(captr));
+        }
+    }
 
     if crate::log::get_log_level() >= tracing::Level::DEBUG {
         for (width, height) in [
