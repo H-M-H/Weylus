@@ -1,7 +1,5 @@
-use autopilot::geometry::Size;
 use autopilot::mouse;
 use autopilot::mouse::ScrollDirection;
-use autopilot::screen::size as screen_size;
 
 use winapi::shared::windef::{HWND, POINT, RECT};
 use winapi::um::winuser::*;

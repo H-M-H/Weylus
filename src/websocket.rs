@@ -13,7 +13,6 @@ use websocket::server::upgrade::{sync::Buffer as WsBuffer, WsUpgrade};
 use websocket::sync::Server;
 use websocket::{Message, OwnedMessage, WebSocketError};
 
-use crate::capturable::captrs_capture::CaptrsCapturable;
 use crate::capturable::{get_capturables, Capturable, Recorder};
 use crate::input::device::{InputDevice, InputDeviceType};
 use crate::protocol::{

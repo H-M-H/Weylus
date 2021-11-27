@@ -10,8 +10,6 @@ use winapi::shared::winerror::*;
 use winapi::um::winuser::*;
 use wio::com::ComPtr;
 
-use super::captrs_capture::CaptrsCapturable;
-
 // from https://github.com/bryal/dxgcap-rs/blob/009b746d1c19c4c10921dd469eaee483db6aa002/src/lib.r
 fn hr_failed(hr: HRESULT) -> bool {
     hr < 0
