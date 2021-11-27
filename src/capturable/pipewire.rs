@@ -107,6 +107,14 @@ impl Capturable for PipeWireCapturable {
     fn recorder(&self, _capture_cursor: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
         Ok(Box::new(PipeWireRecorder::new(self.clone())?))
     }
+
+    fn geometry(&self) -> Result<(u32, u32), Box<dyn Error>> {
+        Ok((0, 0))
+    }
+
+    fn geometry_offset(&self) -> Result<(i32, i32), Box<dyn Error>> {
+        Ok((0, 0))
+    }
 }
 
 pub struct PipeWireRecorder {
