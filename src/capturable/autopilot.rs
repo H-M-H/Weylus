@@ -27,6 +27,12 @@ impl Capturable for AutoPilotCapturable {
     fn recorder(&self, _capture_cursor: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
         Ok(Box::new(RecorderAutoPilot::new()))
     }
+    fn geometry(&self) -> Result<(u32, u32), Box<dyn Error>> {
+        Ok((0, 0))
+    }
+    fn geometry_offset(&self) -> Result<(i32, i32), Box<dyn Error>> {
+        Ok((0, 0))
+    }
 }
 
 pub struct RecorderAutoPilot {

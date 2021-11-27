@@ -57,10 +57,11 @@ impl InputDevice for WindowsInput {
             return;
         }
         let (x_rel, y_rel, width_rel, height_rel) = geometry.unwrap();
-        let Size { width, height } = screen_size();
+        let (width, height) = self.capturable.geometry().unwrap();
+        let (offset_x, offset_y) = self.capturable.geometry_offset().unwrap();
         let (x, y) = (
-            ((event.x * width_rel + x_rel) * width) as i32,
-            ((event.y * height_rel + y_rel) * height) as i32,
+            ((event.x * width_rel + x_rel) * width as f64) as i32 + offset_x,
+            ((event.y * height_rel + y_rel) * height as f64) as i32 + offset_y,
         );
         let mut pointer_type_info = POINTER_TYPE_INFO {
             type_: PT_PEN,
@@ -170,8 +171,8 @@ impl InputDevice for WindowsInput {
             }
             PointerType::Mouse => {
                 if let Err(err) = mouse::move_to(autopilot::geometry::Point::new(
-                    (event.x * width_rel + x_rel) * width,
-                    (event.y * height_rel + y_rel) * height,
+                    (event.x * width_rel + x_rel) * width as f64,
+                    (event.y * height_rel + y_rel) * height as f64,
                 )) {
                     warn!("Could not move mouse: {}", err);
                 }
