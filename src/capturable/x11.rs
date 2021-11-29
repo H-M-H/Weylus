@@ -1,4 +1,4 @@
-use crate::capturable::{Capturable, Recorder};
+use crate::capturable::{Capturable, Geometry, Recorder};
 use crate::cerror::CError;
 use crate::video::PixelProvider;
 use std::ffi::{CStr, CString};

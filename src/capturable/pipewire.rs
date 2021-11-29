@@ -16,7 +16,7 @@ use gstreamer as gst;
 use gstreamer::prelude::*;
 use gstreamer_app::AppSink;
 
-use crate::capturable::{Capturable, Recorder};
+use crate::capturable::{Capturable, Geometry, Recorder};
 use crate::video::PixelProvider;
 
 use crate::capturable::pipewire_dbus::{
