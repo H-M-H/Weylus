@@ -72,7 +72,7 @@ pub struct CaptrsRecorder {
 impl CaptrsRecorder {
     pub fn new(id: u8) -> Result<CaptrsRecorder, Box<dyn Error>> {
         Ok(CaptrsRecorder {
-            capturer: Capturer::new(id.into()).unwrap(),
+            capturer: Capturer::new(id.into())?,
         })
     }
 }
