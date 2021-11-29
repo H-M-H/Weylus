@@ -94,7 +94,7 @@ impl Capturable for X11Capturable {
         }
     }
 
-    fn geometry(&self) -> Result<(Geometry), Box<dyn Error>> {
+    fn geometry(&self) -> Result<Geometry, Box<dyn Error>> {
         let mut x: c_float = 0.0;
         let mut y: c_float = 0.0;
         let mut width: c_float = 0.0;

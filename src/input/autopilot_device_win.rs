@@ -6,16 +6,17 @@ use winapi::um::winuser::*;
 
 use tracing::warn;
 
+use crate::input::autopilot_device::AutoPilotDevice;
 use crate::input::device::{InputDevice, InputDeviceType};
 use crate::protocol::{
-    Button, KeyboardEvent, KeyboardEventType, PointerEvent, PointerEventType, PointerType,
-    WheelEvent,
+    Button, KeyboardEvent, PointerEvent, PointerEventType, PointerType, WheelEvent,
 };
 
 use crate::capturable::{Capturable, Geometry};
 
 pub struct WindowsInput {
     capturable: Box<dyn Capturable>,
+    autopilot_device: AutoPilotDevice,
     pointer_device_handle: *mut HSYNTHETICPOINTERDEVICE__,
     touch_device_handle: *mut HSYNTHETICPOINTERDEVICE__,
 }
@@ -24,7 +25,8 @@ impl WindowsInput {
     pub fn new(capturable: Box<dyn Capturable>) -> Self {
         unsafe {
             Self {
-                capturable,
+                capturable: capturable.clone(),
+                autopilot_device: AutoPilotDevice::new(capturable.clone()),
                 pointer_device_handle: CreateSyntheticPointerDevice(PT_PEN, 1, 1),
                 touch_device_handle: CreateSyntheticPointerDevice(PT_TOUCH, 5, 1),
             }
@@ -70,7 +72,8 @@ impl InputDevice for WindowsInput {
                 pointer_flags = POINTER_FLAG_INRANGE
                     | POINTER_FLAG_INCONTACT
                     | POINTER_FLAG_PRIMARY
-                    | POINTER_FLAG_DOWN;
+                    | POINTER_FLAG_DOWN
+                    | POINTER_FLAG_UPDATE;
                 button_change_type = POINTER_CHANGE_FIRSTBUTTON_DOWN;
             }
 
@@ -79,8 +82,10 @@ impl InputDevice for WindowsInput {
                 button_change_type = POINTER_CHANGE_FIRSTBUTTON_UP;
             }
             PointerEventType::MOVE => {
-                pointer_flags =
-                    POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT | POINTER_FLAG_PRIMARY;
+                pointer_flags = POINTER_FLAG_INRANGE
+                    | POINTER_FLAG_INCONTACT
+                    | POINTER_FLAG_PRIMARY
+                    | POINTER_FLAG_UPDATE;
                 button_change_type = POINTER_CHANGE_NONE;
             }
 
@@ -132,7 +137,7 @@ impl InputDevice for WindowsInput {
                             pointerId: event.pointer_id as u32,
                             frameId: 0,
                             pointerFlags: pointer_flags,
-                            sourceDevice: 0 as *mut winapi::ctypes::c_void, //maybe use syntheticPointerDeviceHandle here but works with 0
+                            sourceDevice: self.touch_device_handle as *mut winapi::ctypes::c_void, //maybe use syntheticPointerDeviceHandle here but works with 0
                             hwndTarget: 0 as HWND,
                             ptPixelLocation: POINT { x: x, y: y },
                             ptHimetricLocation: POINT { x: 0, y: 0 },
@@ -150,16 +155,16 @@ impl InputDevice for WindowsInput {
                         orientation: 0,
                         pressure: (event.pressure * 100f64) as u32,
                         rcContact: RECT {
-                            left: x,
-                            top: y,
-                            right: x,
-                            bottom: y,
+                            left: 0,
+                            top: 0,
+                            right: event.width as i32,
+                            bottom: event.height as i32,
                         },
                         rcContactRaw: RECT {
-                            left: x,
-                            top: y,
-                            right: x,
-                            bottom: y,
+                            left: 0,
+                            top: 0,
+                            right: event.width as i32,
+                            bottom: event.height as i32,
                         },
                     };
                     InjectSyntheticPointerInput(self.touch_device_handle, &pointer_type_info, 1);
@@ -190,85 +195,7 @@ impl InputDevice for WindowsInput {
     }
 
     fn send_keyboard_event(&mut self, event: &KeyboardEvent) {
-        use autopilot::key::{Character, Code, KeyCode};
-
-        let state = match event.event_type {
-            KeyboardEventType::UP => false,
-            KeyboardEventType::DOWN => true,
-            // autopilot doesn't handle this, so just do nothing
-            KeyboardEventType::REPEAT => return,
-        };
-
-        fn map_key(code: &str) -> Option<KeyCode> {
-            match code {
-                "Escape" => Some(KeyCode::Escape),
-                "Enter" => Some(KeyCode::Return),
-                "Backspace" => Some(KeyCode::Backspace),
-                "Tab" => Some(KeyCode::Tab),
-                "Space" => Some(KeyCode::Space),
-                "CapsLock" => Some(KeyCode::CapsLock),
-                "F1" => Some(KeyCode::F1),
-                "F2" => Some(KeyCode::F2),
-                "F3" => Some(KeyCode::F3),
-                "F4" => Some(KeyCode::F4),
-                "F5" => Some(KeyCode::F5),
-                "F6" => Some(KeyCode::F6),
-                "F7" => Some(KeyCode::F7),
-                "F8" => Some(KeyCode::F8),
-                "F9" => Some(KeyCode::F9),
-                "F10" => Some(KeyCode::F10),
-                "F11" => Some(KeyCode::F11),
-                "F12" => Some(KeyCode::F12),
-                "F13" => Some(KeyCode::F13),
-                "F14" => Some(KeyCode::F14),
-                "F15" => Some(KeyCode::F15),
-                "F16" => Some(KeyCode::F16),
-                "F17" => Some(KeyCode::F17),
-                "F18" => Some(KeyCode::F18),
-                "F19" => Some(KeyCode::F19),
-                "F20" => Some(KeyCode::F20),
-                "F21" => Some(KeyCode::F21),
-                "F22" => Some(KeyCode::F22),
-                "F23" => Some(KeyCode::F23),
-                "F24" => Some(KeyCode::F24),
-                "Home" => Some(KeyCode::Home),
-                "ArrowUp" => Some(KeyCode::UpArrow),
-                "PageUp" => Some(KeyCode::PageUp),
-                "ArrowLeft" => Some(KeyCode::LeftArrow),
-                "ArrowRight" => Some(KeyCode::RightArrow),
-                "End" => Some(KeyCode::End),
-                "ArrowDown" => Some(KeyCode::DownArrow),
-                "PageDown" => Some(KeyCode::PageDown),
-                "Delete" => Some(KeyCode::Delete),
-                "ControlLeft" | "ControlRight" => Some(KeyCode::Control),
-                "AltLeft" | "AltRight" => Some(KeyCode::Alt),
-                "MetaLeft" | "MetaRight" => Some(KeyCode::Meta),
-                "ShiftLeft" | "ShiftRight" => Some(KeyCode::Shift),
-                _ => None,
-            }
-        }
-        let key = map_key(&event.code);
-        let mut flags = Vec::new();
-        if event.ctrl {
-            flags.push(autopilot::key::Flag::Control);
-        }
-        if event.alt {
-            flags.push(autopilot::key::Flag::Alt);
-        }
-        if event.meta {
-            flags.push(autopilot::key::Flag::Meta);
-        }
-        if event.shift {
-            flags.push(autopilot::key::Flag::Shift);
-        }
-        match key {
-            Some(key) => autopilot::key::toggle(&Code(key), state, &flags, 0),
-            None => {
-                for c in event.key.chars() {
-                    autopilot::key::toggle(&Character(c), state, &flags, 0);
-                }
-            }
-        }
+        self.autopilot_device.send_keyboard_event(event);
     }
 
     fn set_capturable(&mut self, capturable: Box<dyn Capturable>) {

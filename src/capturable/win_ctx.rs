@@ -50,13 +50,13 @@ fn get_adapter_outputs(adapter: &IDXGIAdapter1) -> Vec<ComPtr<IDXGIOutput>> {
 
 #[derive(Clone)]
 pub struct WinCtx {
-    outputs: Vec<RECT>,
+    outputs: Vec<DXGI_OUTPUT_DESC>,
     union_rect: RECT,
 }
 
 impl WinCtx {
     pub fn new() -> WinCtx {
-        let mut rects: Vec<RECT> = Vec::new();
+        let mut desktops: Vec<DXGI_OUTPUT_DESC> = Vec::new();
         let mut union: RECT;
         unsafe {
             union = mem::zeroed();
@@ -68,7 +68,7 @@ impl WinCtx {
                 for o in outputs {
                     let mut desc: DXGI_OUTPUT_DESC = mem::zeroed();
                     o.GetDesc(ptr::addr_of_mut!(desc));
-                    rects.push(desc.DesktopCoordinates);
+                    desktops.push(desc);
                     UnionRect(
                         ptr::addr_of_mut!(union),
                         ptr::addr_of!(union),
@@ -78,11 +78,11 @@ impl WinCtx {
             }
         }
         WinCtx {
-            outputs: rects,
+            outputs: desktops,
             union_rect: union,
         }
     }
-    pub fn get_outputs(&self) -> &Vec<RECT> {
+    pub fn get_outputs(&self) -> &Vec<DXGI_OUTPUT_DESC> {
         &self.outputs
     }
     pub fn get_union_rect(&self) -> &RECT {
