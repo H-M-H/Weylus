@@ -26,7 +26,7 @@ impl WindowsInput {
         unsafe {
             Self {
                 capturable: capturable.clone(),
-                autopilot_device: AutoPilotDevice::new(capturable.clone()),
+                autopilot_device: AutoPilotDevice::new(capturable),
                 pointer_device_handle: CreateSyntheticPointerDevice(PT_PEN, 1, 1),
                 touch_device_handle: CreateSyntheticPointerDevice(PT_TOUCH, 5, 1),
             }
