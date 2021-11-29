@@ -54,7 +54,17 @@ impl Capturable for CaptrsCapturable {
         ))
     }
 }
+#[derive(Debug)]
+pub struct CaptrsError(String);
 
+impl std::fmt::Display for CaptrsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self(s) = self;
+        write!(f, "{}", s)
+    }
+}
+
+impl Error for CaptrsError {}
 pub struct CaptrsRecorder {
     capturer: Capturer,
 }
@@ -69,7 +79,9 @@ impl CaptrsRecorder {
 
 impl Recorder for CaptrsRecorder {
     fn capture(&mut self) -> Result<crate::video::PixelProvider, Box<dyn Error>> {
-        let _ = self.capturer.capture_store_frame();
+        self.capturer
+            .capture_store_frame()
+            .map_err(|e| CaptrsError("Captrs failed to capture frame".into()))?;
         let (w, h) = self.capturer.geometry();
         Ok(crate::video::PixelProvider::BGR0(
             w as usize,
