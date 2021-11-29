@@ -32,7 +32,7 @@ cc = "^1.0"
 num_cpus = "^1.13"
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3.8", features = ["d3d11", "d3dcommon", "dxgi", "dxgi1_2", "dxgitype", "ntdef", "unknwnbase", "windef", "winerror", "winuser"] }
+winapi = { version = "0.3.8", features = ["d3d11", "d3dcommon", "dxgi", "dxgi1_2", "dxgitype"] }
 wio = "0.2.2"
 captrs = "^0.3.1"
 
