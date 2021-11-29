@@ -44,9 +44,6 @@ impl InputDevice for WindowsInput {
     }
 
     fn send_pointer_event(&mut self, event: &PointerEvent) {
-        if !event.is_primary {
-            return;
-        }
         if let Err(err) = self.capturable.before_input() {
             warn!("Failed to activate window, sending no input ({})", err);
             return;
