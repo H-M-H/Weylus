@@ -176,7 +176,8 @@ impl Capturable for CGWindowCapturable {
         self.name.clone()
     }
     fn geometry(&self) -> Result<Geometry, Box<dyn Error>> {
-        Ok(Geometry::Relative(self.geometry_relative))
+        let (x, y, w, h) = self.geometry_relative;
+        Ok(Geometry::Relative(x, y, w, h))
     }
     fn before_input(&mut self) -> Result<(), Box<dyn Error>> {
         self.update_geometry()
