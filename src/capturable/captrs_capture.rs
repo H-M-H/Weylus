@@ -8,6 +8,7 @@ use super::Geometry;
 #[derive(Clone)]
 pub struct CaptrsCapturable {
     id: u8,
+    name: String,
     width: u32,
     height: u32,
     offset_x: i32,
@@ -15,9 +16,17 @@ pub struct CaptrsCapturable {
 }
 
 impl CaptrsCapturable {
-    pub fn new(id: u8, width: u32, height: u32, offset_x: i32, offset_y: i32) -> CaptrsCapturable {
+    pub fn new(
+        id: u8,
+        name: String,
+        width: u32,
+        height: u32,
+        offset_x: i32,
+        offset_y: i32,
+    ) -> CaptrsCapturable {
         CaptrsCapturable {
             id,
+            name,
             width,
             height,
             offset_x,
@@ -28,7 +37,7 @@ impl CaptrsCapturable {
 
 impl Capturable for CaptrsCapturable {
     fn name(&self) -> String {
-        format!("Desktop {} (captrs)", self.id).into()
+        format!("Desktop {} (captrs)", self.name).into()
     }
     fn before_input(&mut self) -> Result<(), Box<dyn Error>> {
         Ok(())
