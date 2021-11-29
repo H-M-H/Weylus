@@ -3,6 +3,8 @@ use captrs::Capturer;
 use std::boxed::Box;
 use std::error::Error;
 
+use super::Geometry;
+
 #[derive(Clone)]
 pub struct CaptrsCapturable {
     id: u8,
@@ -28,20 +30,19 @@ impl Capturable for CaptrsCapturable {
     fn name(&self) -> String {
         format!("Desktop {} (captrs)", self.id).into()
     }
-    fn geometry_relative(&self) -> Result<(f64, f64, f64, f64), Box<dyn Error>> {
-        Ok((0.0, 0.0, 1.0, 1.0))
-    }
     fn before_input(&mut self) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     fn recorder(&self, _capture_cursor: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
         Ok(Box::new(CaptrsRecorder::new(self.id)))
     }
-    fn geometry(&self) -> Result<(u32, u32), Box<dyn Error>> {
-        Ok((self.width, self.height))
-    }
-    fn geometry_offset(&self) -> Result<(i32, i32), Box<dyn Error>> {
-        Ok((self.offset_x, self.offset_y))
+    fn geometry(&self) -> Result<Geometry, Box<dyn Error>> {
+        Ok(Geometry::VirtualScreen(
+            self.offset_x,
+            self.offset_y,
+            self.width,
+            self.height,
+        ))
     }
 }
 

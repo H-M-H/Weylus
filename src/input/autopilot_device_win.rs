@@ -12,7 +12,7 @@ use crate::protocol::{
     WheelEvent,
 };
 
-use crate::capturable::Capturable;
+use crate::capturable::{Capturable, Geometry};
 
 pub struct WindowsInput {
     capturable: Box<dyn Capturable>,
@@ -49,17 +49,15 @@ impl InputDevice for WindowsInput {
             warn!("Failed to activate window, sending no input ({})", err);
             return;
         }
-        let geometry = self.capturable.geometry_relative();
-        if let Err(err) = geometry {
-            warn!("Failed to get window geometry, sending no input ({})", err);
-            return;
-        }
-        let (x_rel, y_rel, width_rel, height_rel) = geometry.unwrap();
-        let (width, height) = self.capturable.geometry().unwrap();
-        let (offset_x, offset_y) = self.capturable.geometry_offset().unwrap();
+        let (offset_x, offset_y, width, height) = match self.capturable.geometry().unwrap() {
+            Geometry::VirtualScreen(offset_x, offset_y, width, height) => {
+                (offset_x, offset_y, width, height)
+            }
+            _ => unreachable!(),
+        };
         let (x, y) = (
-            ((event.x * width_rel + x_rel) * width as f64) as i32 + offset_x,
-            ((event.y * height_rel + y_rel) * height as f64) as i32 + offset_y,
+            (event.x * width as f64) as i32 + offset_x,
+            (event.y * height as f64) as i32 + offset_y,
         );
         let mut pointer_type_info = POINTER_TYPE_INFO {
             type_: PT_PEN,
@@ -169,8 +167,8 @@ impl InputDevice for WindowsInput {
             }
             PointerType::Mouse => {
                 if let Err(err) = mouse::move_to(autopilot::geometry::Point::new(
-                    (event.x * width_rel + x_rel) * width as f64,
-                    (event.y * height_rel + y_rel) * height as f64,
+                    event.x * width as f64,
+                    event.y * height as f64,
                 )) {
                     warn!("Could not move mouse: {}", err);
                 }

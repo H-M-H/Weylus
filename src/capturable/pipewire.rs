@@ -96,8 +96,8 @@ impl Capturable for PipeWireCapturable {
         format!("Pipewire {}, path: {}", type_str, self.path)
     }
 
-    fn geometry_relative(&self) -> Result<(f64, f64, f64, f64), Box<dyn Error>> {
-        Ok((0.0, 0.0, 1.0, 1.0))
+    fn geometry(&self) -> Result<Geometry, Box<dyn Error>> {
+        Ok(Geometry::Relative(0.0, 0.0, 1.0, 1.0))
     }
 
     fn before_input(&mut self) -> Result<(), Box<dyn Error>> {
@@ -106,14 +106,6 @@ impl Capturable for PipeWireCapturable {
 
     fn recorder(&self, capture_cursor: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
         Ok(Box::new(PipeWireRecorder::new(self.clone())?))
-    }
-
-    fn geometry(&self) -> Result<(u32, u32), Box<dyn Error>> {
-        Ok((0, 0))
-    }
-
-    fn geometry_offset(&self) -> Result<(i32, i32), Box<dyn Error>> {
-        Ok((0, 0))
     }
 }
 
