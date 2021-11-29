@@ -8,7 +8,7 @@ use tracing::warn;
 use crate::input::device::{InputDevice, InputDeviceType};
 use crate::protocol::{Button, KeyboardEvent, KeyboardEventType, PointerEvent, WheelEvent};
 
-use crate::capturable::Capturable;
+use crate::capturable::{Capturable, Geometry};
 
 pub struct AutoPilotDevice {
     capturable: Box<dyn Capturable>,
@@ -37,8 +37,9 @@ impl InputDevice for AutoPilotDevice {
             warn!("Failed to activate window, sending no input ({})", err);
             return;
         }
-        let (x_rel, y_rel, width_rel, height_rel) = match self.capturable.geometry_relative() {
-            Ok(g) => g,
+        let (x_rel, y_rel, width_rel, height_rel) = match self.capturable.geometry() {
+            Ok(Geometry::Relative(x, y, w, h)) => (x, y, w, h),
+            Ok(_) => unreachable!(),
             Err(e) => {
                 warn!("Failed to get window geometry, sending no input ({})", e);
                 return;

@@ -3,7 +3,7 @@ use std::error::Error;
 
 use image_autopilot::GenericImageView;
 
-use crate::capturable::{Capturable, Recorder};
+use crate::capturable::{Capturable, Geometry, Recorder};
 
 #[derive(Clone)]
 pub struct AutoPilotCapturable {}
@@ -18,20 +18,14 @@ impl Capturable for AutoPilotCapturable {
     fn name(&self) -> String {
         "Desktop (autopilot)".into()
     }
-    fn geometry_relative(&self) -> Result<(f64, f64, f64, f64), Box<dyn Error>> {
-        Ok((0.0, 0.0, 1.0, 1.0))
+    fn geometry(&self) -> Result<Geometry, Box<dyn Error>> {
+        Ok(Geometry::Relative(0.0, 0.0, 1.0, 1.0))
     }
     fn before_input(&mut self) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     fn recorder(&self, _capture_cursor: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
         Ok(Box::new(RecorderAutoPilot::new()))
-    }
-    fn geometry(&self) -> Result<(u32, u32), Box<dyn Error>> {
-        Ok((0, 0))
-    }
-    fn geometry_offset(&self) -> Result<(i32, i32), Box<dyn Error>> {
-        Ok((0, 0))
     }
 }
 
