@@ -81,7 +81,7 @@ impl Recorder for CaptrsRecorder {
     fn capture(&mut self) -> Result<crate::video::PixelProvider, Box<dyn Error>> {
         self.capturer
             .capture_store_frame()
-            .map_err(|e| CaptrsError("Captrs failed to capture frame".into()))?;
+            .map_err(|_e| CaptrsError("Captrs failed to capture frame".into()))?;
         let (w, h) = self.capturer.geometry();
         Ok(crate::video::PixelProvider::BGR0(
             w as usize,
