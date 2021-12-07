@@ -1,6 +1,4 @@
-use autopilot::mouse;
-use autopilot::mouse::ScrollDirection;
-
+use winapi::shared::minwindef::DWORD;
 use winapi::shared::windef::{HWND, POINT};
 use winapi::um::winuser::*;
 
@@ -37,11 +35,7 @@ impl WindowsInput {
 
 impl InputDevice for WindowsInput {
     fn send_wheel_event(&mut self, event: &WheelEvent) {
-        match event.dy {
-            1..=i32::MAX => mouse::scroll(ScrollDirection::Up, 1),
-            i32::MIN..=-1 => mouse::scroll(ScrollDirection::Down, 1),
-            0 => {}
-        }
+        unsafe { mouse_event(MOUSEEVENTF_WHEEL, 0, 0, event.dy as DWORD, 0) };
     }
 
     fn send_pointer_event(&mut self, event: &PointerEvent) {
@@ -49,12 +43,17 @@ impl InputDevice for WindowsInput {
             warn!("Failed to activate window, sending no input ({})", err);
             return;
         }
-        let (offset_x, offset_y, width, height) = match self.capturable.geometry().unwrap() {
-            Geometry::VirtualScreen(offset_x, offset_y, width, height) => {
-                (offset_x, offset_y, width, height)
-            }
-            _ => unreachable!(),
-        };
+        let (offset_x, offset_y, width, height, left, top) =
+            match self.capturable.geometry().unwrap() {
+                Geometry::VirtualScreen(offset_x, offset_y, width, height, left, top) => {
+                    (offset_x, offset_y, width, height, left, top)
+                }
+                _ => unreachable!(),
+            };
+        print!(
+            "offset_x {} offset_y {} width {} height {}",
+            offset_x, offset_y, width, height
+        );
         let (x, y) = (
             (event.x * width as f64) as i32 + offset_x,
             (event.y * height as f64) as i32 + offset_y,
@@ -145,24 +144,47 @@ impl InputDevice for WindowsInput {
                 }
             }
             PointerType::Mouse => {
-                if let Err(err) = mouse::move_to(autopilot::geometry::Point::new(
-                    event.x * width as f64,
-                    event.y * height as f64,
-                )) {
-                    warn!("Could not move mouse: {}", err);
+                let mut dw_flags = 0;
+
+                let (screen_x, screen_y) = (
+                    (event.x * width as f64) as i32 + left,
+                    (event.y * height as f64) as i32 + top,
+                );
+
+                match event.event_type {
+                    PointerEventType::DOWN => match event.buttons {
+                        Button::PRIMARY => {
+                            dw_flags |= MOUSEEVENTF_LEFTDOWN;
+                        }
+                        Button::SECONDARY => {
+                            dw_flags |= MOUSEEVENTF_RIGHTDOWN;
+                        }
+                        Button::AUXILARY => {
+                            dw_flags |= MOUSEEVENTF_MIDDLEDOWN;
+                        }
+                        _ => {}
+                    },
+                    PointerEventType::MOVE => {
+                        unsafe { SetCursorPos(screen_x, screen_y) };
+                    }
+                    PointerEventType::UP => match event.button {
+                        Button::PRIMARY => {
+                            dw_flags |= MOUSEEVENTF_LEFTUP;
+                        }
+                        Button::SECONDARY => {
+                            dw_flags |= MOUSEEVENTF_RIGHTUP;
+                        }
+                        Button::AUXILARY => {
+                            dw_flags |= MOUSEEVENTF_MIDDLEUP;
+                        }
+                        _ => {}
+                    },
+                    PointerEventType::CANCEL => {
+                        dw_flags |= MOUSEEVENTF_LEFTUP;
+                    }
                 }
-                match event.button {
-                    Button::PRIMARY => {
-                        mouse::toggle(mouse::Button::Left, event.buttons.contains(event.button))
-                    }
-                    Button::AUXILARY => {
-                        mouse::toggle(mouse::Button::Middle, event.buttons.contains(event.button))
-                    }
-                    Button::SECONDARY => {
-                        mouse::toggle(mouse::Button::Right, event.buttons.contains(event.button))
-                    }
-                    _ => (),
-                }
+                unsafe { mouse_event(dw_flags, 0 as u32, 0 as u32, 0, 0) };
+                print!("mouse event {} {}", screen_x, screen_y);
             }
             PointerType::Unknown => todo!(),
         }

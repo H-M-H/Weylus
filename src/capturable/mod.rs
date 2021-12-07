@@ -39,7 +39,7 @@ where
 /// VirtualScreen: offset_x, offset_y, width, height for a capturable using a virtual screen. (Windows)
 pub enum Geometry {
     Relative(f64, f64, f64, f64),
-    VirtualScreen(i32, i32, u32, u32),
+    VirtualScreen(i32, i32, u32, u32, i32, i32),
 }
 
 pub trait Capturable: Send + BoxCloneCapturable {
@@ -132,10 +132,8 @@ pub fn get_capturables(
             let captr = CaptrsCapturable::new(
                 i as u8,
                 String::from_utf16_lossy(o.DeviceName.as_ref()),
-                (o.DesktopCoordinates.right - o.DesktopCoordinates.left) as u32,
-                (o.DesktopCoordinates.bottom - o.DesktopCoordinates.top) as u32,
-                o.DesktopCoordinates.left - winctx.get_union_rect().left,
-                o.DesktopCoordinates.top - winctx.get_union_rect().top,
+                o.DesktopCoordinates,
+                winctx.get_union_rect().clone(),
             );
             capturables.push(Box::new(captr));
         }
