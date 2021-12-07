@@ -2,6 +2,7 @@ use crate::capturable::{Capturable, Recorder};
 use captrs::Capturer;
 use std::boxed::Box;
 use std::error::Error;
+use winapi::shared::windef::RECT;
 
 use super::Geometry;
 
@@ -9,28 +10,17 @@ use super::Geometry;
 pub struct CaptrsCapturable {
     id: u8,
     name: String,
-    width: u32,
-    height: u32,
-    offset_x: i32,
-    offset_y: i32,
+    screen: RECT,
+    virtual_screen: RECT,
 }
 
 impl CaptrsCapturable {
-    pub fn new(
-        id: u8,
-        name: String,
-        width: u32,
-        height: u32,
-        offset_x: i32,
-        offset_y: i32,
-    ) -> CaptrsCapturable {
+    pub fn new(id: u8, name: String, screen: RECT, virtual_screen: RECT) -> CaptrsCapturable {
         CaptrsCapturable {
             id,
             name,
-            width,
-            height,
-            offset_x,
-            offset_y,
+            screen,
+            virtual_screen,
         }
     }
 }
@@ -47,10 +37,12 @@ impl Capturable for CaptrsCapturable {
     }
     fn geometry(&self) -> Result<Geometry, Box<dyn Error>> {
         Ok(Geometry::VirtualScreen(
-            self.offset_x,
-            self.offset_y,
-            self.width,
-            self.height,
+            self.screen.left - self.virtual_screen.left,
+            self.screen.top - self.virtual_screen.top,
+            (self.screen.right - self.screen.left) as u32,
+            (self.screen.bottom - self.screen.top) as u32,
+            self.screen.left,
+            self.screen.top,
         ))
     }
 }
