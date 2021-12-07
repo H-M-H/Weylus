@@ -50,10 +50,6 @@ impl InputDevice for WindowsInput {
                 }
                 _ => unreachable!(),
             };
-        print!(
-            "offset_x {} offset_y {} width {} height {}",
-            offset_x, offset_y, width, height
-        );
         let (x, y) = (
             (event.x * width as f64) as i32 + offset_x,
             (event.y * height as f64) as i32 + offset_y,
@@ -120,7 +116,6 @@ impl InputDevice for WindowsInput {
                 }
             }
             PointerType::Touch => {
-                println!("touch event\n\n");
                 unsafe {
                     let mut pointer_type_info = POINTER_TYPE_INFO {
                         type_: PT_TOUCH,
@@ -184,7 +179,6 @@ impl InputDevice for WindowsInput {
                     }
                 }
                 unsafe { mouse_event(dw_flags, 0 as u32, 0 as u32, 0, 0) };
-                print!("mouse event {} {}", screen_x, screen_y);
             }
             PointerType::Unknown => todo!(),
         }
