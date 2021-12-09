@@ -107,7 +107,7 @@ impl InputDevice for WindowsInput {
                             | PEN_MASK_ROTATION
                             | PEN_MASK_TILT_X
                             | PEN_MASK_TILT_Y,
-                        pressure: (event.pressure * 100f64) as u32,
+                        pressure: (event.pressure * 1024f64) as u32,
                         rotation: event.twist as u32,
                         tiltX: event.tilt_x,
                         tiltY: event.tilt_y,
