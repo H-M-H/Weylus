@@ -42,18 +42,26 @@ fn main() {
     #[cfg(target_os = "windows")]
     tsc_command.arg("tsc");
 
-    match tsc_command.status() {
-        Err(err) => {
-            println!("cargo:warning=Failed to call tsc: {}", err);
-            std::process::exit(1);
-        }
-        Ok(status) => {
-            if !status.success() {
-                match status.code() {
-                    Some(code) => println!("cargo:warning=tsc failed with exitcode: {}", code),
-                    None => println!("cargo:warning=tsc terminated by signal."),
-                };
-                std::process::exit(2);
+    let js_needs_update = || -> Result<bool, Box<dyn std::error::Error>> {
+        Ok(Path::new("ts/lib.ts").metadata()?.modified()?
+            > Path::new("www/static/lib.js").metadata()?.modified()?)
+    }()
+    .unwrap_or(true);
+
+    if js_needs_update {
+        match tsc_command.status() {
+            Err(err) => {
+                println!("cargo:warning=Failed to call tsc: {}", err);
+                std::process::exit(1);
+            }
+            Ok(status) => {
+                if !status.success() {
+                    match status.code() {
+                        Some(code) => println!("cargo:warning=tsc failed with exitcode: {}", code),
+                        None => println!("cargo:warning=tsc terminated by signal."),
+                    };
+                    std::process::exit(2);
+                }
             }
         }
     }
