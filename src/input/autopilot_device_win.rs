@@ -54,24 +54,25 @@ impl InputDevice for WindowsInput {
             (event.x * width as f64) as i32 + offset_x,
             (event.y * height as f64) as i32 + offset_y,
         );
-        let button_change_type = match event.buttons {
-            Button::PRIMARY => POINTER_CHANGE_FIRSTBUTTON_DOWN,
-            Button::SECONDARY => POINTER_CHANGE_SECONDBUTTON_DOWN,
-            Button::AUXILARY => POINTER_CHANGE_THIRDBUTTON_DOWN,
-            Button::NONE => POINTER_CHANGE_NONE,
-            _ => POINTER_CHANGE_NONE,
-        };
         let mut pointer_flags = match event.event_type {
             PointerEventType::DOWN => {
                 POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT | POINTER_FLAG_DOWN
             }
-            PointerEventType::MOVE => {
-                POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT | POINTER_FLAG_UPDATE
-            }
+            PointerEventType::MOVE => POINTER_FLAG_INRANGE | POINTER_FLAG_UPDATE,
             PointerEventType::UP => POINTER_FLAG_UP,
             PointerEventType::CANCEL => {
                 POINTER_FLAG_INRANGE | POINTER_FLAG_UPDATE | POINTER_FLAG_CANCELED
             }
+        };
+        let button_change_type = match event.buttons {
+            Button::PRIMARY => {
+                pointer_flags |= POINTER_FLAG_INCONTACT;
+                POINTER_CHANGE_FIRSTBUTTON_DOWN
+            }
+            Button::SECONDARY => POINTER_CHANGE_SECONDBUTTON_DOWN,
+            Button::AUXILARY => POINTER_CHANGE_THIRDBUTTON_DOWN,
+            Button::NONE => POINTER_CHANGE_NONE,
+            _ => POINTER_CHANGE_NONE,
         };
         if event.is_primary {
             pointer_flags |= POINTER_FLAG_PRIMARY;
