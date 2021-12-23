@@ -40,6 +40,9 @@ pub struct Config {
     )]
     #[serde(default)]
     pub try_mediafoundation: bool,
+    #[structopt(long, help = "If device is connected Wylus is automatically launched on Android")]
+    #[serde(default)]
+    pub adb_start: bool,
     #[structopt(long, help = "Start Weylus server immediately on program start.")]
     #[serde(default)]
     pub auto_start: bool,

@@ -32,32 +32,6 @@ fn main() {
         build_ffmpeg();
     }
 
-    println!("cargo:rerun-if-changed=ts/lib.ts");
-
-    #[cfg(not(target_os = "windows"))]
-    let mut tsc_command = Command::new("tsc");
-
-    #[cfg(target_os = "windows")]
-    let mut tsc_command = Command::new("bash");
-    #[cfg(target_os = "windows")]
-    tsc_command.arg("tsc");
-
-    match tsc_command.status() {
-        Err(err) => {
-            println!("cargo:warning=Failed to call tsc: {}", err);
-            std::process::exit(1);
-        }
-        Ok(status) => {
-            if !status.success() {
-                match status.code() {
-                    Some(code) => println!("cargo:warning=tsc failed with exitcode: {}", code),
-                    None => println!("cargo:warning=tsc terminated by signal."),
-                };
-                std::process::exit(2);
-            }
-        }
-    }
-
     println!("cargo:rerun-if-changed=lib/error.h");
     println!("cargo:rerun-if-changed=lib/error.c");
     println!("cargo:rerun-if-changed=lib/log.h");
@@ -136,6 +110,7 @@ fn linux() {
         .file("lib/linux/xhelper.c")
         .compile("linux");
 
+    println!("cargo:rustc-link-lib=pango-1.0");
     println!("cargo:rustc-link-lib=X11");
     println!("cargo:rustc-link-lib=Xext");
     println!("cargo:rustc-link-lib=Xrandr");

@@ -459,6 +459,12 @@ impl WsHandler {
         self.send_msg(&MessageOutbound::CapturableList(windows));
     }
 
+    fn send_fullscreen(&mut self) {
+				//if config.adb_start {
+						self.send_msg(&MessageOutbound::Fullscreen);
+				//}
+    }
+
     fn setup(&mut self, config: ClientConfiguration) {
         let client_name_changed = if self.client_name != config.client_name {
             self.client_name = config.client_name;
@@ -573,6 +579,7 @@ impl WsHandler {
                             }
                             MessageInbound::TryGetFrame => self.queue_try_send_video_frame(),
                             MessageInbound::GetCapturableList => self.send_capturable_list(),
+                            MessageInbound::GetFullscreen => self.send_fullscreen(),
                             MessageInbound::Config(config) => self.setup(config),
                         }
                     }

@@ -21,12 +21,14 @@ pub enum MessageInbound {
     // rate. However, the server may drop a request if encoding is too slow.
     TryGetFrame,
     GetCapturableList,
+    GetFullscreen,
     Config(ClientConfiguration),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum MessageOutbound {
     CapturableList(Vec<String>),
+    Fullscreen,
     NewVideo,
     ConfigOk,
     ConfigError(String),

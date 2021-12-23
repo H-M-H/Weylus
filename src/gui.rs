@@ -2,6 +2,7 @@ use std::iter::Iterator;
 use std::net::{IpAddr, SocketAddr};
 
 use std::sync::{mpsc, Arc, Mutex};
+use std::process::Command;
 use tracing::{error, info};
 
 use fltk::{
@@ -64,9 +65,16 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         .with_label("Websocket Port");
     input_ws_port.set_value(&config.websocket_port.to_string());
 
-    let mut check_auto_start = CheckButton::default()
+    let mut check_adb_start = CheckButton::default()
         .with_size(70, height)
         .below_of(&input_ws_port, padding)
+        .with_label("Autodetect USB (via adb)");
+    check_adb_start.set_tooltip("If device is connected Wylus is automatically launched on Android.");
+    check_adb_start.set_checked(config.adb_start);
+
+    let mut check_auto_start = CheckButton::default()
+        .with_size(70, height)
+        .below_of(&check_adb_start, padding)
         .with_label("Auto Start");
     check_auto_start.set_tooltip("Start Weylus server immediately on program start.");
     check_auto_start.set_checked(config.auto_start);
@@ -178,6 +186,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
 
     let mut weylus = crate::weylus::Weylus::new();
     let mut is_server_running = false;
+    let adb_start = config.adb_start;
     let auto_start = config.auto_start;
     let mut config = config.clone();
 
@@ -198,6 +207,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     config.web_port = web_port;
                     config.websocket_port = ws_port;
                     config.bind_address = bind_addr;
+                    config.adb_start = check_adb_start.is_checked();
                     config.auto_start = check_auto_start.is_checked();
                     #[cfg(target_os = "linux")]
                     {
@@ -326,6 +336,34 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     }
                 }
                 output_server_addr.show();
+								
+								if adb_start {
+									Command::new("adb")
+										.arg("reverse")
+										.arg("tcp:1701")
+										.arg("tcp:1701")
+										.spawn()
+										.expect("failed to execute process");
+									
+									Command::new("adb")
+										.arg("reverse")
+										.arg("tcp:9001")
+										.arg("tcp:9001")
+										.spawn()
+										.expect("failed to execute process");
+									
+									Command::new("adb")
+										.arg("shell")
+										.arg("am")
+										.arg("start")
+										.arg("-a")
+										.arg("android.intent.action.VIEW")
+										.arg("-d")
+										.arg("http://127.0.0.1:1701")
+										.spawn()
+										.expect("failed to execute process");
+								}
+								
                 but.set_label("Stop");
             } else {
                 weylus.stop();
