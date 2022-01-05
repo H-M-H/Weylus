@@ -54,6 +54,13 @@ jobs:
       with:
         name: ${{ runner.os }}-deb
         path: ${{ matrix.deb-file }}
+    - name: ArtifactsDeps
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ runner.os }}-deps
+        path: |
+          deps/dist
+          www/static/lib.js
     - name: Publish
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
@@ -129,6 +136,13 @@ jobs:
         name: ${{ runner.os }}
         path: |
           ${{ matrix.exec-file }}
+    - name: ArtifactsDeps
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ runner.os }}-deps
+        path: |
+          deps/dist
+          www/static/lib.js
     - name: ArtifactsDebug
       if: failure()
       uses: actions/upload-artifact@v2
