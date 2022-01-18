@@ -1,10 +1,10 @@
 diff --git a/libavcodec/libx264.c b/libavcodec/libx264.c
-index 4ddc497..0152d30 100644
+index c5e0231..05ef8d6 100644
 --- a/libavcodec/libx264.c
 +++ b/libavcodec/libx264.c
-@@ -32,10 +32,6 @@
- #include "packet_internal.h"
+@@ -34,10 +34,6 @@
  #include "atsc_a53.h"
+ #include "sei.h"
  
 -#if defined(_MSC_VER)
 -#define X264_API_IMPORTS 1
