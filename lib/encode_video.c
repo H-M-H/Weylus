@@ -468,12 +468,12 @@ void destroy_video_encoder(VideoContext* ctx)
 	free(ctx);
 }
 
-void encode_video_frame(VideoContext* ctx, int micros, Error* err)
+void encode_video_frame(VideoContext* ctx, int millis, Error* err)
 {
 	int ret;
 	AVFrame* frame = ctx->using_vaapi ? ctx->frame_hw : ctx->frame;
 
-	frame->pts = micros;
+	frame->pts = millis;
 
 	ret = avcodec_send_frame(ctx->c, frame);
 	if (ret < 0)
