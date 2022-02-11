@@ -475,37 +475,26 @@ impl WsHandler {
             }
 
             #[cfg(target_os = "linux")]
-            if config.uinput_support {
-                if self.input_device.as_ref().map_or(true, |d| {
-                    client_name_changed || d.device_type() != InputDeviceType::UInputDevice
-                }) {
-                    let device = crate::input::uinput_device::UInputDevice::new(
-                        capturable.clone(),
-                        &self.client_name,
-                    );
-                    if let Err(err) = device {
-                        error!("Failed to create uinput device: {}", err);
-                        if let CErrorCode::UInputNotAccessible = err.to_enum() {
-                            if let Err(err) = self.gui_sender.send(Ws2UiMessage::UInputInaccessible)
-                            {
-                                warn!("Failed to send message to gui thread: {}!", err);
-                            }
-                        }
-                        self.send_msg(&MessageOutbound::ConfigError(
-                            "Failed to create uinput device!".to_string(),
-                        ));
-                        return;
-                    }
-                    self.input_device = Some(Box::new(device.unwrap()))
-                } else if let Some(d) = self.input_device.as_mut() {
-                    d.set_capturable(capturable.clone());
-                }
-            } else if self.input_device.as_ref().map_or(true, |d| {
-                d.device_type() != InputDeviceType::AutoPilotDevice
+            if self.input_device.as_ref().map_or(true, |d| {
+                client_name_changed || d.device_type() != InputDeviceType::UInputDevice
             }) {
-                self.input_device = Some(Box::new(
-                    crate::input::autopilot_device::AutoPilotDevice::new(capturable.clone()),
-                ));
+                let device = crate::input::uinput_device::UInputDevice::new(
+                    capturable.clone(),
+                    &self.client_name,
+                );
+                if let Err(err) = device {
+                    error!("Failed to create uinput device: {}", err);
+                    if let CErrorCode::UInputNotAccessible = err.to_enum() {
+                        if let Err(err) = self.gui_sender.send(Ws2UiMessage::UInputInaccessible) {
+                            warn!("Failed to send message to gui thread: {}!", err);
+                        }
+                    }
+                    self.send_msg(&MessageOutbound::ConfigError(
+                        "Failed to create uinput device!".to_string(),
+                    ));
+                    return;
+                }
+                self.input_device = Some(Box::new(device.unwrap()))
             } else if let Some(d) = self.input_device.as_mut() {
                 d.set_capturable(capturable.clone());
             }

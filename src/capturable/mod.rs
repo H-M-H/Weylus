@@ -111,8 +111,8 @@ pub fn get_capturables(
         }
     }
 
-    use crate::capturable::autopilot::AutoPilotCapturable;
-    capturables.push(Box::new(AutoPilotCapturable::new()));
+    //use crate::capturable::autopilot::AutoPilotCapturable;
+    //capturables.push(Box::new(AutoPilotCapturable::new()));
 
     if crate::log::get_log_level() >= tracing::Level::DEBUG {
         for (width, height) in [
