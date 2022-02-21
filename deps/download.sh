@@ -14,6 +14,10 @@ if [ "$TARGET_OS" == "windows" ]; then
 fi
 cd ffmpeg
 
+if [ "$TARGET_OS" == "linux" ]; then
+    git apply ../v4l2.patch
+fi
+
 if [ "$TARGET_OS" == "windows" ] && [ "$HOST_OS" == "windows" ]; then
     git apply ../command_limit.patch
     git apply ../awk.patch
