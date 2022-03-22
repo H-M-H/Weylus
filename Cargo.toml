@@ -11,7 +11,7 @@ hyper = "^0.13"
 url = "^2.2"
 tokio = { version = "0.2", features = ["macros"] }
 handlebars = "^4.1"
-websocket = { version = "^0.26", features = ["sync"], default-features = false }
+websocket = { version = "=0.26.2", features = ["sync"], default-features = false }
 autopilot = { git = "https://github.com/H-M-H/autopilot-rs.git", rev = "63eed09c715bfb665bb23172a3930a528e11691c" }
 serde = { version = "^1.0", features = ["derive"] }
 serde_json = "^1.0"
