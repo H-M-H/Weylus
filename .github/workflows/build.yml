@@ -128,7 +128,6 @@ jobs:
     - uses: ilammy/msvc-dev-cmd@v1
     - name: Build
       run: ${{ matrix.build-cmd }}
-      shell: bash
     - name: Package
       run: ${{ matrix.pkg-cmd }}
     - name: Artifacts
