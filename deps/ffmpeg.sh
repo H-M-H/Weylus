@@ -10,7 +10,6 @@ PKG_CONFIG_PATH="../dist/lib/pkgconfig" ./configure \
 	--disable-shared \
 	--enable-pic \
 	--enable-stripping \
-	--disable-programs \
 	--enable-gpl \
 	--enable-libx264 \
 	--disable-autodetect \

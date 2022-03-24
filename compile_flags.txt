@@ -5,3 +5,4 @@
 -Ideps/dist/include
 -DHAS_NVENC
 -DHAS_VAAPI
+-DHAS_V4L2_M2M

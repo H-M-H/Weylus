@@ -52,6 +52,7 @@ typedef struct VideoContext
 	int frame_hw_allocated;
 	int using_vaapi;
 	int try_vaapi;
+	int try_v4l2_m2m;
 	int try_nvenc;
 	int try_videotoolbox;
 	int try_mediafoundation;
@@ -265,6 +266,35 @@ void open_video(VideoContext* ctx, Error* err)
 		}
 		else
 			av_buffer_unref(&ctx->hw_device_ctx);
+	}
+#endif
+
+#ifdef HAS_V4L2_M2M
+	if (ctx->try_v4l2_m2m && !using_hw)
+	{
+		codec = avcodec_find_encoder_by_name("h264_v4l2m2m");
+		if (codec)
+		{
+			ctx->c = avcodec_alloc_context3(codec);
+			if (ctx->c)
+			{
+				ctx->sw_pix_fmt = ctx->c->pix_fmt = AV_PIX_FMT_NV12;
+				// TODO: parameters
+				set_codec_params(ctx);
+				int ret = avcodec_open2(ctx->c, codec, NULL);
+				if (ret == 0)
+					using_hw = 1;
+				else
+				{
+					log_debug("Could not open codec: %s!", av_err2str(ret));
+					avcodec_free_context(&ctx->c);
+				}
+			}
+			else
+				log_debug("Could not allocate video codec context for 'h264_v4l2m2m'!");
+		}
+		else
+			log_debug("Codec 'h264_v4l2m2m' not found!");
 	}
 #endif
 
@@ -521,6 +551,8 @@ VideoContext* init_video_encoder(
 	ctx->frame_hw_allocated = 0;
 	ctx->using_vaapi = 0;
 	ctx->try_vaapi = try_vaapi;
+	// TODO:
+	ctx->try_v4l2_m2m = 1;
 	ctx->try_nvenc = try_nvenc;
 	ctx->try_videotoolbox = try_videotoolbox;
 	ctx->try_mediafoundation = try_mediafoundation;

@@ -82,6 +82,7 @@ fn main() {
     }
     if target_os == "linux" {
         cc_video.define("HAS_VAAPI", None);
+        cc_video.define("HAS_V4L2_M2M", None);
     }
     if target_os == "macos" {
         cc_video.define("HAS_VIDEOTOOLBOX", None);

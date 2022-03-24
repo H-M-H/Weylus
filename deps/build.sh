@@ -44,7 +44,8 @@ else
             --enable-ffnvcodec \
             --enable-vaapi \
             --enable-libdrm \
-            --enable-xlib"
+            --enable-xlib \
+            --enable-v4l2-m2m"
     fi
     if [ "$TARGET_OS" == "macos" ]; then
         export FFMPEG_EXTRA_ARGS="--enable-videotoolbox"
