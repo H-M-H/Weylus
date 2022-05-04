@@ -132,5 +132,8 @@ pub fn get_capturables(
         }
     }
 
+    // sort the window list case-insensitively
+    capturables.sort_by(|a, b| a.name().to_lowercase().cmp(&b.name().to_lowercase()));
+
     capturables
 }
