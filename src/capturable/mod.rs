@@ -102,7 +102,7 @@ pub fn get_capturables(
         }
 
         match get_windows_cg() {
-            Ok(captrs) => {
+            Ok(mut captrs) => {
                 captrs.sort_by(|a, b| a.name().to_lowercase().cmp(&b.name().to_lowercase()));
                 for c in captrs {
                     capturables.push(Box::new(c));
