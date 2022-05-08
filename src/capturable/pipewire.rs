@@ -242,8 +242,7 @@ impl Recorder for PipeWireRecorder {
         };
         match self.pix_fmt.as_str() {
             "BGRx" => Ok(PixelProvider::BGR0(self.width, self.height, buf)),
-            // TODO: Implement RGB0 or YV12!
-            "RGBx" => Ok(PixelProvider::BGR0(self.width, self.height, buf)),
+            "RGBx" => Ok(PixelProvider::RGB0(self.width, self.height, buf)),
             _ => unreachable!(),
         }
     }
