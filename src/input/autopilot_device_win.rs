@@ -17,6 +17,8 @@ pub struct WindowsInput {
     autopilot_device: AutoPilotDevice,
     pointer_device_handle: *mut HSYNTHETICPOINTERDEVICE__,
     touch_device_handle: *mut HSYNTHETICPOINTERDEVICE__,
+    last_timestamp: std::time::SystemTime,
+    multitouch_map: std::collections::HashMap<i64, POINTER_TYPE_INFO>
 }
 
 impl WindowsInput {
@@ -28,6 +30,8 @@ impl WindowsInput {
                 autopilot_device: AutoPilotDevice::new(capturable),
                 pointer_device_handle: CreateSyntheticPointerDevice(PT_PEN, 1, 1),
                 touch_device_handle: CreateSyntheticPointerDevice(PT_TOUCH, 5, 1),
+                last_timestamp: std::time::SystemTime::now(),
+                multitouch_map: std::collections::HashMap::new()
             }
         }
     }
@@ -58,7 +62,7 @@ impl InputDevice for WindowsInput {
             PointerEventType::DOWN => {
                 POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT | POINTER_FLAG_DOWN
             }
-            PointerEventType::MOVE => POINTER_FLAG_INRANGE | POINTER_FLAG_UPDATE,
+            PointerEventType::MOVE => POINTER_FLAG_INRANGE | POINTER_FLAG_UPDATE | POINTER_FLAG_INCONTACT,
             PointerEventType::UP => POINTER_FLAG_UP,
             PointerEventType::CANCEL => {
                 POINTER_FLAG_INRANGE | POINTER_FLAG_UPDATE | POINTER_FLAG_CANCELED
@@ -136,7 +140,26 @@ impl InputDevice for WindowsInput {
                     pointer_touch_info.pointerInfo.ButtonChangeType = button_change_type;
 
                     *pointer_type_info.u.touchInfo_mut() = pointer_touch_info;
-                    InjectSyntheticPointerInput(self.touch_device_handle, &pointer_type_info, 1);
+
+                    let now_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis();
+                    let prev_ms = self.last_timestamp.duration_since(std::time::UNIX_EPOCH).unwrap().as_millis();
+
+                    if now_ms - prev_ms > 100 {
+                        self.multitouch_map.clear();
+                        self.last_timestamp = std::time::SystemTime::now();
+                    }
+
+                    self.multitouch_map.insert(event.pointer_id, pointer_type_info);
+                    let len = self.multitouch_map.len();
+
+                    let mut pointer_type_info_vec: Vec<POINTER_TYPE_INFO> = Vec::new();
+                    for (i, info) in self.multitouch_map.iter().enumerate() {
+                        pointer_type_info_vec.push(*info.1);
+                    }
+                    let b: Box<[POINTER_TYPE_INFO]> = pointer_type_info_vec.into_boxed_slice();
+                    let m: *mut POINTER_TYPE_INFO = Box::into_raw(b) as _;
+
+                    InjectSyntheticPointerInput(self.touch_device_handle, m, len as u32);
                 }
             }
             PointerType::Mouse => {
