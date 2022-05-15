@@ -17,7 +17,7 @@ pub struct WindowsInput {
     autopilot_device: AutoPilotDevice,
     pointer_device_handle: *mut HSYNTHETICPOINTERDEVICE__,
     touch_device_handle: *mut HSYNTHETICPOINTERDEVICE__,
-    last_timestamp: std::time::SystemTime,
+    last_timestamp: u64,
     multitouch_map: std::collections::HashMap<i64, POINTER_TYPE_INFO>
 }
 
@@ -30,7 +30,7 @@ impl WindowsInput {
                 autopilot_device: AutoPilotDevice::new(capturable),
                 pointer_device_handle: CreateSyntheticPointerDevice(PT_PEN, 1, 1),
                 touch_device_handle: CreateSyntheticPointerDevice(PT_TOUCH, 5, 1),
-                last_timestamp: std::time::SystemTime::now(),
+                last_timestamp: 0,
                 multitouch_map: std::collections::HashMap::new()
             }
         }
@@ -141,12 +141,9 @@ impl InputDevice for WindowsInput {
 
                     *pointer_type_info.u.touchInfo_mut() = pointer_touch_info;
 
-                    let now_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis();
-                    let prev_ms = self.last_timestamp.duration_since(std::time::UNIX_EPOCH).unwrap().as_millis();
-
-                    if now_ms - prev_ms > 100 {
+                    if event.timestamp - self.last_timestamp > 100 {
                         self.multitouch_map.clear();
-                        self.last_timestamp = std::time::SystemTime::now();
+                        self.last_timestamp = event.timestamp;
                     }
 
                     self.multitouch_map.insert(event.pointer_id, pointer_type_info);
