@@ -62,7 +62,7 @@ impl InputDevice for WindowsInput {
             PointerEventType::DOWN => {
                 POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT | POINTER_FLAG_DOWN
             }
-            PointerEventType::MOVE => POINTER_FLAG_INRANGE | POINTER_FLAG_UPDATE | POINTER_FLAG_INCONTACT,
+            PointerEventType::MOVE => POINTER_FLAG_INRANGE | POINTER_FLAG_UPDATE,
             PointerEventType::UP => POINTER_FLAG_UP,
             PointerEventType::CANCEL => {
                 POINTER_FLAG_INRANGE | POINTER_FLAG_UPDATE | POINTER_FLAG_CANCELED
