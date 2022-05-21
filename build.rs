@@ -100,14 +100,14 @@ fn main() {
         } else {
             "static"
         };
-    println!("cargo:rustc-link-lib={}=avcodec", ffmpeg_link_kind);
     println!("cargo:rustc-link-lib={}=avdevice", ffmpeg_link_kind);
-    println!("cargo:rustc-link-lib={}=avfilter", ffmpeg_link_kind);
     println!("cargo:rustc-link-lib={}=avformat", ffmpeg_link_kind);
-    println!("cargo:rustc-link-lib={}=avutil", ffmpeg_link_kind);
-    println!("cargo:rustc-link-lib={}=postproc", ffmpeg_link_kind);
+    println!("cargo:rustc-link-lib={}=avfilter", ffmpeg_link_kind);
+    println!("cargo:rustc-link-lib={}=avcodec", ffmpeg_link_kind);
     println!("cargo:rustc-link-lib={}=swresample", ffmpeg_link_kind);
     println!("cargo:rustc-link-lib={}=swscale", ffmpeg_link_kind);
+    println!("cargo:rustc-link-lib={}=avutil", ffmpeg_link_kind);
+    println!("cargo:rustc-link-lib={}=postproc", ffmpeg_link_kind);
     println!("cargo:rustc-link-lib={}=x264", ffmpeg_link_kind);
     if env::var("CARGO_FEATURE_FFMPEG_SYSTEM").is_err() {
         println!("cargo:rustc-link-search=deps/dist/lib");
