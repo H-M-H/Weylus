@@ -19,7 +19,7 @@ use core_graphics::{
     window::CGWindowID,
 };
 
-use crate::capturable::{Capturable, Recorder};
+use crate::capturable::{Capturable, Geometry, Recorder};
 
 #[derive(Debug)]
 pub struct CGError(String);
@@ -52,10 +52,10 @@ impl Capturable for CGDisplayCapturable {
             self.display.pixels_high()
         )
     }
-    fn geometry_relative(&self) -> Result<(f64, f64, f64, f64), Box<dyn Error>> {
+    fn geometry(&self) -> Result<Geometry, Box<dyn Error>> {
         let bounds = self.display.bounds();
         let (x0, y0, w, h) = screen_coordsys()?;
-        Ok((
+        Ok(Geometry::Relative(
             (bounds.origin.x - x0) / w,
             (bounds.origin.y - y0) / h,
             bounds.size.width / w,
@@ -175,8 +175,9 @@ impl Capturable for CGWindowCapturable {
     fn name(&self) -> String {
         self.name.clone()
     }
-    fn geometry_relative(&self) -> Result<(f64, f64, f64, f64), Box<dyn Error>> {
-        Ok(self.geometry_relative)
+    fn geometry(&self) -> Result<Geometry, Box<dyn Error>> {
+        let (x, y, w, h) = self.geometry_relative;
+        Ok(Geometry::Relative(x, y, w, h))
     }
     fn before_input(&mut self) -> Result<(), Box<dyn Error>> {
         self.update_geometry()
