@@ -66,13 +66,6 @@ fn main() {
         }
     }
 
-    println!("cargo:rerun-if-changed=lib/error.h");
-    println!("cargo:rerun-if-changed=lib/error.c");
-    println!("cargo:rerun-if-changed=lib/log.h");
-    println!("cargo:rerun-if-changed=lib/log.c");
-    cc::Build::new().file("lib/error.c").compile("error");
-    cc::Build::new().file("lib/log.c").compile("log");
-
     println!("cargo:rerun-if-changed=lib/encode_video.c");
     let mut cc_video = cc::Build::new();
     cc_video.file("lib/encode_video.c");
@@ -90,6 +83,14 @@ fn main() {
         cc_video.define("HAS_MEDIAFOUNDATION", None);
     }
     cc_video.compile("video");
+
+    println!("cargo:rerun-if-changed=lib/error.h");
+    println!("cargo:rerun-if-changed=lib/error.c");
+    println!("cargo:rerun-if-changed=lib/log.h");
+    println!("cargo:rerun-if-changed=lib/log.c");
+    cc::Build::new().file("lib/error.c").compile("error");
+    cc::Build::new().file("lib/log.c").compile("log");
+
     let ffmpeg_link_kind =
         // https://github.com/rust-lang/rust/pull/72785
         // https://users.rust-lang.org/t/linking-on-windows-without-wholearchive/49846/3
@@ -99,14 +100,14 @@ fn main() {
         } else {
             "static"
         };
-    println!("cargo:rustc-link-lib={}=avcodec", ffmpeg_link_kind);
     println!("cargo:rustc-link-lib={}=avdevice", ffmpeg_link_kind);
-    println!("cargo:rustc-link-lib={}=avfilter", ffmpeg_link_kind);
     println!("cargo:rustc-link-lib={}=avformat", ffmpeg_link_kind);
-    println!("cargo:rustc-link-lib={}=avutil", ffmpeg_link_kind);
-    println!("cargo:rustc-link-lib={}=postproc", ffmpeg_link_kind);
+    println!("cargo:rustc-link-lib={}=avfilter", ffmpeg_link_kind);
+    println!("cargo:rustc-link-lib={}=avcodec", ffmpeg_link_kind);
     println!("cargo:rustc-link-lib={}=swresample", ffmpeg_link_kind);
     println!("cargo:rustc-link-lib={}=swscale", ffmpeg_link_kind);
+    println!("cargo:rustc-link-lib={}=avutil", ffmpeg_link_kind);
+    println!("cargo:rustc-link-lib={}=postproc", ffmpeg_link_kind);
     println!("cargo:rustc-link-lib={}=x264", ffmpeg_link_kind);
     if env::var("CARGO_FEATURE_FFMPEG_SYSTEM").is_err() {
         println!("cargo:rustc-link-search=deps/dist/lib");
