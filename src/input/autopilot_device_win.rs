@@ -17,7 +17,6 @@ pub struct WindowsInput {
     autopilot_device: AutoPilotDevice,
     pointer_device_handle: *mut HSYNTHETICPOINTERDEVICE__,
     touch_device_handle: *mut HSYNTHETICPOINTERDEVICE__,
-    last_timestamp: u64,
     multitouch_map: std::collections::HashMap<i64, POINTER_TYPE_INFO>
 }
 
@@ -30,7 +29,6 @@ impl WindowsInput {
                 autopilot_device: AutoPilotDevice::new(capturable),
                 pointer_device_handle: CreateSyntheticPointerDevice(PT_PEN, 1, 1),
                 touch_device_handle: CreateSyntheticPointerDevice(PT_TOUCH, 5, 1),
-                last_timestamp: 0,
                 multitouch_map: std::collections::HashMap::new()
             }
         }
@@ -140,12 +138,7 @@ impl InputDevice for WindowsInput {
                     pointer_touch_info.pointerInfo.ButtonChangeType = button_change_type;
 
                     *pointer_type_info.u.touchInfo_mut() = pointer_touch_info;
-
-                    if event.timestamp - self.last_timestamp > 100 {
-                        self.multitouch_map.clear();
-                        self.last_timestamp = event.timestamp;
-                    }
-
+                    
                     self.multitouch_map.insert(event.pointer_id, pointer_type_info);
                     let len = self.multitouch_map.len();
 
@@ -157,6 +150,15 @@ impl InputDevice for WindowsInput {
                     let m: *mut POINTER_TYPE_INFO = Box::into_raw(b) as _;
 
                     InjectSyntheticPointerInput(self.touch_device_handle, m, len as u32);
+
+                    match event.event_type {
+                        PointerEventType::DOWN | PointerEventType::MOVE => {
+                        }
+
+                        PointerEventType::UP | PointerEventType::CANCEL => {
+                            self.multitouch_map.remove(&event.pointer_id);
+                        }
+                    }
                 }
             }
             PointerType::Mouse => {
