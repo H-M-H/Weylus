@@ -31,6 +31,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         .with_size(660, 620)
         .center_screen()
         .with_label(&format!("Weylus - {}", env!("CARGO_PKG_VERSION")));
+    wind.set_xclass("weylus");
 
     let mut input_access_code = Input::default()
         .with_pos(130, 30)
@@ -228,6 +229,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                                 .with_size(w, h)
                                 .center_screen()
                                 .with_label("Weylus - UInput inaccessible!");
+                            pop_up.set_xclass("weylus");
 
                             let buf = TextBuffer::default();
                             let mut pop_up_text = TextDisplay::default().with_size(w, h);
