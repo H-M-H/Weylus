@@ -29,9 +29,9 @@ struct GuiTracingWriterFactory {
     sender: mpsc::SyncSender<String>,
 }
 
-impl tracing_subscriber::fmt::MakeWriter for GuiTracingWriterFactory {
+impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for GuiTracingWriterFactory {
     type Writer = GuiTracingWriter;
-    fn make_writer(&self) -> Self::Writer {
+    fn make_writer(&'a self) -> Self::Writer {
         Self::Writer {
             gui_sender: self.sender.clone(),
         }
