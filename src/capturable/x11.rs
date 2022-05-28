@@ -21,6 +21,7 @@ extern "C" {
     fn create_capturables(
         disp: *mut c_void,
         handles: *mut *mut c_void,
+        num_monitors: *mut c_int,
         size: c_int,
         err: *mut CError,
     ) -> c_int;
@@ -202,11 +203,13 @@ impl X11Context {
     pub fn capturables(&mut self) -> Result<Vec<X11Capturable>, CError> {
         let mut err = CError::new();
         let mut handles = [std::ptr::null_mut::<c_void>(); 128];
+        let mut num_monitors: c_int = 0;
         self.disp.lock();
         let size = unsafe {
             create_capturables(
                 self.disp.handle,
                 handles.as_mut_ptr(),
+                &mut num_monitors,
                 handles.len() as c_int,
                 &mut err,
             )
@@ -219,13 +222,18 @@ impl X11Context {
                 return Err(err);
             }
         }
-        Ok(handles[0..size as usize]
+        let mut capturables: Vec<X11Capturable> = handles[0..size as usize]
             .iter()
             .map(|handle| X11Capturable {
                 handle: *handle,
                 disp: self.disp.clone(),
             })
-            .collect::<Vec<X11Capturable>>())
+            .collect();
+        // The first capturable is always the whole desktop, after that there is num_monitors
+        // monitors and finally windows.
+        let win = &mut capturables[(num_monitors as usize + 1 )..(size as usize)];
+        win.sort_by(|a, b| a.name().to_lowercase().cmp(&b.name().to_lowercase()));
+        Ok(capturables)
     }
 
     pub fn map_input_device_to_entire_screen(&mut self, device_name: &str, pen: bool) -> CError {

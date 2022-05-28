@@ -83,7 +83,8 @@ jobs:
              npm install -g typescript
              brew install nasm
              cargo install cargo-bundle
-          build-cmd: MACOSX_DEPLOYMENT_TARGET=10.13 cargo bundle --release
+          # build-cmd: MACOSX_DEPLOYMENT_TARGET=10.13 cargo bundle --release
+          build-cmd: cargo bundle --release
           package-files: target/release/bundle/osx/macOS.zip
           exec-file: target/release/bundle/osx/macOS.zip
           pkg-cmd: cd target/release/bundle/osx/ && zip -r macOS.zip Weylus.app
@@ -99,9 +100,9 @@ jobs:
              curl -LO https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/nasm-2.15.05-win64.zip
              7z x nasm-2.15.05-win64.zip
              cp nasm-2.15.05/nasm.exe /usr/bin/nasm.exe
-             npm install typescript
              # default pkg-config is broken, fortunately this one comes first in PATH
              choco install pkgconfiglite
+             choco install typescript
           build-cmd: cargo build --release --verbose
           package-files: target/release/Windows.zip
           exec-file: target/release/Windows.zip
@@ -127,7 +128,6 @@ jobs:
     - uses: ilammy/msvc-dev-cmd@v1
     - name: Build
       run: ${{ matrix.build-cmd }}
-      shell: bash
     - name: Package
       run: ${{ matrix.pkg-cmd }}
     - name: Artifacts

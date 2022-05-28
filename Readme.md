@@ -358,7 +358,7 @@ Linux it is possible that your window manager does not support
 need to activate them first, like for XMonad.
 
 Q: Do I have to follow the instructions to setup Weylus as second screen too?<br>
-A: No this is strictly optional.
+A: No, this is strictly optional.
 
 Q: Why am I unable to connect my tablet to the URL displayed by Weylus?<br>
 A: It is possible that your computer and WiFi connected tablet are on different networks, make sure
@@ -369,6 +369,9 @@ A: Actually it does, just make sure Firefox version 80+ is installed.
 
 Q: Why does this not run under Chrome on my iPad?<br>
 A: Chrome lacks some features for video streaming on iPadOS/iOS, try Firefox or Safari.
+
+Q: Why won't my cursor move in osu! ?<br>
+A: Try disabling raw input.
 
 Q: Can I use Weylus even if there is no WiFi?<br>
 A: Probably yes! Most tablets permit setting up a WiFi hotspot that can be used to connect your

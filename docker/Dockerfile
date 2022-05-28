@@ -9,7 +9,7 @@ RUN apt-get update && \
 RUN apt-add-repository contrib
 RUN apt-add-repository non-free
 RUN apt-get update && apt-get install -y nvidia-cuda-dev
-RUN curl -Lo cmake.tar.gz https://github.com/Kitware/CMake/releases/download/v3.22.1/cmake-3.22.1.tar.gz && tar xf cmake.tar.gz
+RUN curl -Lo cmake.tar.gz https://github.com/Kitware/CMake/releases/download/v3.23.1/cmake-3.23.1.tar.gz && tar xf cmake.tar.gz
 RUN cd cmake-3.* && cmake . && make -j$(nproc) && make install
 RUN rm -rf cmake*
 RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - && \

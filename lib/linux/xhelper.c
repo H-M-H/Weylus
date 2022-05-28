@@ -176,7 +176,7 @@ Window* get_client_list(Display* disp, unsigned long* size, Error* err)
 	return client_list;
 }
 
-int create_capturables(Display* disp, Capturable** capturables, int size, Error* err)
+int create_capturables(Display* disp, Capturable** capturables, int* num_monitors, int size, Error* err)
 {
 	if (size <= 0)
 		return 0;
@@ -185,14 +185,14 @@ int create_capturables(Display* disp, Capturable** capturables, int size, Error*
 	Window root = RootWindow(disp, screen);
 
 	int event_base, error_base, major, minor;
-	int num_monitors = 0;
+	*num_monitors = 0;
 	XRRMonitorInfo* monitors = NULL;
 	if (XRRQueryExtension(disp, &event_base, &error_base) && XRRQueryVersion(disp, &major, &minor))
 	{
-		monitors = XRRGetMonitors(disp, root, True, &num_monitors);
-		if (num_monitors < 0)
+		monitors = XRRGetMonitors(disp, root, True, num_monitors);
+		if (*num_monitors < 0)
 		{
-			num_monitors = 0;
+			*num_monitors = 0;
 			fill_error(err, 2, "Failed to query monitor info via xrandr.");
 		}
 	}
@@ -219,7 +219,7 @@ int create_capturables(Display* disp, Capturable** capturables, int size, Error*
 	c->c.winfo.is_regular_window = 0;
 	++i;
 
-	for (; i < (size_t)num_monitors + 1 && i < (size_t)size; ++i)
+	for (; i < (size_t)*num_monitors + 1 && i < (size_t)size; ++i)
 	{
 		Capturable* c = malloc(sizeof(Capturable));
 		capturables[i] = c;
@@ -236,9 +236,9 @@ int create_capturables(Display* disp, Capturable** capturables, int size, Error*
 		c->c.rinfo.height = m->height;
 	}
 
-	for (; i < num_windows + num_monitors + 1 && i < (size_t)size; ++i)
+	for (; i < num_windows + *num_monitors + 1 && i < (size_t)size; ++i)
 	{
-		size_t j = i - num_monitors - 1;
+		size_t j = i - *num_monitors - 1;
 		char* title_utf8 = get_window_title(disp, client_list[j], NULL);
 		if (title_utf8 == NULL)
 		{

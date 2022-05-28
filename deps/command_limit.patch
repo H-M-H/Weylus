@@ -1,10 +1,10 @@
 diff --git a/ffbuild/library.mak b/ffbuild/library.mak
-index 612bacb980..1842dac699 100644
+index ad09f20..e63196d 100644
 --- a/ffbuild/library.mak
 +++ b/ffbuild/library.mak
-@@ -19,7 +19,9 @@ $(LIBOBJS) $(LIBOBJS:.o=.s) $(LIBOBJS:.o=.i):   CPPFLAGS += -DHAVE_AV_CONFIG_H
- 
- $(SUBDIR)$(LIBNAME): $(OBJS)
+@@ -35,7 +35,9 @@ OBJS += $(SHLIBOBJS)
+ endif
+ $(SUBDIR)$(LIBNAME): $(OBJS) $(STLIBOBJS)
  	$(RM) $@
 -	$(AR) $(ARFLAGS) $(AR_O) $^
 +	$(file >$@.ar.txt, $^)
