@@ -289,14 +289,14 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                 {
                     use image::Luma;
                     use qrcode::QrCode;
-                    let addr_string = format!("http://{}", web_sock.to_string());
+                    let addr_string = format!("http://{}", web_sock);
                     output_server_addr.set_value(&addr_string);
                     let mut url_string = addr_string;
                     if let Some(access_code) = &config.access_code {
                         url_string.push_str("?access_code=");
                         url_string.push_str(
                             &percent_encoding::utf8_percent_encode(
-                                &access_code,
+                                access_code,
                                 percent_encoding::NON_ALPHANUMERIC,
                             )
                             .to_string(),

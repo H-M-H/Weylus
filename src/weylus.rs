@@ -78,7 +78,7 @@ impl Weylus {
             Ok(Ws2UiMessage::Start) => {}
             Ok(Ws2UiMessage::Error(err)) => {
                 error!("Failed to start websocket server: {}", err);
-                if let Err(_) = ws_thread.join() {
+                if ws_thread.join().is_err() {
                     error!("Websocketserver thread panicked.");
                 }
                 return false;
@@ -86,7 +86,7 @@ impl Weylus {
             Ok(Ws2UiMessage::UInputInaccessible) => unreachable!(),
             Err(err) => {
                 error!("Error communicating with websocketserver thread: {}", err);
-                if let Err(_) = ws_thread.join() {
+                if ws_thread.join().is_err() {
                     error!("Websocketserver thread panicked.");
                 }
                 return false;
@@ -98,7 +98,7 @@ impl Weylus {
             receiver_ui2web,
             &SocketAddr::new(config.bind_address, config.web_port),
             config.websocket_port,
-            config.access_code.as_ref().map(|s| s.as_str()),
+            config.access_code.as_deref(),
             config.custom_index_html.clone(),
             config.custom_access_html.clone(),
             config.custom_style_css.clone(),
@@ -108,7 +108,7 @@ impl Weylus {
             Ok(Web2UiMessage::Start) => (),
             Ok(Web2UiMessage::Error(err)) => {
                 error!("Webserver error: {}", err);
-                if let Err(_) = web_thread.join() {
+                if web_thread.join().is_err() {
                     error!("Webserver thread panicked.");
                 }
 
@@ -118,14 +118,14 @@ impl Weylus {
                         err
                     );
                 }
-                if let Err(_) = ws_thread.join() {
+                if ws_thread.join().is_err() {
                     error!("Websocketserver thread panicked.");
                 }
                 return false;
             }
             Err(err) => {
                 error!("Error communicating with webserver thread: {}", err);
-                if let Err(_) = web_thread.join() {
+                if web_thread.join().is_err() {
                     error!("Webserver thread panicked.");
                 }
 
@@ -135,7 +135,7 @@ impl Weylus {
                         err
                     );
                 }
-                if let Err(_) = ws_thread.join() {
+                if ws_thread.join().is_err() {
                     error!("Websocketserver thread panicked.");
                 }
                 return false;
@@ -178,12 +178,12 @@ impl Weylus {
 
     pub fn wait(&mut self) {
         if let Some(t) = self.ws_thread.take() {
-            if let Err(_) = t.join() {
+            if t.join().is_err() {
                 error!("Websocket thread panicked.");
             }
         }
         if let Some(t) = self.web_thread.take() {
-            if let Err(_) = t.join() {
+            if t.join().is_err() {
                 error!("Web thread panicked.");
             }
         }
