@@ -226,7 +226,7 @@ impl X11Context {
             .collect();
         // The first capturable is always the whole desktop, after that there is num_monitors
         // monitors and finally windows.
-        let win = &mut capturables[(num_monitors as usize + 1 )..(size as usize)];
+        let win = &mut capturables[(num_monitors as usize + 1)..(size as usize)];
         win.sort_by(|a, b| a.name().to_lowercase().cmp(&b.name().to_lowercase()));
         Ok(capturables)
     }
