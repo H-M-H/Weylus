@@ -3,7 +3,7 @@ name = "weylus"
 version = "0.11.4"
 authors = ["HMH <henry@freedesk.net>"]
 license = "AGPL-3.0-or-later"
-edition = "2018"
+edition = "2021"
 description = "Use your iPad or Android tablet as graphic tablet."
 
 [dependencies]
