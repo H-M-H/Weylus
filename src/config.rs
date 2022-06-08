@@ -64,8 +64,10 @@ pub struct Config {
     #[serde(skip)]
     pub print_lib_js: bool,
 
-
-    #[structopt(long, help = "Use custom template of index.html to be served by Weylus.")]
+    #[structopt(
+        long,
+        help = "Use custom template of index.html to be served by Weylus."
+    )]
     #[serde(skip)]
     pub custom_index_html: Option<String>,
     #[structopt(long, help = "Use custom access.html to be served by Weylus.")]

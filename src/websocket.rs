@@ -417,7 +417,7 @@ impl WsHandler {
 
     fn process_wheel_event(&mut self, event: &WheelEvent) {
         if self.input_device.is_some() {
-            self.input_device.as_mut().unwrap().send_wheel_event(&event)
+            self.input_device.as_mut().unwrap().send_wheel_event(event)
         } else {
             warn!("Input device is not initalized, can not process WheelEvent!");
         }
@@ -428,7 +428,7 @@ impl WsHandler {
             self.input_device
                 .as_mut()
                 .unwrap()
-                .send_pointer_event(&event)
+                .send_pointer_event(event)
         } else {
             warn!("Input device is not initalized, can not process PointerEvent!");
         }
@@ -439,7 +439,7 @@ impl WsHandler {
             self.input_device
                 .as_mut()
                 .unwrap()
-                .send_keyboard_event(&event)
+                .send_keyboard_event(event)
         } else {
             warn!("Input device is not initalized, can not process KeyboardEvent!");
         }
@@ -540,7 +540,7 @@ impl WsHandler {
     fn process(&mut self, message: &OwnedMessage) {
         match message {
             OwnedMessage::Text(s) => {
-                let message: Result<MessageInbound, _> = serde_json::from_str(&s);
+                let message: Result<MessageInbound, _> = serde_json::from_str(s);
                 match message {
                     Ok(message) => {
                         if let MessageInbound::TryGetFrame = message {

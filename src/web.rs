@@ -180,10 +180,7 @@ pub fn run(
         .register_template_string("index", INDEX_HTML)
         .unwrap();
 
-    let access_code = match access_code {
-        Some(access_code) => Some(access_code.to_string()),
-        None => None,
-    };
+    let access_code = access_code.map(ToString::to_string);
 
     let context = Context {
         bind_addr: *bind_addr,

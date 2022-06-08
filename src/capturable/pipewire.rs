@@ -427,7 +427,6 @@ fn request_screen_cast(
                     let session = session.clone();
                     let fd = fd.clone();
                     let streams = streams.clone();
-                    let failure = failure.clone();
                     let failure_out = failure.clone();
                     handle_response(
                         c,

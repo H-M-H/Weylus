@@ -119,7 +119,7 @@ impl VideoEncoder {
         let mut err = CError::new();
         match pixel_provider {
             PixelProvider::BGR0(w, _, bgr0) => unsafe {
-                fill_bgr0(self.handle, bgr0.as_ptr(), (w*4) as c_int, &mut err);
+                fill_bgr0(self.handle, bgr0.as_ptr(), (w * 4) as c_int, &mut err);
             },
             PixelProvider::BGR0S(_, _, stride, bgr0) => unsafe {
                 fill_bgr0(self.handle, bgr0.as_ptr(), stride as c_int, &mut err);
