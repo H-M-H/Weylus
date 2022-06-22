@@ -1,10 +1,7 @@
 use std::collections::HashMap;
 use std::net::{SocketAddr, TcpStream};
-use std::sync::mpsc::SendError;
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    mpsc, Arc, Mutex,
-};
+use std::sync::mpsc::{SendError, TryRecvError};
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread::spawn;
 use tracing::{debug, error, info, warn};
 
@@ -55,73 +52,58 @@ pub fn run(
     receiver: mpsc::Receiver<Ui2WsMessage>,
     config: WsConfig,
 ) -> std::thread::JoinHandle<()> {
-    let clients = Arc::new(Mutex::new(HashMap::<
-        SocketAddr,
-        Arc<Mutex<Writer<TcpStream>>>,
-    >::new()));
-    let clients2 = clients.clone();
-    let shutdown = Arc::new(AtomicBool::new(false));
-    let shutdown2 = shutdown.clone();
+    spawn(move || {
+        let clients = Arc::new(Mutex::new(HashMap::<
+            SocketAddr,
+            Arc<Mutex<Writer<TcpStream>>>,
+        >::new()));
 
-    spawn(move || match receiver.recv() {
-        Err(_) | Ok(Ui2WsMessage::Shutdown) => {
-            let clients = clients.lock().unwrap();
-            for client in clients.values() {
-                let client = client.lock().unwrap();
-                if let Err(err) = client.shutdown_all() {
-                    error!("Could not shutdown websocket client: {}", err);
-                }
-            }
-            shutdown.store(true, Ordering::Relaxed);
+        let server = Server::bind(config.address);
+        if let Err(err) = server {
+            log_send_error(sender.send(Ws2UiMessage::Error(format!(
+                "Failed binding to socket: {}",
+                err
+            ))));
+            return;
         }
-    });
-    spawn(move || listen_websocket(config, clients2, shutdown2, sender))
-}
-
-fn listen_websocket(
-    config: WsConfig,
-    clients: WsClients,
-    shutdown: Arc<AtomicBool>,
-    sender: mpsc::Sender<Ws2UiMessage>,
-) {
-    let server = Server::bind(config.address);
-    if let Err(err) = server {
-        log_send_error(sender.send(Ws2UiMessage::Error(format!(
-            "Failed binding to socket: {}",
-            err
-        ))));
-        return;
-    }
-    let mut server = server.unwrap();
-    if let Err(err) = server.set_nonblocking(true) {
-        warn!(
+        let mut server = server.unwrap();
+        if let Err(err) = server.set_nonblocking(true) {
+            warn!(
             "Could not set websocket to non-blocking, graceful shutdown may be impossible now: {}",
             err
         );
-    }
-
-    log_send_error(sender.send(Ws2UiMessage::Start));
-
-    loop {
-        std::thread::sleep(std::time::Duration::from_millis(10));
-        if shutdown.load(Ordering::Relaxed) {
-            info!("Shutting down websocket: {}", config.address);
-            return;
         }
-        match server.accept() {
-            Ok(request) => {
-                let clients = clients.clone();
-                let config = config.clone();
-                let sender = sender.clone();
-                spawn(move || handle_connection(request, clients, config, sender));
-            }
-            Err(_) => {
-                if shutdown.load(Ordering::Relaxed) {
+
+        log_send_error(sender.send(Ws2UiMessage::Start));
+
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+
+            match receiver.try_recv() {
+                Err(TryRecvError::Disconnected) | Ok(Ui2WsMessage::Shutdown) => {
+                    let clients = clients.lock().unwrap();
+                    for client in clients.values() {
+                        let client = client.lock().unwrap();
+                        if let Err(err) = client.shutdown_all() {
+                            error!("Could not shutdown websocket client: {}", err);
+                        }
+                    }
+                    info!("Shutting down websocket: {}", config.address);
                     return;
                 }
+                _ => {}
             }
-        };
-    }
+            match server.accept() {
+                Ok(request) => {
+                    let clients = clients.clone();
+                    let config = config.clone();
+                    let sender = sender.clone();
+                    spawn(move || handle_connection(request, clients, config, sender));
+                }
+                _ => {}
+            };
+        }
+    })
 }
 
 fn handle_connection(
