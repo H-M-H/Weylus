@@ -167,9 +167,9 @@ struct Context<'a> {
 pub fn run(
     sender: mpsc::Sender<Web2UiMessage>,
     receiver: mpsc_tokio::Receiver<Ui2WebMessage>,
-    bind_addr: &SocketAddr,
+    bind_addr: SocketAddr,
     ws_port: u16,
-    access_code: Option<&str>,
+    access_code: Option<String>,
     custom_index_html: Option<String>,
     custom_access_html: Option<String>,
     custom_style_css: Option<String>,
@@ -180,10 +180,8 @@ pub fn run(
         .register_template_string("index", INDEX_HTML)
         .unwrap();
 
-    let access_code = access_code.map(ToString::to_string);
-
     let context = Context {
-        bind_addr: *bind_addr,
+        bind_addr,
         ws_port,
         access_code,
         custom_index_html,

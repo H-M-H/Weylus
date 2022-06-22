@@ -96,9 +96,9 @@ impl Weylus {
         let web_thread = crate::web::run(
             sender_web2ui,
             receiver_ui2web,
-            &SocketAddr::new(config.bind_address, config.web_port),
+            SocketAddr::new(config.bind_address, config.web_port),
             config.websocket_port,
-            config.access_code.as_deref(),
+            config.access_code.clone(),
             config.custom_index_html.clone(),
             config.custom_access_html.clone(),
             config.custom_style_css.clone(),
