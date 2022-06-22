@@ -69,9 +69,9 @@ pub fn run(
         let mut server = server.unwrap();
         if let Err(err) = server.set_nonblocking(true) {
             warn!(
-            "Could not set websocket to non-blocking, graceful shutdown may be impossible now: {}",
-            err
-        );
+                "Could not set websocket to non-blocking, graceful shutdown may be impossible now: {}",
+                err
+            );
         }
 
         log_send_error(sender.send(Ws2UiMessage::Start));
