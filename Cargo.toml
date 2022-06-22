@@ -38,7 +38,7 @@ gstreamer-app = { version = "^0.18", features = ["v1_10"] }
 gstreamer-video = "^0.18"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
-pnet = "^0.29"
+pnet_datalink = "^0.31"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = "^0.9"

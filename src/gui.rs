@@ -16,7 +16,7 @@ use fltk::{
 };
 
 #[cfg(not(target_os = "windows"))]
-use pnet::datalink;
+use pnet_datalink as datalink;
 
 use crate::config::{write_config, Config};
 use crate::websocket::Ws2UiMessage;
