@@ -90,14 +90,13 @@ pub fn read_config() -> Option<Config> {
         config_path.push("weylus");
         config_path.push("weylus.toml");
         match fs::read_to_string(&config_path) {
-            Ok(s) => {
-                let config: Result<Config, _> = toml::from_str(&s);
-                if let Err(err) = config {
-                    warn!("Failed to read configuration file: {}", err);
-                    return None;
+            Ok(s) => match toml::from_str(&s) {
+                Ok(c) => Some(c),
+                Err(e) => {
+                    warn!("Failed to read configuration file: {}", e);
+                    None
                 }
-                Some(config.unwrap())
-            }
+            },
             Err(err) => {
                 warn!("Failed to read configuration file: {}", err);
                 None
