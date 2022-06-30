@@ -281,12 +281,13 @@ impl InputDevice for UInputDevice {
             warn!("Failed to activate window, sending no input ({})", err);
             return;
         }
-        let geometry = self.capturable.geometry_relative();
-        if let Err(err) = geometry {
-            warn!("Failed to get window geometry, sending no input ({})", err);
-            return;
-        }
-        let (x, y, width, height) = geometry.unwrap();
+        let (x, y, width, height) = match self.capturable.geometry_relative() {
+            Ok(g) => g,
+            Err(e) => {
+                warn!("Failed to get window geometry, sending no input ({})", e);
+                return;
+            }
+        };
         self.x = x;
         self.y = y;
         self.width = width;

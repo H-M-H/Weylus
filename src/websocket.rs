@@ -58,15 +58,17 @@ pub fn run(
             Arc<Mutex<Writer<TcpStream>>>,
         >::new()));
 
-        let server = Server::bind(config.address);
-        if let Err(err) = server {
-            log_send_error(sender.send(Ws2UiMessage::Error(format!(
-                "Failed binding to socket: {}",
-                err
-            ))));
-            return;
-        }
-        let mut server = server.unwrap();
+        let mut server = match Server::bind(config.address) {
+            Ok(s) => s,
+            Err(e) => {
+                log_send_error(sender.send(Ws2UiMessage::Error(format!(
+                    "Failed binding to socket: {}",
+                    e
+                ))));
+                return;
+            }
+        };
+
         if let Err(err) = server.set_nonblocking(true) {
             warn!(
                 "Could not set websocket to non-blocking, graceful shutdown may be impossible now: {}",
@@ -112,27 +114,33 @@ fn handle_connection(
     config: WsConfig,
     gui_sender: mpsc::Sender<Ws2UiMessage>,
 ) {
-    let client = request.accept();
-    if let Err((_, err)) = client {
-        warn!("Failed to accept client: {}", err);
-        return;
-    }
-    let client = client.unwrap();
+    let client = match request.accept() {
+        Ok(c) => c,
+        Err((_, err)) => {
+            warn!("Failed to accept client: {}", err);
+            return;
+        }
+    };
+
     if let Err(err) = client.set_nonblocking(false) {
         warn!("Failed to set client to blocking mode: {}", err);
     }
-    let peer_addr = client.peer_addr();
-    if let Err(err) = peer_addr {
-        warn!("Failed to retrieve client address: {}", err);
-        return;
-    }
-    let peer_addr = peer_addr.unwrap();
-    let client = client.split();
-    if let Err(err) = client {
-        warn!("Failed to setup connection: {}", err);
-        return;
-    }
-    let (mut ws_receiver, ws_sender) = client.unwrap();
+
+    let peer_addr = match client.peer_addr() {
+        Ok(p) => p,
+        Err(err) => {
+            warn!("Failed to retrieve client address: {}", err);
+            return;
+        }
+    };
+
+    let (mut ws_receiver, ws_sender) = match client.split() {
+        Ok(s) => s,
+        Err(err) => {
+            warn!("Failed to setup connection: {}", err);
+            return;
+        }
+    };
 
     let ws_sender = Arc::new(Mutex::new(ws_sender));
 
@@ -220,13 +228,11 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, confi
     let mut max_height = 1080;
 
     loop {
-        let msg = receiver.recv();
-
         // stop thread once the channel is closed
-        if msg.is_err() {
-            return;
-        }
-        let mut msg = msg.unwrap();
+        let mut msg = match receiver.recv() {
+            Ok(m) => m,
+            Err(_) => return,
+        };
 
         // drop frames if the client is requesting frames at a higher rate than they can be
         // produced here
@@ -300,11 +306,13 @@ fn handle_video(receiver: mpsc::Receiver<VideoCommands>, sender: WsWriter, confi
                         },
                         config.encoder_options,
                     );
-                    if let Err(err) = res {
-                        warn!("{}", err);
-                        continue;
-                    }
-                    video_encoder = Some(res.unwrap());
+                    match res {
+                        Ok(r) => video_encoder = Some(r),
+                        Err(e) => {
+                            warn!("{}", e);
+                            continue;
+                        }
+                    };
                 }
                 let video_encoder = video_encoder.as_mut().unwrap();
                 video_encoder.encode(pixel_data);
@@ -398,10 +406,9 @@ impl WsHandler {
     }
 
     fn process_wheel_event(&mut self, event: &WheelEvent) {
-        if self.input_device.is_some() {
-            self.input_device.as_mut().unwrap().send_wheel_event(event)
-        } else {
-            warn!("Input device is not initalized, can not process WheelEvent!");
+        match &mut self.input_device {
+            Some(i) => i.send_wheel_event(event),
+            None => warn!("Input device is not initalized, can not process WheelEvent!"),
         }
     }
 
@@ -465,20 +472,23 @@ impl WsHandler {
                         capturable.clone(),
                         &self.client_name,
                     );
-                    if let Err(err) = device {
-                        error!("Failed to create uinput device: {}", err);
-                        if let CErrorCode::UInputNotAccessible = err.to_enum() {
-                            if let Err(err) = self.gui_sender.send(Ws2UiMessage::UInputInaccessible)
-                            {
-                                warn!("Failed to send message to gui thread: {}!", err);
+                    match device {
+                        Ok(d) => self.input_device = Some(Box::new(d)),
+                        Err(e) => {
+                            error!("Failed to create uinput device: {}", e);
+                            if let CErrorCode::UInputNotAccessible = e.to_enum() {
+                                if let Err(err) =
+                                    self.gui_sender.send(Ws2UiMessage::UInputInaccessible)
+                                {
+                                    warn!("Failed to send message to gui thread: {}!", err);
+                                }
                             }
+                            self.send_msg(&MessageOutbound::ConfigError(
+                                "Failed to create uinput device!".to_string(),
+                            ));
+                            return;
                         }
-                        self.send_msg(&MessageOutbound::ConfigError(
-                            "Failed to create uinput device!".to_string(),
-                        ));
-                        return;
                     }
-                    self.input_device = Some(Box::new(device.unwrap()))
                 } else if let Some(d) = self.input_device.as_mut() {
                     d.set_capturable(capturable.clone());
                 }
