@@ -19,8 +19,8 @@ use crate::protocol::{
 use crate::cerror::CErrorCode;
 use crate::video::{EncoderOptions, VideoEncoder};
 
-type WsWriter = Arc<Mutex<websocket::sender::Writer<std::net::TcpStream>>>;
-type WsClients = Arc<Mutex<HashMap<SocketAddr, Arc<Mutex<Writer<TcpStream>>>>>>;
+type WsWriter = Arc<Mutex<Writer<TcpStream>>>;
+type WsClients = Arc<Mutex<HashMap<SocketAddr, WsWriter>>>;
 
 pub enum Ws2UiMessage {
     Start,
@@ -53,10 +53,7 @@ pub fn run(
     config: WsConfig,
 ) -> std::thread::JoinHandle<()> {
     spawn(move || {
-        let clients = Arc::new(Mutex::new(HashMap::<
-            SocketAddr,
-            Arc<Mutex<Writer<TcpStream>>>,
-        >::new()));
+        let clients: WsClients = Arc::new(Mutex::new(HashMap::new()));
 
         let mut server = match Server::bind(config.address) {
             Ok(s) => s,
