@@ -50,7 +50,7 @@ impl InputDevice for AutoPilotDevice {
         let (_, _, width, height) = match crate::capturable::core_graphics::screen_coordsys() {
             Ok(bounds) => bounds,
             Err(err) => {
-                warn!("Could determine global coordinate system: {}", err);
+                warn!("Could not determine global coordinate system: {}", err);
                 return;
             }
         };
