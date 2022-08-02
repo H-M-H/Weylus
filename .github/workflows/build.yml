@@ -24,12 +24,12 @@ jobs:
             packages/Weylus*.deb
             packages/weylus-windows.zip
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/cache@v2
+    - uses: actions/checkout@v3
+    - uses: actions/cache@v3
       with:
-        path: deps/dist
+        path: deps/dist*
         key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       with:
         path: |
           ~/.cargo/registry
@@ -52,7 +52,7 @@ jobs:
         name: linux-deb
         path: packages/Weylus*.deb
     - name: Artifacts3
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: windows
         path: packages/weylus-windows.zip
@@ -84,19 +84,18 @@ jobs:
           exec-file: target/release/bundle/osx/macOS.zip
           pkg-cmd: cd target/release/bundle/osx/ && zip -r macOS.zip Weylus.app
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/cache@v2
+    - uses: actions/checkout@v3
+    - uses: actions/cache@v3
       with:
         path: deps/dist
-        key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}-6
-    - uses: actions/cache@v2
-      if: ${{ !contains(matrix.os, 'macOS') }}
+        key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}
+    - uses: actions/cache@v3
       with:
         path: |
           ~/.cargo/registry
           ~/.cargo/git
           target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}-6
+        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
     - name: Download deps
       run: ${{ matrix.install-deps }}
       shell: bash
