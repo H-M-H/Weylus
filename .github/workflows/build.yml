@@ -18,27 +18,24 @@ jobs:
         os: [ubuntu-latest]
         include:
         - os: ubuntu-latest
-          build-cmd: cargo deb --  --features=va-static && dpkg -i target/debian/Weylus*.deb && mv target/release/weylus target/release/weylus_va_static && cargo build --release
+          build-cmd: ./docker_build.sh
           package-files: |
-            target/release/linux.zip
-            target/debian/Weylus*.deb
-          exec-file: target/release/linux.zip
-          deb-file: target/debian/Weylus*.deb
-          pkg-cmd: cp weylus.desktop target/release/ && cd target/release/ && zip linux.zip weylus weylus_va_static weylus.desktop
-
+            packages/weylus-linux.zip
+            packages/Weylus*.deb
+            packages/weylus-windows.zip
     steps:
     - uses: actions/checkout@v2
     - uses: actions/cache@v2
       with:
         path: deps/dist
-        key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}-6
+        key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}
     - uses: actions/cache@v2
       with:
         path: |
           ~/.cargo/registry
           ~/.cargo/git
           target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}-6
+        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
     - name: Build
       run: ${{ matrix.build-cmd }}
       shell: bash
@@ -47,20 +44,18 @@ jobs:
     - name: Artifacts1
       uses: actions/upload-artifact@v2
       with:
-        name: ${{ runner.os }}-exec
-        path: ${{ matrix.exec-file }}
+        name: linux
+        path: packages/weylus-linux.zip
     - name: Artifacts2
       uses: actions/upload-artifact@v2
       with:
-        name: ${{ runner.os }}-deb
-        path: ${{ matrix.deb-file }}
-    - name: ArtifactsDeps
+        name: linux-deb
+        path: packages/Weylus*.deb
+    - name: Artifacts3
       uses: actions/upload-artifact@v2
       with:
-        name: ${{ runner.os }}-deps
-        path: |
-          deps/dist
-          www/static/lib.js
+        name: windows
+        path: packages/weylus-windows.zip
     - name: Publish
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
@@ -76,7 +71,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macOS-latest, windows-latest]
+        os: [macOS-latest]
         include:
         - os: macOS-latest
           install-deps: |
@@ -88,26 +83,6 @@ jobs:
           package-files: target/release/bundle/osx/macOS.zip
           exec-file: target/release/bundle/osx/macOS.zip
           pkg-cmd: cd target/release/bundle/osx/ && zip -r macOS.zip Weylus.app
-
-        - os: windows-latest
-          install-deps: |
-             # This is not bash but a placeholder from WSL that tells you to install some WSL crap
-             # and by doing so it shadows the actual bash executable when calling CreateProcess from
-             # winapi, which rust's std::Command does ...
-             rm 'C:\Windows\System32\bash.exe'
-             # make sure to only use msvc's link.exe
-             rm 'C:\Program Files\Git\usr\bin\link.exe'
-             curl -LO https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/nasm-2.15.05-win64.zip
-             7z x nasm-2.15.05-win64.zip
-             cp nasm-2.15.05/nasm.exe /usr/bin/nasm.exe
-             # default pkg-config is broken, fortunately this one comes first in PATH
-             choco install pkgconfiglite
-             choco install typescript
-          build-cmd: cargo build --release --verbose
-          package-files: target/release/Windows.zip
-          exec-file: target/release/Windows.zip
-          pkg-cmd: cd target/release/ && 7z a Windows.zip weylus.exe
-
     steps:
     - uses: actions/checkout@v2
     - uses: actions/cache@v2
@@ -125,7 +100,6 @@ jobs:
     - name: Download deps
       run: ${{ matrix.install-deps }}
       shell: bash
-    - uses: ilammy/msvc-dev-cmd@v1
     - name: Build
       run: ${{ matrix.build-cmd }}
     - name: Package
@@ -136,13 +110,6 @@ jobs:
         name: ${{ runner.os }}
         path: |
           ${{ matrix.exec-file }}
-    - name: ArtifactsDeps
-      uses: actions/upload-artifact@v2
-      with:
-        name: ${{ runner.os }}-deps
-        path: |
-          deps/dist
-          www/static/lib.js
     - name: ArtifactsDebug
       if: failure()
       uses: actions/upload-artifact@v2

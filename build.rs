@@ -2,8 +2,8 @@ use std::env;
 use std::path::Path;
 use std::process::Command;
 
-fn build_ffmpeg() {
-    if Path::new("deps/dist").exists() {
+fn build_ffmpeg(dist_dir: &Path) {
+    if dist_dir.exists() {
         return;
     }
 
@@ -16,6 +16,7 @@ fn build_ffmpeg() {
     if !Command::new("bash")
         .arg(Path::new("build.sh"))
         .current_dir("deps")
+        .env("DIST", dist_dir)
         .status()
         .expect("Failed to run bash!")
         .success()
@@ -28,8 +29,13 @@ fn build_ffmpeg() {
 fn main() {
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
 
+    let dist_dir = Path::new("deps")
+        .canonicalize()
+        .unwrap()
+        .join(format!("dist_{}", target_os));
+
     if env::var("CARGO_FEATURE_FFMPEG_SYSTEM").is_err() {
-        build_ffmpeg();
+        build_ffmpeg(&dist_dir);
     }
 
     println!("cargo:rerun-if-changed=ts/lib.ts");
@@ -69,7 +75,7 @@ fn main() {
     println!("cargo:rerun-if-changed=lib/encode_video.c");
     let mut cc_video = cc::Build::new();
     cc_video.file("lib/encode_video.c");
-    cc_video.include("deps/dist/include");
+    cc_video.include(dist_dir.join("include"));
     if ["linux", "windows"].contains(&target_os.as_str()) {
         cc_video.define("HAS_NVENC", None);
     }
@@ -110,7 +116,10 @@ fn main() {
     println!("cargo:rustc-link-lib={}=postproc", ffmpeg_link_kind);
     println!("cargo:rustc-link-lib={}=x264", ffmpeg_link_kind);
     if env::var("CARGO_FEATURE_FFMPEG_SYSTEM").is_err() {
-        println!("cargo:rustc-link-search=deps/dist/lib");
+        println!(
+            "cargo:rustc-link-search={}",
+            dist_dir.join("lib").to_string_lossy()
+        );
     }
 
     if target_os == "linux" {
