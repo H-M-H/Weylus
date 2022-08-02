@@ -1,0 +1,15 @@
+FROM alpine:latest
+ENV RUSTUP_HOME="/usr/local/rustup" CARGO_HOME="/usr/local/cargo" PATH="/usr/local/cargo/bin:$PATH"
+
+RUN apk add --no-cache libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev \
+    libxrender-dev libxfixes-dev libxtst-dev libxrandr-dev libxcomposite-dev libxi-dev libxv-dev \
+    autoconf libtool pkgconfig libdrm-dev pango-dev gst-plugins-base-dev gstreamer-dev dbus-libs \
+    dbus-dev cmake build-base nasm npm ffmpeg-dev libva-dev curl git bash automake
+
+RUN npm install --global typescript
+
+RUN ln -s /usr/bin/x86_64-alpine-linux-musl-gcc /usr/bin/musl-gcc
+RUN ln -s /usr/bin/x86_64-alpine-linux-musl-g++ /usr/bin/musl-g++
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+    sh -s -- -y --default-toolchain stable-x86_64-unknown-linux-musl
