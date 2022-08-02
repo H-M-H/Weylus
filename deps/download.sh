@@ -17,5 +17,4 @@ cd ffmpeg
 if [ "$TARGET_OS" == "windows" ] && [ "$HOST_OS" == "windows" ]; then
     git apply ../command_limit.patch
     git apply ../awk.patch
-    git apply ../ffmpeg-x264-static.patch
 fi
