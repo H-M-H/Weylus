@@ -4,7 +4,7 @@ ENV RUSTUP_HOME="/usr/local/rustup" CARGO_HOME="/usr/local/cargo" PATH="/usr/loc
 RUN apk add --no-cache libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev \
     libxrender-dev libxfixes-dev libxtst-dev libxrandr-dev libxcomposite-dev libxi-dev libxv-dev \
     autoconf libtool pkgconfig libdrm-dev pango-dev gst-plugins-base-dev gstreamer-dev dbus-libs \
-    dbus-dev cmake build-base nasm npm ffmpeg-dev libva-dev curl git bash automake
+    dbus-dev cmake build-base nasm npm ffmpeg-dev libva-dev curl git bash automake tar
 
 RUN npm install --global typescript
 
