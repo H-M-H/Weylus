@@ -152,6 +152,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec8a7b6a70fde80372154c65702f00a0f56f3e1c36abbc6c440484be248856db"
 
 [[package]]
+name = "captrs"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dad312f1be0ea3cce9ad0cdbace33350ea0781f138d7b49bfe191df0aa83db1b"
+dependencies = [
+ "dxgcap",
+ "x11cap",
+]
+
+[[package]]
 name = "cc"
 version = "1.0.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -441,6 +451,16 @@ dependencies = [
  "libc",
  "redox_users",
  "winapi",
+]
+
+[[package]]
+name = "dxgcap"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18a3f3df51c509e7c8d2807c63abfecdea1a83def81baec83d68c6f5bb8ac654"
+dependencies = [
+ "winapi",
+ "wio",
 ]
 
 [[package]]
@@ -2261,6 +2281,7 @@ version = "0.11.4"
 dependencies = [
  "autopilot",
  "bitflags",
+ "captrs",
  "cc",
  "core-foundation 0.9.3",
  "core-graphics 0.22.3",
@@ -2287,6 +2308,8 @@ dependencies = [
  "tracing-subscriber",
  "url 2.2.2",
  "websocket",
+ "winapi",
+ "wio",
 ]
 
 [[package]]
@@ -2355,6 +2378,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c811ca4a8c853ef420abd8592ba53ddbbac90410fab6903b3e79972a631f7680"
 
 [[package]]
+name = "wio"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d129932f4644ac2396cb456385cbf9e63b5b30c6e8dc4820bdca4eb082037a5"
+dependencies = [
+ "winapi",
+]
+
+[[package]]
 name = "x11"
 version = "2.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2362,4 +2394,14 @@ checksum = "6dd0565fa8bfba8c5efe02725b14dff114c866724eff2cfd44d76cea74bcd87a"
 dependencies = [
  "libc",
  "pkg-config",
+]
+
+[[package]]
+name = "x11cap"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16ccedf556cb1f784d462dd8f24a7804f766d57c0051439d3e4052465263c399"
+dependencies = [
+ "libc",
+ "x11",
 ]

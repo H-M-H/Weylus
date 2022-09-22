@@ -1,4 +1,4 @@
-use crate::capturable::{Capturable, Recorder};
+use crate::capturable::{Capturable, Geometry, Recorder};
 use crate::video::PixelProvider;
 use std::error::Error;
 
@@ -43,8 +43,8 @@ impl Capturable for TestCapturable {
     fn name(&self) -> String {
         format!("Test Source {}x{}", self.width, self.height)
     }
-    fn geometry_relative(&self) -> Result<(f64, f64, f64, f64), Box<dyn Error>> {
-        Ok((1.0, 1.0, 1.0, 1.0))
+    fn geometry(&self) -> Result<Geometry, Box<dyn Error>> {
+        Ok(Geometry::Relative(0.0, 0.0, 1.0, 1.0))
     }
     fn before_input(&mut self) -> Result<(), Box<dyn Error>> {
         Ok(())

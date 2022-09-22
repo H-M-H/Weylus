@@ -16,7 +16,7 @@ use gstreamer as gst;
 use gstreamer::prelude::*;
 use gstreamer_app::AppSink;
 
-use crate::capturable::{Capturable, Recorder};
+use crate::capturable::{Capturable, Geometry, Recorder};
 use crate::video::PixelProvider;
 
 use crate::capturable::pipewire_dbus::{
@@ -96,8 +96,8 @@ impl Capturable for PipeWireCapturable {
         format!("Pipewire {}, path: {}", type_str, self.path)
     }
 
-    fn geometry_relative(&self) -> Result<(f64, f64, f64, f64), Box<dyn Error>> {
-        Ok((0.0, 0.0, 1.0, 1.0))
+    fn geometry(&self) -> Result<Geometry, Box<dyn Error>> {
+        Ok(Geometry::Relative(0.0, 0.0, 1.0, 1.0))
     }
 
     fn before_input(&mut self) -> Result<(), Box<dyn Error>> {
