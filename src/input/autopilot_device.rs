@@ -37,14 +37,12 @@ impl InputDevice for AutoPilotDevice {
             warn!("Failed to activate window, sending no input ({})", err);
             return;
         }
-        let geometry = self.capturable.geometry();
-        if let Err(err) = geometry {
-            warn!("Failed to get window geometry, sending no input ({})", err);
-            return;
-        }
-        let (x_rel, y_rel, width_rel, height_rel) = match geometry.unwrap() {
+        let (x_rel, y_rel, width_rel, height_rel) = match self.capturable.geometry().unwrap() {
             Geometry::Relative(x, y, width, height) => (x, y, width, height),
-            _ => unreachable!(),
+            _ => {
+                warn!("Failed to get window geometry, sending no input");
+                return;
+            }
         };
         #[cfg(not(target_os = "macos"))]
         let Size { width, height } = screen_size();
@@ -52,7 +50,7 @@ impl InputDevice for AutoPilotDevice {
         let (_, _, width, height) = match crate::capturable::core_graphics::screen_coordsys() {
             Ok(bounds) => bounds,
             Err(err) => {
-                warn!("Could determine global coordinate system: {}", err);
+                warn!("Could not determine global coordinate system: {}", err);
                 return;
             }
         };

@@ -1,7 +1,7 @@
 /target
 /deps/ffmpeg
 /deps/x264
-/deps/dist
+/deps/dist*
 /deps/nv-codec-headers
 /deps/libva
 c_helper/target

@@ -16,6 +16,7 @@ if [ "$OS" == "Windows_NT" ]; then
     export HOST_OS="windows"
 fi
 
+[ -z "$DIST" ] && export DIST="dist"
 [ -z "$TARGET_OS" ] && export TARGET_OS="$HOST_OS"
 
 export NPROCS="$(nproc || echo 4)"
@@ -27,18 +28,18 @@ if [ "$TARGET_OS" == "windows" ]; then
         export CROSS_COMPILE="x86_64-w64-mingw32-"
         export FFMPEG_EXTRA_ARGS="--arch=x86_64 --target-os=mingw64 --cross-prefix=x86_64-w64-mingw32- \
             --enable-nvenc --enable-ffnvcodec --enable-mediafoundation --pkg-config=pkg-config"
-        export FFMPEG_CFLAGS="-I../dist/include"
-        export FFMPEG_LIBRARY_PATH="-L../dist/lib"
+        export FFMPEG_CFLAGS="-I$DIST/include"
+        export FFMPEG_LIBRARY_PATH="-L$DIST/lib"
     else
         export CC="cl"
         export FFMPEG_EXTRA_ARGS="--toolchain=msvc --enable-nvenc --enable-ffnvcodec \
             --enable-mediafoundation"
-        export FFMPEG_CFLAGS="-I../dist/include"
-        export FFMPEG_LIBRARY_PATH="-LIBPATH:../dist/lib"
+        export FFMPEG_CFLAGS="-I$DIST/include"
+        export FFMPEG_LIBRARY_PATH="-LIBPATH:$DIST/lib"
     fi
 else
-    export FFMPEG_CFLAGS="-I../dist/include"
-    export FFMPEG_LIBRARY_PATH="-L../dist/lib"
+    export FFMPEG_CFLAGS="-I$DIST/include"
+    export FFMPEG_LIBRARY_PATH="-L$DIST/lib"
     if [ "$TARGET_OS" == "linux" ]; then
         export FFMPEG_EXTRA_ARGS="--enable-nvenc \
             --enable-ffnvcodec \
@@ -65,7 +66,7 @@ fi
 ./ffmpeg.sh
 
 if [ "$TARGET_OS" == "windows" ] && [ "$HOST_OS" == "windows" ]; then
-    cd dist/lib
+    cd "$DIST/lib"
     for l in *.a; do
         d=${l#lib}
         cp "$l" "${d%.a}.lib"

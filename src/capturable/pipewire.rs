@@ -91,7 +91,7 @@ impl Capturable for PipeWireCapturable {
         let type_str = match self.source_type {
             1 => "Desktop",
             2 => "Window",
-            _ => "Unknow",
+            _ => "Unknown",
         };
         format!("Pipewire {}, path: {}", type_str, self.path)
     }
@@ -104,7 +104,7 @@ impl Capturable for PipeWireCapturable {
         Ok(())
     }
 
-    fn recorder(&self, capture_cursor: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
+    fn recorder(&self, _capture_cursor: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
         Ok(Box::new(PipeWireRecorder::new(self.clone())?))
     }
 }
@@ -427,7 +427,6 @@ fn request_screen_cast(
                     let session = session.clone();
                     let fd = fd.clone();
                     let streams = streams.clone();
-                    let failure = failure.clone();
                     let failure_out = failure.clone();
                     handle_response(
                         c,

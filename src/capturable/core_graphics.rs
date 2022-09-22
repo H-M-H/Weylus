@@ -258,11 +258,11 @@ fn get_window_infos() -> Vec<WindowInfo> {
             let bounds = unsafe { CFDictionary::wrap_under_get_rule(*bounds as CFDictionaryRef) };
             let bounds = CGRect::from_dict_representation(&bounds).unwrap();
 
-            let name = w.find(unsafe { window::kCGWindowName }.to_void());
-            if let None = name {
-                continue;
-            }
-            let name = name.unwrap();
+            let name = match w.find(unsafe { window::kCGWindowName }.to_void()) {
+                Some(n) => n,
+                None => continue,
+            };
+
             let name = unsafe { CFString::wrap_under_get_rule(*name as CFStringRef) };
             win_infos.push(WindowInfo {
                 id,
