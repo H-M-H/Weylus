@@ -221,6 +221,11 @@ expand documentation on this!
   to actually do that: https://github.com/swaywm/sway/issues/5553
 - On Wayland with GNOME recently there has been added an option to [create virtual monitors with
   mutter](https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/1698)
+- On Wayland with KDE there is now also the option to [create virtual desktops.](https://wayland.app/protocols/kde-plasma-virtual-desktop)
+
+![Screenshot_20230211_120842](https://user-images.githubusercontent.com/54219098/218254811-8253aea4-fb72-4caf-92d3-40db128525a0.png)
+
+
 
 #### Encryption
 By default Weylus comes without encryption and should only be run on networks you trust. If this is
