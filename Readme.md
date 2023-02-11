@@ -223,7 +223,6 @@ expand documentation on this!
   mutter](https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/1698)
 - On Wayland with KDE there is now also the option to [create virtual desktops.](https://wayland.app/protocols/kde-plasma-virtual-desktop)
 
-![Screenshot_20230211_120842](https://user-images.githubusercontent.com/54219098/218254811-8253aea4-fb72-4caf-92d3-40db128525a0.png)
 
 
 
