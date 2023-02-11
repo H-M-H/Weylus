@@ -223,9 +223,6 @@ expand documentation on this!
   mutter](https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/1698)
 - On Wayland with KDE there is now also the option to [create virtual desktops.](https://wayland.app/protocols/kde-plasma-virtual-desktop)
 
-
-
-
 #### Encryption
 By default Weylus comes without encryption and should only be run on networks you trust. If this is
 not the case it's strongly advised to set up a TLS proxy. One option is to use
