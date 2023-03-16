@@ -262,9 +262,9 @@ impl InputDevice for UInputDevice {
             self.mouse_fd,
             ET_RELATIVE,
             EC_REL_HWHEEL,
-            direction(event.dy),
+            direction(event.dx),
         );
-        self.send(self.mouse_fd, ET_RELATIVE, EC_REL_WHEEL_HI_RES, event.dx);
+        self.send(self.mouse_fd, ET_RELATIVE, EC_REL_WHEEL_HI_RES, event.dy);
         self.send(self.mouse_fd, ET_RELATIVE, EC_REL_HWHEEL_HI_RES, event.dx);
 
         self.send(
