@@ -34,6 +34,7 @@ pub struct UInputDevice {
     touch_fd: c_int,
     touches: [Option<MultiTouch>; 5],
     tool_pen_active: bool,
+    pen_touching: bool,
     capturable: Box<dyn Capturable>,
     x: f64,
     y: f64,
@@ -100,6 +101,7 @@ impl UInputDevice {
             touch_fd,
             touches: Default::default(),
             tool_pen_active: false,
+            pen_touching: false,
             capturable,
             x: 0.0,
             y: 0.0,
@@ -445,6 +447,7 @@ impl InputDevice for UInputDevice {
                 match event.event_type {
                     PointerEventType::DOWN | PointerEventType::MOVE => {
                         if let PointerEventType::DOWN = event.event_type {
+                            self.pen_touching = true;
                             self.send(self.stylus_fd, ET_KEY, EC_KEY_TOUCH, 1);
                         }
                         if !self.tool_pen_active && !event.buttons.contains(Button::ERASER) {
@@ -473,7 +476,11 @@ impl InputDevice for UInputDevice {
                             self.stylus_fd,
                             ET_ABSOLUTE,
                             EC_ABSOLUTE_PRESSURE,
-                            self.transform_pressure(event.pressure),
+                            if self.pen_touching {
+                                self.transform_pressure(event.pressure)
+                            } else {
+                                0
+                            },
                         );
                         self.send(
                             self.stylus_fd,
@@ -494,6 +501,7 @@ impl InputDevice for UInputDevice {
                         self.send(self.stylus_fd, ET_KEY, EC_KEY_TOOL_RUBBER, 0);
                         self.send(self.stylus_fd, ET_ABSOLUTE, EC_ABSOLUTE_PRESSURE, 0);
                         self.tool_pen_active = false;
+                        self.pen_touching = false;
                     }
                 }
                 self.send(
