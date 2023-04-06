@@ -687,19 +687,37 @@ class KeyboardHandler {
     constructor(webSocket: WebSocket) {
         this.webSocket = webSocket;
 
-        let m = document.getElementById("main");
+        let d = document;
+        let s = document.getElementById("settings")
 
-        m.onkeydown = (e) => {
+        // Consume all KeyboardEvents, except the settings menu is open.
+        // this avoids making the main/video/canvas element focusable by using
+        // a tabindex which interferes with PointerEvent than can be considered
+        // hovering.
+
+        function settings_hidden() {
+            return s.classList.contains("hide") || s.classList.contains("vanish");
+        }
+
+        d.onkeydown = (e) => {
+            if (!settings_hidden())
+                return true;
             if (e.repeat)
                 return this.onEvent(e, "repeat");
             return this.onEvent(e, "down");
         };
-        m.onkeyup = (e) => { return this.onEvent(e, "up") };
-        m.onkeypress = (e) => {
+        d.onkeyup = (e) => {
+            if (!settings_hidden())
+                return true;
+            return this.onEvent(e, "up");
+        };
+        d.onkeypress = (e) => {
+            if (!settings_hidden())
+                return true;
             e.preventDefault();
             e.stopPropagation();
             return false;
-        }
+        };
     }
 
     onEvent(event: KeyboardEvent, event_type: string) {
