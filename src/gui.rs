@@ -1,3 +1,4 @@
+use std::cmp::min;
 use std::iter::Iterator;
 use std::net::{IpAddr, SocketAddr};
 
@@ -305,11 +306,8 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     let code = QrCode::new(&url_string).unwrap();
                     let img_buf = code.render::<Luma<u8>>().build();
                     let image = image::DynamicImage::ImageLuma8(img_buf);
-                    let image = image.resize_exact(
-                        qr_frame.width() as u32,
-                        qr_frame.height() as u32,
-                        image::imageops::FilterType::Nearest,
-                    );
+                    let dims = min(qr_frame.width(), qr_frame.height()) as u32;
+                    let image = image.resize_exact(dims, dims, image::imageops::FilterType::Nearest);
                     let mut buf = vec![];
                     image
                         .write_to(&mut buf, image::ImageOutputFormat::Png)
