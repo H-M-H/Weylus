@@ -1,4 +1,4 @@
-FROM debian:stretch
+FROM debian:buster
 ENV RUSTUP_HOME="/usr/local/rustup" CARGO_HOME="/usr/local/cargo" PATH="/usr/local/cargo/bin:$PATH"
 RUN apt-get update && \
    apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev \
@@ -9,13 +9,13 @@ RUN apt-get update && \
 RUN apt-add-repository contrib
 RUN apt-add-repository non-free
 RUN apt-get update && apt-get install -y nvidia-cuda-dev
-RUN curl -Lo cmake.tar.gz https://github.com/Kitware/CMake/releases/download/v3.23.3/cmake-3.23.3.tar.gz && tar xf cmake.tar.gz
+RUN curl -Lo cmake.tar.gz https://github.com/Kitware/CMake/releases/download/v3.27.8/cmake-3.27.8.tar.gz && tar xf cmake.tar.gz
 RUN cd cmake-3.* && cmake . && make -j$(nproc) && make install
 RUN rm -rf cmake*
-RUN curl -LO "https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/nasm-2.15.05.tar.xz" && \
-    tar xf "nasm-2.15.05.tar.xz" && cd "nasm-2.15.05" && \
-    ./configure --prefix=/usr && make -j$(nproc) && make install && cd .. && rm -rf "nasm-2.15.05*"
-RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - && \
+RUN curl -LO "https://www.nasm.us/pub/nasm/releasebuilds/2.16.01/nasm-2.16.01.tar.xz" && \
+    tar xf "nasm-2.16.01.tar.xz" && cd "nasm-2.16.01" && \
+    ./configure --prefix=/usr && make -j$(nproc) && make install && cd .. && rm -rf "nasm-2.16.01*"
+RUN curl -sL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y nodejs && \
     npm install -g typescript
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
