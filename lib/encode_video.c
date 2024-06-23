@@ -59,7 +59,7 @@ typedef struct VideoContext
 } VideoContext;
 
 // this is a rust function and lives in src/video.rs
-int write_video_packet(void* rust_ctx, uint8_t* buf, int buf_size);
+int write_video_packet(void* rust_ctx, const uint8_t* buf, int buf_size);
 
 #if defined(__clang__) || defined(__GNUC__)
 void log_callback(__attribute__((unused)) void* _ptr, int level, const char* fmt_orig, va_list args)
