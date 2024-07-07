@@ -92,15 +92,21 @@ impl InputDevice for AutoPilotDevice {
             match event.event_type {
                 PointerEventType::ENTER => {
                     debug!("Entering tablet");
-                },
+                }
                 PointerEventType::LEAVE => {
                     debug!("Leaving tablet");
-                },
+                }
                 _ => (),
             }
 
             let buttons = if self.tablet_down { 1 } else { 0 };
-            if let Err(err) = mouse::send_pressure_event(point, pe_type, buttons, event.pressure) {
+            if let Err(err) = mouse::send_pressure_event(
+                point,
+                pe_type,
+                event.button.bits().into(),
+                buttons,
+                event.pressure,
+            ) {
                 warn!("Could not send pressure: {}", err);
             }
 

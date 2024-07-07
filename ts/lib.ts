@@ -855,11 +855,11 @@ function init(access_code: string, websocket_port: number) {
     let video = document.getElementById("video") as HTMLVideoElement;
     let canvas = document.getElementById("canvas") as HTMLCanvasElement;
 
-    video.oncontextmenu = function(event) {
+    document.body.addEventListener("contextmenu", (event) => {
         event.preventDefault();
         event.stopPropagation();
         return false;
-    };
+    }, true);
 
     let toggle_fullscreen_btn = document.getElementById("fullscreen") as HTMLButtonElement;
 
