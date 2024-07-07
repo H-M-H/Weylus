@@ -605,6 +605,8 @@ class PointerHandler {
         this.webSocket = webSocket;
         this.pointerTypes = settings.pointer_types();
 
+        video.onpointerenter = (e) => this.onEvent(e, "pointerenter");
+        video.onpointerleave = (e) => this.onEvent(e, "pointerleave");
         video.onpointerdown = (e) => this.onEvent(e, "pointerdown");
         video.onpointerup = (e) => this.onEvent(e, "pointerup");
         video.onpointercancel = (e) => this.onEvent(e, "pointercancel");
@@ -615,11 +617,15 @@ class PointerHandler {
             painter = new Painter(canvas as HTMLCanvasElement);
 
         if (painter && painter.initialized) {
+            canvas.onpointerenter = (e) => this.onEvent(e, "pointerenter");
+            canvas.onpointerleave = (e) => this.onEvent(e, "pointerleave");
             canvas.onpointerdown = (e) => { this.onEvent(e, "pointerdown"); painter.onstart(e); };
             canvas.onpointerup = (e) => { this.onEvent(e, "pointerup"); painter.onstop(e); };
             canvas.onpointercancel = (e) => { this.onEvent(e, "pointercancel"); painter.onstop(e); };
             canvas.onpointermove = (e) => { this.onEvent(e, "pointermove"); painter.onmove(e); };
         } else {
+            canvas.onpointerenter = (e) => this.onEvent(e, "pointerenter");
+            canvas.onpointerleave = (e) => this.onEvent(e, "pointerleave");
             canvas.onpointerdown = (e) => this.onEvent(e, "pointerdown");
             canvas.onpointerup = (e) => this.onEvent(e, "pointerup");
             canvas.onpointercancel = (e) => this.onEvent(e, "pointercancel");

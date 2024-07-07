@@ -33,7 +33,7 @@ pub enum MessageOutbound {
     Error(String),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum PointerType {
     #[serde(rename = "")]
     Unknown,
@@ -55,6 +55,10 @@ pub enum PointerEventType {
     CANCEL,
     #[serde(rename = "pointermove")]
     MOVE,
+    #[serde(rename = "pointerenter")]
+    ENTER,
+    #[serde(rename = "pointerleave")]
+    LEAVE,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
