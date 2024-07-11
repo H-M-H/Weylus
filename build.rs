@@ -38,33 +38,39 @@ fn main() {
         build_ffmpeg(&dist_dir);
     }
 
-    println!("cargo:rerun-if-changed=ts/lib.ts");
+    println!("cargo:rerun-if-changed=www/src/");
 
+    let mut npm_command: Command;
     #[cfg(not(target_os = "windows"))]
-    let mut tsc_command = Command::new("tsc");
-
+    {
+        npm_command = Command::new("npm");
+        npm_command.args(&["run", "build"]).current_dir("www");
+    }
     #[cfg(target_os = "windows")]
-    let mut tsc_command = Command::new("bash");
-    #[cfg(target_os = "windows")]
-    tsc_command.args(&["-c", "tsc"]);
+    {
+        npm_command = Command::new("bash");
+        npm_command
+            .args(&["-c", "npm run build"])
+            .current_dir("www");
+    }
 
     let js_needs_update = || -> Result<bool, Box<dyn std::error::Error>> {
-        Ok(Path::new("ts/lib.ts").metadata()?.modified()?
+        Ok(Path::new("www/src/").metadata()?.modified()?
             > Path::new("www/static/lib.js").metadata()?.modified()?)
     }()
     .unwrap_or(true);
 
     if js_needs_update {
-        match tsc_command.status() {
+        match npm_command.status() {
             Err(err) => {
-                println!("cargo:warning=Failed to call tsc: {}", err);
+                println!("cargo:warning=Failed to call npm: {}", err);
                 std::process::exit(1);
             }
             Ok(status) => {
                 if !status.success() {
                     match status.code() {
-                        Some(code) => println!("cargo:warning=tsc failed with exitcode: {}", code),
-                        None => println!("cargo:warning=tsc terminated by signal."),
+                        Some(code) => println!("cargo:warning=npm failed with exitcode: {}", code),
+                        None => println!("cargo:warning=npm terminated by signal."),
                     };
                     std::process::exit(2);
                 }
