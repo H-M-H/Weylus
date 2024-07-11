@@ -6,6 +6,8 @@
 /deps/libva
 c_helper/target
 c_helper/Cargo.lock
-*.js
-*.js.map
 .DS_Store
+node_modules
+/www/static/lib.js
+/www/static/style.css
+/www/static/*.map

@@ -14,9 +14,18 @@
     </head>
 
     <body>
-        <main id="main" contenteditable="true">
+        <main id="main" tabindex="0">
             <video id="video" autoplay muted defaultMuted playsinline></video>
             <canvas id="canvas" class="vanish"></canvas>
+            <div id="vk-container">
+                <div class="vk-editing-notice">
+                    <strong>Virtual Keys</strong>: Drag to move, strike keyboard to change key.
+                    <br>
+                    <button id="vk-add">Add Key</button>
+                    <button id="vk-delete">Delete</button>
+
+                </div>
+            </div>
         </main>
         <div id="settings">
             <div id="handle">⠿</div>
@@ -54,6 +63,11 @@
                 </section>
                 <section {{#if (not uinput_enabled)}}class="hide"{{/if}}>
                     <label><span>Client Name:</span><br><input type="text" id="client_name" /><br><span>Optional, useful to distinguish multiple devices.</span></label>
+                </section>
+                <h3>Virtual Keys</h3>
+                <section>
+                    <label><input type="checkbox" id="enable_virtual_keys" /> <span>Show Virtual Keys</span></label>
+                    <label><input type="checkbox" id="enable_edit_virtual_keys" /> <span>Edit Mode</span></label>
                 </section>
                 <section id="displayoptions">
                     <label id="leftylabel"><input type="checkbox" id="lefty" />Swap</label>

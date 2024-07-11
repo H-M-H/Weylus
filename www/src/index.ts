@@ -189,6 +189,13 @@ class Settings {
             toggle_energysaving((e.target as HTMLInputElement).checked);
         };
 
+        this.checks.get("enable_virtual_keys").onchange = (e) => {
+            this.save_settings();
+            const vkContainer = document.getElementById("vk-container") as HTMLDivElement;
+            if ((e.target as HTMLInputElement).checked) vkContainer.classList.remove("hidden");
+            else vkContainer.classList.add("hidden");
+        }
+
         this.frame_update_limit_input.onchange = () => this.save_settings();
         this.range_min_pressure.onchange = () => this.save_settings();
 
@@ -277,6 +284,10 @@ class Settings {
                 toggle_energysaving(true);
             }
 
+            if (!this.checks.get("enable_virtual_keys").checked) {
+                document.getElementById("vk-container").classList.add("hidden");
+            }
+
             let client_name = settings["client_name"];
             if (client_name)
                 this.client_name_input.value = client_name;
@@ -331,9 +342,194 @@ class Settings {
             // Can't find the window, so don't select anything
             this.capturable_select.value = "";
     }
+
+
 }
 
 let settings: Settings;
+
+interface VirtualKeyItem {
+    x: number; // percentage 0~100
+    y: number; // percentage 0~100
+    width: number; // in pixels
+    height: number; // in pixels
+
+    kEvent: KEvent | null; // ignoring its "event_type"
+}
+
+class VirtualKey {
+    webSocket: WebSocket;
+
+    container: HTMLDivElement;
+    editPanel: HTMLDivElement;
+
+    editing = false;
+    pointerEditing = false;
+
+    index = -1
+    items: ({ opt: VirtualKeyItem, el: HTMLElement })[] = [];
+
+    constructor(webSocket: WebSocket) {
+        this.webSocket = webSocket;
+        this.container = document.getElementById("vk-container") as HTMLDivElement;
+        this.editPanel = document.getElementById("vk-edit") as HTMLDivElement;
+
+        const enableEditing = document.getElementById("enable_edit_virtual_keys") as HTMLInputElement;
+        enableEditing.checked = false; // disable by default
+        enableEditing.onchange = e => {
+            this.editing = (e.target as HTMLInputElement).checked;
+            if (this.editing) {
+                document.addEventListener("keydown", globalKeydownHandler, true);
+                this.container.classList.add("isEditing");
+            } else {
+                document.removeEventListener("keydown", globalKeydownHandler, true);
+                this.container.classList.remove("isEditing");
+            }
+        }
+
+        const globalKeydownHandler = (e: KeyboardEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            this.applyOpt({
+                kEvent: new KEvent("down", e),
+            })
+            this.save();
+        }
+
+        document.getElementById("vk-add").onclick = (e) => {
+            e.preventDefault();
+            this.addKey({
+                x: 50,
+                y: 50,
+                width: 200,
+                height: 100,
+                kEvent: null,
+            })
+            this.save();
+        }
+        document.getElementById("vk-delete").onclick = (e) => {
+            e.preventDefault();
+            if (this.index < 0) return alert("No virtual key selected.");
+            this.deleteAndSave(this.index);
+        }
+
+        let storedSettings = localStorage.getItem("vk-settings");
+        if (storedSettings) {
+            let opts = JSON.parse(storedSettings) as VirtualKeyItem[];
+            for (let opt of opts) this.addKey(opt);
+        }
+    }
+
+    save() {
+        localStorage.setItem("vk-settings", JSON.stringify(this.items.map(it => it.opt)));
+    }
+
+    addKey(initialOpt: VirtualKeyItem) {
+        const el = document.createElement("div");
+        el.classList.add("vk-key");
+
+        const it = { opt: initialOpt, el };
+        this.items.push(it);
+        this.container.appendChild(el);
+        this.setIndex(this.items.length - 1);
+        this.applyOpt(initialOpt);
+
+        el.addEventListener("pointerdown", e => {
+            if (this.pointerEditing) return;
+
+            const pointerId = e.pointerId;
+            el.setPointerCapture(pointerId);
+            e.stopPropagation();
+            e.preventDefault();
+
+            this.setIndex(this.items.indexOf(it));
+            if (this.editing) {
+                this.pointerEditing = true;
+
+                const cx0 = e.clientX;
+                const cy0 = e.clientY;
+                const { x, y, width, height } = this.items[this.index].opt;
+
+                const onpointermove = (e: PointerEvent) => {
+                    if (e.pointerId !== pointerId) return
+                    const dx = e.clientX - cx0;
+                    const dy = e.clientY - cy0;
+
+                    this.applyOpt({
+                        x: x + dx / window.innerWidth * 100,
+                        y: y + dy / window.innerHeight * 100,
+                    })
+                }
+                const onpointerup = (e: PointerEvent) => {
+                    if (e.pointerId !== pointerId) return
+                    this.pointerEditing = false;
+                    window.removeEventListener("pointermove", onpointermove, true);
+                    window.removeEventListener("pointerup", onpointerup, true);
+                    window.removeEventListener("pointercancel", onpointerup, true);
+                    this.save();
+                }
+                window.addEventListener("pointermove", onpointermove, true);
+                window.addEventListener("pointerup", onpointerup, true);
+                window.addEventListener("pointercancel", onpointerup, true);
+
+                return
+            }
+
+            if (it.opt.kEvent) {
+                // regular send key 
+                this.webSocket.send(JSON.stringify({ "KeyboardEvent": it.opt.kEvent }));
+                el.classList.add("justPressed");
+
+                setTimeout(() => {
+                    el.classList.remove("justPressed");
+                    this.webSocket.send(JSON.stringify({ "KeyboardEvent": { ...it.opt.kEvent, event_type: "up" } }));
+                }, 150);
+            }
+        })
+    }
+
+    applyOpt(opt: Partial<VirtualKeyItem>) {
+        let e = this.items[this.index];
+        if (!e) return;
+
+        opt = e.opt = { ...e.opt, ...opt };
+
+        let text = '';
+        
+        const kEvent = opt.kEvent;
+        if (kEvent) {
+            if (kEvent.alt) text += 'Alt+';
+            if (kEvent.ctrl) text += 'Ctrl+';
+            if (kEvent.shift) text += 'Shift+';
+            if (kEvent.meta) text += 'Meta+';
+            text += kEvent.code;
+        } else {
+            text = '<not set>';
+        }
+
+        e.el.style.cssText = `left: ${opt.x}%; top: ${opt.y}%; width: ${opt.width}px; height: ${opt.height}px;`;
+        e.el.textContent = text;
+    }
+
+    setIndex(index: number) {
+        this.items[this.index]?.el.classList.remove("isActive");
+        if (index < this.items.length) {
+            this.index = index;
+            this.items[this.index]?.el.classList.add("isActive");
+        } else {
+            this.index = -1
+        }
+    }
+
+    deleteAndSave(index: number) {
+        if (index === this.index) this.setIndex(-1);
+        if (index < this.index) this.index--;
+        const removed = this.items.splice(index, 1)[0];
+        removed?.el.remove()
+        this.save();
+    }
+}
 
 class PEvent {
     event_type: string;
@@ -851,6 +1047,7 @@ function init(access_code: string, websocket_port: number) {
     webSocket.binaryType = "arraybuffer";
 
     settings = new Settings(webSocket);
+    new VirtualKey(webSocket)
 
     let video = document.getElementById("video") as HTMLVideoElement;
     let canvas = document.getElementById("canvas") as HTMLCanvasElement;
@@ -910,7 +1107,7 @@ function init(access_code: string, websocket_port: number) {
         (window_names) => settings.onCapturableList(window_names)
     );
     window.onunload = () => { webSocket.close(); }
-    webSocket.onopen = function(event) {
+    webSocket.onopen = function (event) {
         if (access_code)
             webSocket.send(access_code);
         authed = true;
@@ -930,3 +1127,5 @@ function stretch_video() {
         video.style.transform = "scale(" + scale + ")";
     }
 }
+
+window.run = run;
