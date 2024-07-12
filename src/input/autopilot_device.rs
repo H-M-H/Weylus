@@ -13,6 +13,9 @@ use crate::protocol::{
 
 use crate::capturable::Capturable;
 
+#[cfg(target_os = "macos")]
+use super::macos_tablet::{MacosPenEventType, macos_send_tablet_event};
+
 pub struct AutoPilotDevice {
     tablet_down: bool,
     capturable: Box<dyn Capturable>,
@@ -67,16 +70,15 @@ impl InputDevice for AutoPilotDevice {
             (event.y * height_rel + y_rel) * height,
         );
 
-        use autopilot::mouse::PressureEventType;
         #[cfg(target_os = "macos")]
         if event.pointer_type == PointerType::Pen {
             let pe_type = match event.event_type {
-                PointerEventType::DOWN => PressureEventType::Down,
-                PointerEventType::UP => PressureEventType::Up,
-                PointerEventType::CANCEL => PressureEventType::Up,
-                PointerEventType::ENTER => PressureEventType::Enter,
-                PointerEventType::LEAVE => PressureEventType::Leave,
-                _ => PressureEventType::Move,
+                PointerEventType::DOWN => MacosPenEventType::Down,
+                PointerEventType::UP => MacosPenEventType::Up,
+                PointerEventType::CANCEL => MacosPenEventType::Up,
+                PointerEventType::ENTER => MacosPenEventType::Enter,
+                PointerEventType::LEAVE => MacosPenEventType::Leave,
+                _ => MacosPenEventType::Move,
             };
 
             match event.event_type {
@@ -100,7 +102,7 @@ impl InputDevice for AutoPilotDevice {
             }
 
             let buttons = if self.tablet_down { 1 } else { 0 };
-            if let Err(err) = mouse::send_pressure_event(
+            if let Err(err) = macos_send_tablet_event(
                 point,
                 pe_type,
                 event.button.bits().into(),

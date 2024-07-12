@@ -38,7 +38,7 @@ $handle-width: 1em;
 @mixin color-scheme($bg, $element-bg, $text, $border) {
   body,
   html {
-    background: $bg;
+    background: $bg !important;
   }
   #settings {
     color: $text;

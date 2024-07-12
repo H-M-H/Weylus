@@ -26,6 +26,34 @@ fn build_ffmpeg(dist_dir: &Path) {
     }
 }
 
+fn build_www() {
+    let www_dir = Path::new("www");
+
+    // try `pnpm` first, then `npm`
+    if !www_dir.join("node_modules").exists() {
+        match Command::new("bash")
+            .args(["-c", "pnpm install"])
+            .current_dir(www_dir)
+            .status()
+        {
+            Ok(_) => (),
+            Err(_) => {
+                Command::new("bash")
+                    .args(["-c", "npm install"])
+                    .current_dir(www_dir)
+                    .status()
+                    .expect("Failed to run npm or pnpm!");
+            }
+        }
+    }
+
+    Command::new("bash")
+        .args(["-c", "npm run build"])
+        .current_dir(www_dir)
+        .status()
+        .expect("Failed to build www!");
+}
+
 fn main() {
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
 
@@ -39,44 +67,7 @@ fn main() {
     }
 
     println!("cargo:rerun-if-changed=www/src/");
-
-    let mut npm_command: Command;
-    #[cfg(not(target_os = "windows"))]
-    {
-        npm_command = Command::new("npm");
-        npm_command.args(&["run", "build"]).current_dir("www");
-    }
-    #[cfg(target_os = "windows")]
-    {
-        npm_command = Command::new("bash");
-        npm_command
-            .args(&["-c", "npm run build"])
-            .current_dir("www");
-    }
-
-    let js_needs_update = || -> Result<bool, Box<dyn std::error::Error>> {
-        Ok(Path::new("www/src/").metadata()?.modified()?
-            > Path::new("www/static/lib.js").metadata()?.modified()?)
-    }()
-    .unwrap_or(true);
-
-    if js_needs_update {
-        match npm_command.status() {
-            Err(err) => {
-                println!("cargo:warning=Failed to call npm: {}", err);
-                std::process::exit(1);
-            }
-            Ok(status) => {
-                if !status.success() {
-                    match status.code() {
-                        Some(code) => println!("cargo:warning=npm failed with exitcode: {}", code),
-                        None => println!("cargo:warning=npm terminated by signal."),
-                    };
-                    std::process::exit(2);
-                }
-            }
-        }
-    }
+    build_www();
 
     println!("cargo:rerun-if-changed=lib/encode_video.c");
     let mut cc_video = cc::Build::new();
