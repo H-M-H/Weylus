@@ -17,6 +17,16 @@
         <main id="main" tabindex="0">
             <video id="video" autoplay muted defaultMuted playsinline></video>
             <canvas id="canvas" class="vanish"></canvas>
+            
+            <div id="disconnected-notice" class="hidden">
+                <h2>Connection lost</h2>
+                click screen to retry...
+            </div>
+            
+            <div id="connecting-notice" class="hidden">
+                Connecting...
+            </div>
+
             <div id="vk-container">
                 <div class="vk-editing-notice">
                     <strong>Virtual Keys</strong>: Drag to move, strike keyboard to change key.

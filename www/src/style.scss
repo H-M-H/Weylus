@@ -279,6 +279,33 @@ label input:disabled + span {
   @include allow-select;
 }
 
+%connection-notice {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: #03c9;
+  color: #fff;
+  padding: 1em 2em;
+  border-radius: 0.5em;
+  text-align: center;
+}
+
+#disconnected-notice {
+  @extend %connection-notice;
+  background: #c009;
+}
+
+#connecting-notice {
+  @extend %connection-notice;
+  background: #03c9;
+  animation: connecting-facein 0.4s 0.2s 1 backwards;
+}
+@keyframes connecting-facein {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
 // Virtual Keys
 
 #vk-container {
