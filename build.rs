@@ -31,27 +31,43 @@ fn build_www() {
 
     // try `pnpm` first, then `npm`
     if !www_dir.join("node_modules").exists() {
-        match Command::new("bash")
+        let pnpm_install_success = match Command::new("bash")
             .args(["-c", "pnpm install"])
             .current_dir(www_dir)
             .status()
         {
-            Ok(_) => (),
-            Err(_) => {
-                Command::new("bash")
-                    .args(["-c", "npm install"])
-                    .current_dir(www_dir)
-                    .status()
-                    .expect("Failed to run npm or pnpm!");
+            Ok(e) => e.success(),
+            Err(_) => false,
+        };
+
+        if !pnpm_install_success {
+            let npm_install_result = Command::new("bash")
+                .args(["-c", "npm install"])
+                .current_dir(www_dir)
+                .status()
+                .expect("Failed to run npm or pnpm!");
+
+            if !npm_install_result.success() {
+                panic!(
+                    "Failed to install npm dependencies! npm exited with code {}",
+                    npm_install_result.code().unwrap_or(-1)
+                );
             }
         }
     }
 
-    Command::new("bash")
+    let build_result = Command::new("bash")
         .args(["-c", "npm run build"])
         .current_dir(www_dir)
         .status()
         .expect("Failed to build www!");
+
+    if !build_result.success() {
+        panic!(
+            "Failed to build www! npm exited with code {}",
+            build_result.code().unwrap_or(-1)
+        );
+    }
 }
 
 fn main() {
