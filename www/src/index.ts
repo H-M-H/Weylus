@@ -435,6 +435,7 @@ class VirtualKey {
         this.setIndex(this.items.length - 1);
         this.applyOpt(initialOpt);
 
+        let killPressingStrikeTimer: () => void;
         el.addEventListener("pointerdown", e => {
             if (this.pointerEditing) return;
 
@@ -478,13 +479,31 @@ class VirtualKey {
 
             if (it.opt.kEvent) {
                 // regular send key 
-                this.webSocket.send(JSON.stringify({ "KeyboardEvent": it.opt.kEvent }));
-                el.classList.add("justPressed");
+                const makePress = () => {
+                    el.classList.add("justPressed");
+                    this.webSocket.send(JSON.stringify({ "KeyboardEvent": it.opt.kEvent }));
+                    setTimeout(() => {
+                        el.classList.remove("justPressed");
+                        this.webSocket.send(JSON.stringify({ "KeyboardEvent": { ...it.opt.kEvent, event_type: "up" } }));
+                    }, 70);
+                }
 
-                setTimeout(() => {
-                    el.classList.remove("justPressed");
-                    this.webSocket.send(JSON.stringify({ "KeyboardEvent": { ...it.opt.kEvent, event_type: "up" } }));
-                }, 150);
+                makePress()
+                const timer = setTimeout(() => {
+                    el.classList.add("justPressed", "inCombo");
+                    const timer = setInterval(makePress, 120);
+                    killPressingStrikeTimer = () => {
+                        clearTimeout(timer)
+                        el.classList.remove("inCombo");
+                    };
+                }, 800); // if press for too long, start repeating the keypress
+                killPressingStrikeTimer = () => clearTimeout(timer);
+            }
+        })
+        el.addEventListener("pointerup", e => {
+            if (killPressingStrikeTimer) {
+                killPressingStrikeTimer();
+                killPressingStrikeTimer = null;
             }
         })
     }
@@ -496,7 +515,7 @@ class VirtualKey {
         opt = e.opt = { ...e.opt, ...opt };
 
         let text = '';
-        
+
         const kEvent = opt.kEvent;
         if (kEvent) {
             if (kEvent.alt) text += 'Alt+';

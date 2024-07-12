@@ -328,6 +328,10 @@ $vk-editing-rgb: 255, 200, 100;
     }
   }
 
+  &.inCombo {
+    border-style: double;
+  }
+
   &.justPressed {
     transform: translate(-50%, -50%) scale(0.9);
     transition-duration: 0s;
