@@ -433,6 +433,7 @@ impl InputDevice for UInputDevice {
                             self.touches[slot] = None;
                         }
                     }
+                    PointerEventType::ENTER | PointerEventType::LEAVE => ()
                 };
             }
             PointerType::Pen => {
@@ -495,6 +496,7 @@ impl InputDevice for UInputDevice {
                         self.send(self.stylus_fd, ET_ABSOLUTE, EC_ABSOLUTE_PRESSURE, 0);
                         self.tool_pen_active = false;
                     }
+                    PointerEventType::ENTER | PointerEventType::LEAVE => ()
                 }
                 self.send(
                     self.stylus_fd,
@@ -550,6 +552,7 @@ impl InputDevice for UInputDevice {
                         }
                         _ => (),
                     },
+                    PointerEventType::ENTER | PointerEventType::LEAVE => (),
                 }
                 self.send(
                     self.mouse_fd,
