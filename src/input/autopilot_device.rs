@@ -40,7 +40,7 @@ impl InputDevice for AutoPilotDevice {
     }
 
     fn send_pointer_event(&mut self, event: &PointerEvent) {
-        if !event.is_primary {
+        if !event.is_primary && event.pointer_type != PointerType::Pen {
             return;
         }
         if let Err(err) = self.capturable.before_input() {
@@ -70,6 +70,7 @@ impl InputDevice for AutoPilotDevice {
             (event.y * height_rel + y_rel) * height,
         );
 
+        // MacOS only: send tablet (stylus) events
         #[cfg(target_os = "macos")]
         if event.pointer_type == PointerType::Pen {
             let pe_type = match event.event_type {
