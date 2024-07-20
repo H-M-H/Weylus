@@ -7,7 +7,7 @@ edition = "2021"
 description = "Use your iPad or Android tablet as graphic tablet."
 
 [dependencies]
-autopilot = { git = "https://github.com/lyonbot/autopilot-rs.git", rev = "d7940415514213d128afdbd79104c109da8b94f9", version = "0.4.0" }
+autopilot = { git = "https://github.com/lyonbot/autopilot-rs.git", rev = "a92b41edb4818d0d4b4289d49e65420dbe9ab081", version = "0.4.0" }
 bitflags = "^1.3"
 dirs = "^4.0"
 fltk = { version = "^1", features = ["no-pango"] }
