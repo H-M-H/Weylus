@@ -9,85 +9,22 @@ on:
     branches: [ master ]
 
 jobs:
-  build-docker:
-    runs-on: ubuntu-latest
-    container: docker://hhmhh/weylus_build:latest
+  build-linux:
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v3
-    - uses: actions/cache@v3
-      with:
-        path: deps/dist*
-        key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}
-    - uses: actions/cache@v3
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+    - uses: actions-rust-lang/setup-rust-toolchain@v1
     - name: Build
-      run: ./docker_build.sh
-      shell: bash
-    - name: Artifacts1
-      uses: actions/upload-artifact@v2
+      run: |
+        sudo apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libxtst-dev libxrandr-dev libxcomposite-dev libxi-dev libxv-dev autoconf libtool-bin nvidia-cuda-dev pkg-config libdrm-dev libpango1.0-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libdbus-1-dev libavcodec-dev libavformat-dev libswscale-dev libva-dev libavdevice-dev libavfilter-dev libpostproc-dev libx264-dev
+        RUSTFLAGS="$RUSTFLAGS -A dead_code -A unused_imports" cargo b --features ffmpeg-system --release
+        mv target/release/weylus .
+        tar -czvf weylus_linux.tar.gz weylus
+    - name: Upload tar
+      uses: actions/upload-artifact@v2.2.4
       with:
-        name: linux
-        path: packages/weylus-linux.zip
-    - name: Artifacts2
-      uses: actions/upload-artifact@v2
-      with:
-        name: linux-deb
-        path: packages/Weylus*.deb
-    - name: Artifacts3
-      uses: actions/upload-artifact@v3
-      with:
-        name: windows
-        path: packages/weylus-windows.zip
-    - name: Publish
-      uses: softprops/action-gh-release@v1
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-          files: |
-            packages/weylus-linux.zip
-            packages/Weylus*.deb
-            packages/weylus-windows.zip
-          prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  build-docker-alpine:
-    runs-on: ubuntu-latest
-    container: docker://hhmhh/weylus_build_alpine:latest
-    steps:
-    - uses: actions/checkout@v3
-    - uses: actions/cache@v3
-      with:
-        path: deps/dist*
-        key: ${{ runner.os }}-alpine-deps-${{ hashFiles('deps/*') }}
-    - uses: actions/cache@v3
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-alpine-cargo-${{ hashFiles('Cargo.lock') }}
-    - name: Build
-      run: cargo build --release && cd target/release && tar czf weylus-linux-alpine-musl.tar.gz weylus
-      shell: bash
-    - name: Artifacts1
-      uses: actions/upload-artifact@v2
-      with:
-        name: linux-alpine-musl
-        path: target/release/weylus-linux-alpine-musl.tar.gz
-    - name: Publish
-      uses: softprops/action-gh-release@v1
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-          files: |
-            target/release/weylus-linux-alpine-musl.tar.gz
-          prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        name: weylus_linux
+        path: weylus_linux.tar.gz
 
   build-macos:
     runs-on: macOS-latest
