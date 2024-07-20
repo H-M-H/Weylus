@@ -90,7 +90,10 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-macos:
-    runs-on: macOS-latest
+    strategy:
+      matrix:
+        os: [macos-latest, macos-13] # -latest if for Apple Silicon, -13 is for Intel
+    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v3
     - uses: actions/cache@v3
@@ -114,16 +117,18 @@ jobs:
       # run: MACOSX_DEPLOYMENT_TARGET=10.13 cargo bundle --release
       run: cargo bundle --release
     - name: Package
-      run: cd target/release/bundle/osx/ && zip -r macOS.zip Weylus.app
+      run: |
+        MACOS_BUILD_NAME=macos-$([ "${{ matrix.os }}" == "macos-latest" ] && echo "arm" || echo "intel")
+        echo "MACOS_BUILD_NAME=$MACOS_BUILD_NAME" >> $GITHUB_ENV
+        cd target/release/bundle/osx/ && zip -r ${MACOS_BUILD_NAME}.zip Weylus.app
     - name: Artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
-        name: ${{ runner.os }}
-        path: |
-          target/release/bundle/osx/macOS.zip
+        name: ${{ env.MACOS_BUILD_NAME }}
+        path: target/release/bundle/osx/${{ env.MACOS_BUILD_NAME }}.zip
     - name: ArtifactsDebug
       if: failure()
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ runner.os }}-ffbuild
         path: |
