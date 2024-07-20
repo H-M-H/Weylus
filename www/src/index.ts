@@ -1,3 +1,5 @@
+import { initVirtualKey, setVirtualKeysProfiles } from "./virtualKey";
+
 enum LogLevel {
     ERROR = 0,
     WARN,
@@ -16,6 +18,9 @@ let last_fps_calc: number = performance.now();
 
 let check_video: HTMLInputElement;
 let webSocket: WebSocket;
+
+export const getWebSocket = () => webSocket;
+export const sendWsMessage = (msg: object) => webSocket.send(JSON.stringify(msg));
 
 function run(access_code: string, websocket_port: number, level: string) {
     window.onload = () => {
@@ -188,13 +193,6 @@ class Settings {
             toggle_energysaving((e.target as HTMLInputElement).checked);
         };
 
-        this.checks.get("enable_virtual_keys").onchange = (e) => {
-            this.save_settings();
-            const vkContainer = document.getElementById("vk-container") as HTMLDivElement;
-            if ((e.target as HTMLInputElement).checked) vkContainer.classList.remove("hidden");
-            else vkContainer.classList.add("hidden");
-        }
-
         this.frame_update_limit_input.onchange = () => this.save_settings();
         this.range_min_pressure.onchange = () => this.save_settings();
 
@@ -346,205 +344,6 @@ class Settings {
 }
 
 let settings: Settings;
-
-interface VirtualKeyItem {
-    x: number; // percentage 0~100
-    y: number; // percentage 0~100
-    width: number; // in pixels
-    height: number; // in pixels
-
-    kEvent: KEvent | null; // ignoring its "event_type"
-}
-
-class VirtualKey {
-    container: HTMLDivElement;
-    editPanel: HTMLDivElement;
-
-    editing = false;
-    pointerEditing = false;
-
-    index = -1
-    items: ({ opt: VirtualKeyItem, el: HTMLElement })[] = [];
-
-    constructor() {
-        this.container = document.getElementById("vk-container") as HTMLDivElement;
-        this.editPanel = document.getElementById("vk-edit") as HTMLDivElement;
-
-        const enableEditing = document.getElementById("enable_edit_virtual_keys") as HTMLInputElement;
-        enableEditing.checked = false; // disable by default
-        enableEditing.onchange = e => {
-            this.editing = (e.target as HTMLInputElement).checked;
-            if (this.editing) {
-                document.addEventListener("keydown", globalKeydownHandler, true);
-                this.container.classList.add("isEditing");
-            } else {
-                document.removeEventListener("keydown", globalKeydownHandler, true);
-                this.container.classList.remove("isEditing");
-            }
-        }
-
-        const globalKeydownHandler = (e: KeyboardEvent) => {
-            e.preventDefault();
-            e.stopPropagation();
-
-            this.applyOpt({
-                kEvent: new KEvent("down", e),
-            })
-            this.save();
-        }
-
-        document.getElementById("vk-add").onclick = (e) => {
-            e.preventDefault();
-            this.addKey({
-                x: 50,
-                y: 50,
-                width: 200,
-                height: 100,
-                kEvent: null,
-            })
-            this.save();
-        }
-        document.getElementById("vk-delete").onclick = (e) => {
-            e.preventDefault();
-            if (this.index < 0) return alert("No virtual key selected.");
-            this.deleteAndSave(this.index);
-        }
-
-        let storedSettings = localStorage.getItem("vk-settings");
-        if (storedSettings) {
-            let opts = JSON.parse(storedSettings) as VirtualKeyItem[];
-            for (let opt of opts) this.addKey(opt);
-        }
-    }
-
-    save() {
-        localStorage.setItem("vk-settings", JSON.stringify(this.items.map(it => it.opt)));
-    }
-
-    addKey(initialOpt: VirtualKeyItem) {
-        const el = document.createElement("div");
-        el.classList.add("vk-key");
-
-        const it = { opt: initialOpt, el };
-        this.items.push(it);
-        this.container.appendChild(el);
-        this.setIndex(this.items.length - 1);
-        this.applyOpt(initialOpt);
-
-        let killPressingStrikeTimer: () => void;
-        el.addEventListener("pointerdown", e => {
-            if (this.pointerEditing) return;
-
-            const pointerId = e.pointerId;
-            el.setPointerCapture(pointerId);
-            e.stopPropagation();
-            e.preventDefault();
-
-            this.setIndex(this.items.indexOf(it));
-            if (this.editing) {
-                this.pointerEditing = true;
-
-                const cx0 = e.clientX;
-                const cy0 = e.clientY;
-                const { x, y, width, height } = this.items[this.index].opt;
-
-                const onpointermove = (e: PointerEvent) => {
-                    if (e.pointerId !== pointerId) return
-                    const dx = e.clientX - cx0;
-                    const dy = e.clientY - cy0;
-
-                    this.applyOpt({
-                        x: x + dx / window.innerWidth * 100,
-                        y: y + dy / window.innerHeight * 100,
-                    })
-                }
-                const onpointerup = (e: PointerEvent) => {
-                    if (e.pointerId !== pointerId) return
-                    this.pointerEditing = false;
-                    window.removeEventListener("pointermove", onpointermove, true);
-                    window.removeEventListener("pointerup", onpointerup, true);
-                    window.removeEventListener("pointercancel", onpointerup, true);
-                    this.save();
-                }
-                window.addEventListener("pointermove", onpointermove, true);
-                window.addEventListener("pointerup", onpointerup, true);
-                window.addEventListener("pointercancel", onpointerup, true);
-
-                return
-            }
-
-            if (it.opt.kEvent) {
-                // regular send key 
-                const makePress = () => {
-                    el.classList.add("justPressed");
-                    webSocket.send(JSON.stringify({ "KeyboardEvent": it.opt.kEvent }));
-                    setTimeout(() => {
-                        el.classList.remove("justPressed");
-                        webSocket.send(JSON.stringify({ "KeyboardEvent": { ...it.opt.kEvent, event_type: "up" } }));
-                    }, 70);
-                }
-
-                makePress()
-                const timer = setTimeout(() => {
-                    el.classList.add("justPressed", "inCombo");
-                    const timer = setInterval(makePress, 120);
-                    killPressingStrikeTimer = () => {
-                        clearTimeout(timer)
-                        el.classList.remove("inCombo");
-                    };
-                }, 800); // if press for too long, start repeating the keypress
-                killPressingStrikeTimer = () => clearTimeout(timer);
-            }
-        })
-        el.addEventListener("pointerup", e => {
-            if (killPressingStrikeTimer) {
-                killPressingStrikeTimer();
-                killPressingStrikeTimer = null;
-            }
-        })
-    }
-
-    applyOpt(opt: Partial<VirtualKeyItem>) {
-        let e = this.items[this.index];
-        if (!e) return;
-
-        opt = e.opt = { ...e.opt, ...opt };
-
-        let text = '';
-
-        const kEvent = opt.kEvent;
-        if (kEvent) {
-            if (kEvent.alt) text += 'Alt+';
-            if (kEvent.ctrl) text += 'Ctrl+';
-            if (kEvent.shift) text += 'Shift+';
-            if (kEvent.meta) text += 'Meta+';
-            text += kEvent.code;
-        } else {
-            text = '<not set>';
-        }
-
-        e.el.style.cssText = `left: ${opt.x}%; top: ${opt.y}%; width: ${opt.width}px; height: ${opt.height}px;`;
-        e.el.textContent = text;
-    }
-
-    setIndex(index: number) {
-        this.items[this.index]?.el.classList.remove("isActive");
-        if (index < this.items.length) {
-            this.index = index;
-            this.items[this.index]?.el.classList.add("isActive");
-        } else {
-            this.index = -1
-        }
-    }
-
-    deleteAndSave(index: number) {
-        if (index === this.index) this.setIndex(-1);
-        if (index < this.index) this.index--;
-        const removed = this.items.splice(index, 1)[0];
-        removed?.el.remove()
-        this.save();
-    }
-}
 
 class PEvent {
     event_type: string;
@@ -874,7 +673,7 @@ class PointerHandler {
     }
 }
 
-class KEvent {
+export class KEvent {
     event_type: string;
     code: string;
     key: string;
@@ -1009,6 +808,10 @@ function handle_messages(
                 else if ("ConfigError" in msg) {
                     onConfigError(msg["ConfigError"]);
                 }
+                else if ("VirtualKeysProfiles" in msg) {
+                    const profiles = JSON.parse(msg["VirtualKeysProfiles"] || '[]');
+                    setVirtualKeysProfiles(profiles);
+                }
             }
 
             return;
@@ -1076,6 +879,7 @@ function init(access_code: string, websocket_port: number) {
             is_connected = true;
 
             ws.send('"GetCapturableList"');
+            ws.send('"RequestVirtualKeysProfiles"');
             settings.send_server_config();
 
             disconnectedNotice.classList.add("hidden");
@@ -1120,8 +924,7 @@ function init(access_code: string, websocket_port: number) {
     makeConnection();
 
     settings = new Settings();
-    new VirtualKey()
-
+    initVirtualKey();
 
     document.body.addEventListener("contextmenu", (event) => {
         event.preventDefault();
@@ -1170,4 +973,5 @@ function stretch_video() {
     }
 }
 
+// @ts-ignore
 window.run = run;

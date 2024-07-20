@@ -22,11 +22,14 @@ pub enum MessageInbound {
     TryGetFrame,
     GetCapturableList,
     Config(ClientConfiguration),
+    RequestVirtualKeysProfiles,
+    SetVirtualKeysProfiles(String),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum MessageOutbound {
     CapturableList(Vec<String>),
+    VirtualKeysProfiles(String),
     NewVideo,
     ConfigOk,
     ConfigError(String),

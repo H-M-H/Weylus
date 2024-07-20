@@ -135,7 +135,6 @@ form {
   top: 0;
   bottom: 0;
   transform: none;
-  padding: 1em;
   font-family: sans-serif;
   transition:
     transform 0.5s,
@@ -157,9 +156,11 @@ form {
   }
 
   #settings_scroll {
+    padding: 1em;
     overflow: auto;
-    width: 100%;
-    height: 100%;
+    box-sizing: border-box;
+    inset: 0;
+    position: absolute;
   }
 
   h2 {

@@ -27,14 +27,7 @@
                 Connecting...
             </div>
 
-            <div id="vk-container">
-                <div class="vk-editing-notice">
-                    <strong>Virtual Keys</strong>: Drag to move, strike keyboard to change key.
-                    <br>
-                    <button id="vk-add">Add Key</button>
-                    <button id="vk-delete">Delete</button>
-
-                </div>
+            <div id="vk-container-outter">
             </div>
         </main>
         <div id="settings">
@@ -45,6 +38,9 @@
                     <label for="window">Capture:</label>
                     <select id="window"></select>
                     <button id="refresh">Refresh List</button>
+                </section>
+                <h3>Virtual Keys</h3>
+                <section id="vk-settings-container">
                 </section>
                 <h3>Video</h3>
                 <section>
@@ -73,11 +69,6 @@
                 </section>
                 <section {{#if (not uinput_enabled)}}class="hide"{{/if}}>
                     <label><span>Client Name:</span><br><input type="text" id="client_name" /><br><span>Optional, useful to distinguish multiple devices.</span></label>
-                </section>
-                <h3>Virtual Keys</h3>
-                <section>
-                    <label><input type="checkbox" id="enable_virtual_keys" /> <span>Show Virtual Keys</span></label>
-                    <label><input type="checkbox" id="enable_edit_virtual_keys" /> <span>Edit Mode</span></label>
                 </section>
                 <section id="displayoptions">
                     <label id="leftylabel"><input type="checkbox" id="lefty" />Swap</label>

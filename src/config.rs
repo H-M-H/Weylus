@@ -64,6 +64,8 @@ pub struct Config {
     #[serde(skip)]
     pub print_lib_js: bool,
 
+    pub virtual_keys_profiles: Option<String>,
+
     #[structopt(
         long,
         help = "Use custom template of index.html to be served by Weylus."

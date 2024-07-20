@@ -5,6 +5,8 @@
     "module": "commonjs",
     "outDir": "static",
     "rootDir": "src",
+    "jsx": "react",
+    "jsxFactory": "h",
     "sourceMap": false
   },
   "include": [

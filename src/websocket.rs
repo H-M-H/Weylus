@@ -105,6 +105,10 @@ pub fn run(
     })
 }
 
+enum WsHandleProcessResult {
+    BroadcastVirtualKeysProfiles,
+}
+
 fn handle_connection(
     request: WsUpgrade<TcpStream, Option<WsBuffer>>,
     clients: WsClients,
@@ -147,6 +151,15 @@ fn handle_connection(
         info!(address = ?peer_addr, "Client connected.");
     }
 
+    macro_rules! do_broadcast {
+        ($msg:expr) => {
+            let mut clients = clients.lock().unwrap();
+            clients.values_mut().for_each(|c| {
+                send_msg(c, $msg);
+            });
+        };
+    }
+
     let mut ws_handler = WsHandler::new(ws_sender, config.clone(), gui_sender, peer_addr);
 
     let mut authed = config.access_code.is_none();
@@ -171,7 +184,16 @@ fn handle_connection(
                         }
                     }
                 } else {
-                    ws_handler.process(&msg);
+                    match ws_handler.process(&msg) {
+                        Some(WsHandleProcessResult::BroadcastVirtualKeysProfiles) => {
+                            use crate::config;
+                            let profiles = config::get_config()
+                                .virtual_keys_profiles
+                                .unwrap_or("[]".into());
+                            do_broadcast!(&MessageOutbound::VirtualKeysProfiles(profiles.clone()));
+                        }
+                        _ => {}
+                    }
                 }
                 if msg.is_close() {
                     let mut clients = clients.lock().unwrap();
@@ -445,6 +467,15 @@ impl WsHandler {
         self.send_msg(&MessageOutbound::CapturableList(windows));
     }
 
+    fn send_virtual_keys_profiles(&mut self) {
+        use crate::config;
+        let profiles = config::get_config()
+            .virtual_keys_profiles
+            .unwrap_or("[]".into())
+            .clone();
+        self.send_msg(&MessageOutbound::VirtualKeysProfiles(profiles));
+    }
+
     fn setup(&mut self, config: ClientConfiguration) {
         let client_name_changed = if self.client_name != config.client_name {
             self.client_name = config.client_name;
@@ -526,7 +557,7 @@ impl WsHandler {
         }
     }
 
-    fn process(&mut self, message: &OwnedMessage) {
+    fn process(&mut self, message: &OwnedMessage) -> Option<WsHandleProcessResult> {
         match message {
             OwnedMessage::Text(s) => {
                 let message: Result<MessageInbound, _> = serde_json::from_str(s);
@@ -553,17 +584,30 @@ impl WsHandler {
                             MessageInbound::TryGetFrame => self.queue_try_send_video_frame(),
                             MessageInbound::GetCapturableList => self.send_capturable_list(),
                             MessageInbound::Config(config) => self.setup(config),
+                            MessageInbound::RequestVirtualKeysProfiles => {
+                                self.send_virtual_keys_profiles()
+                            }
+                            MessageInbound::SetVirtualKeysProfiles(profiles) => {
+                                use crate::config::{self, write_config};
+                                let mut config = config::get_config().clone();
+                                config.virtual_keys_profiles = Some(profiles.clone());
+                                write_config(&config);
+
+                                return Some(WsHandleProcessResult::BroadcastVirtualKeysProfiles);
+                            }
                         }
+                        None
                     }
                     Err(err) => {
                         warn!("Unable to parse message: {} ({})", s, err);
                         self.send_msg(&MessageOutbound::Error(
                             "Failed to parse message!".to_string(),
                         ));
+                        None
                     }
                 }
             }
-            _ => (),
+            _ => None,
         }
     }
 }
