@@ -20,10 +20,7 @@ interface VirtualKeyProfile {
 
 const profiles = signal<VirtualKeyProfile[]>([]);
 const profileIndex = signal(Number(localStorage.getItem("profileIndex") ?? "-1"));
-effect(() => {
-  const profileCount = profiles.value.length;
-  if (profileIndex.value >= profileCount) profileIndex.value = profileCount - 1;
-})
+
 effect(() => localStorage.setItem("profileIndex", profileIndex.value.toString()))
 const currentProfile = computed(() => profiles.value[profileIndex.value]);
 
@@ -100,6 +97,8 @@ const VirtualKeyItem = memo((_props: {
           if (!(approx(deltaX, 0) && approx(deltaY, 0))) commitVirtualKeysProfiles()
         }
       })
+
+      return
     }
 
     // for regular clicks
