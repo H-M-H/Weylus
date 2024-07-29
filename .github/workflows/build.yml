@@ -8,7 +8,40 @@ on:
   pull_request:
     branches: [ master ]
 
+
+
+
+
 jobs:
+  build-windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Build
+        run: |
+          choco install -y --no-progress nodejs.install
+          npm install -g typescript
+          choco install -y --no-progress 7zip
+          Invoke-WebRequest -Uri https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-6.1.1-full_build-shared.7z -OutFile ffmpeg.7z
+          7z x ffmpeg.7z
+          $env:INCLUDE = ".\ffmpeg-6.1.1-full_build-shared\include\;" + $env:INCLUDE
+          $env:LIB = ".\ffmpeg-6.1.1-full_build-shared\lib\;" + $env:LIB
+          Invoke-WebRequest -Uri https://github.com/ShiftMediaProject/x264/releases/download/0.164.r3191/libx264_0.164.r3191_msvc17.zip -OutFile x264.zip
+          7z x x264.zip -ox264
+          $env:LIB = ".\x264\lib\x64\;" + $env:LIB
+          $env:RUSTFLAGS="$RUSTFLAGS -A dead_code -A unused_imports"
+          cargo b --features ffmpeg-system --release
+          mkdir weylus
+          cp .\ffmpeg-6.1.1-full_build-shared\bin\* weylus
+          cp .\target\release\weylus.exe weylus
+          7z a weylus_windows.7z weylus\*
+      - name: Upload 7zip
+        uses: actions/upload-artifact@v2.2.4
+        with:
+          name: weylus_windows
+          path: weylus_windows.7z
+
   build-linux:
     runs-on: ubuntu-20.04
     steps:

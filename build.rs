@@ -44,9 +44,9 @@ fn main() {
     let mut tsc_command = Command::new("tsc");
 
     #[cfg(target_os = "windows")]
-    let mut tsc_command = Command::new("bash");
+    let mut tsc_command = Command::new("cmd");
     #[cfg(target_os = "windows")]
-    tsc_command.args(&["-c", "tsc"]);
+    tsc_command.args(&["/c", "tsc"]);
 
     let js_needs_update = || -> Result<bool, Box<dyn std::error::Error>> {
         Ok(Path::new("ts/lib.ts").metadata()?.modified()?
