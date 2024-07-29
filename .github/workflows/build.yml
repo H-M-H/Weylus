@@ -27,57 +27,62 @@ jobs:
         path: weylus_linux.tar.gz
 
   build-macos:
-    runs-on: macOS-latest
+    strategy:
+      matrix:
+        os: [ macos-latest, macos-13 ] # -latest if for Apple Silicon, -13 is for Intel
+    runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/cache@v3
-      with:
-        path: deps/dist
-        key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}
-    - uses: actions/cache@v3
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
-    - name: Download deps
-      run: |
-        npm install -g typescript
-        brew install nasm
-        cargo install cargo-bundle
-      shell: bash
-    - name: Build
-      # run: MACOSX_DEPLOYMENT_TARGET=10.13 cargo bundle --release
-      run: cargo bundle --release
-    - name: Package
-      run: cd target/release/bundle/osx/ && zip -r macOS.zip Weylus.app
-    - name: Artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: ${{ runner.os }}
-        path: |
-          target/release/bundle/osx/macOS.zip
-    - name: ArtifactsDebug
-      if: failure()
-      uses: actions/upload-artifact@v2
-      with:
-        name: ${{ runner.os }}-ffbuild
-        path: |
-          deps/ffmpeg/ffbuild
-    - name: Debug via SSH
-      if: failure()
-      uses: luchihoratiu/debug-via-ssh@main
-      with:
-        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
-        SSH_PASS: ${{ secrets.SSH_PASS }}
-        NGROK_REGION: eu
-    - name: Publish
-      uses: softprops/action-gh-release@v1
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: deps/dist
+          key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+      - name: Download deps
+        run: |
+          npm install -g typescript
+          brew install nasm
+          cargo install cargo-bundle
+        shell: bash
+      - name: Build
+        # run: MACOSX_DEPLOYMENT_TARGET=10.13 cargo bundle --release
+        run: cargo bundle --release
+      - name: Package
+        run: |
+          MACOS_BUILD_NAME=macos-$([ "${{ matrix.os }}" == "macos-latest" ] && echo "arm" || echo "intel")
+          echo "MACOS_BUILD_NAME=$MACOS_BUILD_NAME" >> $GITHUB_ENV
+          cd target/release/bundle/osx/ && zip -r ${MACOS_BUILD_NAME}.zip Weylus.app
+      - name: Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.MACOS_BUILD_NAME }}
+          path: target/release/bundle/osx/${{ env.MACOS_BUILD_NAME }}.zip
+      - name: ArtifactsDebug
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}-ffbuild
+          path: |
+            deps/ffmpeg/ffbuild
+      - name: Debug via SSH
+        if: failure()
+        uses: luchihoratiu/debug-via-ssh@main
+        with:
+          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+          SSH_PASS: ${{ secrets.SSH_PASS }}
+          NGROK_REGION: eu
+      - name: Publish
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
           files: |
             target/release/bundle/osx/macOS.zip
           prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
