@@ -25,6 +25,7 @@ jobs:
           choco install -y --no-progress 7zip
           Invoke-WebRequest -Uri https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-6.1.1-full_build-shared.7z -OutFile ffmpeg.7z
           7z x ffmpeg.7z
+          del .\ffmpeg-6.1.1-full_build-shared\bin\*.exe
           $env:INCLUDE = ".\ffmpeg-6.1.1-full_build-shared\include\;" + $env:INCLUDE
           $env:LIB = ".\ffmpeg-6.1.1-full_build-shared\lib\;" + $env:LIB
           Invoke-WebRequest -Uri https://github.com/ShiftMediaProject/x264/releases/download/0.164.r3191/libx264_0.164.r3191_msvc17.zip -OutFile x264.zip
@@ -37,9 +38,9 @@ jobs:
           cp .\target\release\weylus.exe weylus
           7z a weylus_windows.7z weylus\*
       - name: Upload 7zip
-        uses: actions/upload-artifact@v2.2.4
+        uses: actions/upload-artifact@v3
         with:
-          name: weylus_windows
+          name: weylus
           path: weylus_windows.7z
 
   build-linux:
@@ -54,9 +55,9 @@ jobs:
         mv target/release/weylus .
         tar -czvf weylus_linux.tar.gz weylus
     - name: Upload tar
-      uses: actions/upload-artifact@v2.2.4
+      uses: actions/upload-artifact@v3
       with:
-        name: weylus_linux
+        name: weylus
         path: weylus_linux.tar.gz
 
   build-macos:
@@ -88,13 +89,13 @@ jobs:
         run: cargo bundle --release
       - name: Package
         run: |
-          MACOS_BUILD_NAME=macos-$([ "${{ matrix.os }}" == "macos-latest" ] && echo "arm" || echo "intel")
+          MACOS_BUILD_NAME=weylus-macos-$([ "${{ matrix.os }}" == "macos-latest" ] && echo "arm" || echo "intel")
           echo "MACOS_BUILD_NAME=$MACOS_BUILD_NAME" >> $GITHUB_ENV
           cd target/release/bundle/osx/ && zip -r ${MACOS_BUILD_NAME}.zip Weylus.app
       - name: Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
-          name: ${{ env.MACOS_BUILD_NAME }}
+          name: weylus
           path: target/release/bundle/osx/${{ env.MACOS_BUILD_NAME }}.zip
       - name: ArtifactsDebug
         if: failure()
