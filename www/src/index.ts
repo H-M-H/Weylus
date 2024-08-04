@@ -618,7 +618,7 @@ class PointerHandler {
         video.onpointerdown = (e) => this.onEvent(e, "pointerdown");
         video.onpointerup = (e) => this.onEvent(e, "pointerup");
         video.onpointercancel = (e) => this.onEvent(e, "pointercancel");
-        video.onpointermove = (e) => this.onEvent(e, "pointermove");
+        video.addEventListener('pointermove', (e) => this.onEvent(e, "pointermove"), { passive: true });
 
         let painter: Painter;
         if (!settings.checks.get("energysaving").checked)
@@ -630,21 +630,15 @@ class PointerHandler {
             canvas.onpointerdown = (e) => { this.onEvent(e, "pointerdown"); painter.onstart(e); };
             canvas.onpointerup = (e) => { this.onEvent(e, "pointerup"); painter.onstop(e); };
             canvas.onpointercancel = (e) => { this.onEvent(e, "pointercancel"); painter.onstop(e); };
-            canvas.onpointermove = (e) => { this.onEvent(e, "pointermove"); painter.onmove(e); };
+            canvas.addEventListener('pointermove', (e) => { this.onEvent(e, "pointermove"); painter.onmove(e); }, { passive: true });
         } else {
             canvas.onpointerenter = (e) => this.onEvent(e, "pointerenter");
             canvas.onpointerleave = (e) => this.onEvent(e, "pointerleave");
             canvas.onpointerdown = (e) => this.onEvent(e, "pointerdown");
             canvas.onpointerup = (e) => this.onEvent(e, "pointerup");
             canvas.onpointercancel = (e) => this.onEvent(e, "pointercancel");
-            canvas.onpointermove = (e) => this.onEvent(e, "pointermove");
+            canvas.addEventListener('pointermove', (e) => this.onEvent(e, "pointermove"), { passive: true });
         }
-
-        // This is a workaround for the following Safari/WebKit bug:
-        // https://bugs.webkit.org/show_bug.cgi?id=217430
-        // I have no idea why this works but it does.
-        video.ontouchmove = (e) => e.preventDefault();
-        canvas.ontouchmove = (e) => e.preventDefault();
 
         for (let elem of [video, canvas]) {
             elem.onwheel = (e) => {
@@ -654,6 +648,12 @@ class PointerHandler {
     }
 
     onEvent(event: PointerEvent, event_type: string) {
+        if (event_type === "pointerdown") {
+            const el = event.currentTarget as HTMLElement;
+            el.setPointerCapture(event.pointerId);
+            event.preventDefault();
+        }
+
         if (this.pointerTypes.includes(event.pointerType)) {
             webSocket.send(
                 JSON.stringify(
