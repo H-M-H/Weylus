@@ -600,7 +600,7 @@ class Painter {
     }
 }
 
-let painter: Painter | undefined   // use `getPainter` to get the current painter
+let painter: Painter | undefined   // be undefined in power-save mode
 
 class PointerHandler {
     constructor() {
