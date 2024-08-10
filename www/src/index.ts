@@ -276,9 +276,7 @@ class Settings {
                 document.getElementById("canvas").classList.remove("vanish");
             }
 
-            if (this.checks.get("energysaving").checked) {
-                toggle_energysaving(true);
-            }
+            toggle_energysaving(!!this.checks.get("energysaving").checked);
 
             if (!this.checks.get("enable_virtual_keys").checked) {
                 document.getElementById("vk-container").classList.add("hidden");
@@ -359,8 +357,7 @@ class PEvent {
     width: number;
     height: number;
 
-    constructor(eventType: string, event: PointerEvent, target: HTMLElement) {
-        let targetRect = target.getBoundingClientRect();
+    constructor(eventType: string, event: PointerEvent, targetRect: DOMRect) {
         let diag_len = Math.sqrt(targetRect.width * targetRect.width + targetRect.height * targetRect.height)
         this.event_type = eventType.toString();
         this.pointer_id = event.pointerId;
@@ -587,7 +584,9 @@ class Painter {
 
     onmove(event: PointerEvent) {
         if (this.lines_active.has(event.pointerId))
-            this.appendEventToLine(event);
+            for (const e of event.getCoalescedEvents()) {
+                this.appendEventToLine(e);
+            }
     }
 
     onstop(event: PointerEvent) {
@@ -618,6 +617,9 @@ class PointerHandler {
         }
     }
 
+    /** since getBoundingClientRect() is slow, we only compute once when pointer is down */
+    targetRect: DOMRect;
+
     onEvent(event: PointerEvent, event_type: string) {
         if (!settings.is_pointer_type_enabled(event.pointerType))
             return;
@@ -626,19 +628,25 @@ class PointerHandler {
             const el = event.currentTarget as HTMLElement;
             el.setPointerCapture(event.pointerId);
             event.preventDefault();
+            this.targetRect = el.getBoundingClientRect();
         }
 
-        webSocket.send(
-            JSON.stringify(
-                {
-                    "PointerEvent": new PEvent(
-                        event_type,
-                        event,
-                        event.target as HTMLElement
-                    )
-                }
-            )
-        );
+        const events = event_type === "pointermove" ? event.getCoalescedEvents() : [event];
+
+        for (let event of events) {
+            webSocket.send(
+                JSON.stringify(
+                    {
+                        "PointerEvent": new PEvent(
+                            event_type,
+                            event,
+                            this.targetRect
+                        )
+                    }
+                )
+            );
+        }
+
         if (settings.visible) {
             settings.toggle();
         }
