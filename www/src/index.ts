@@ -81,15 +81,16 @@ function fresh_canvas() {
     canvas.id = canvas_old.id;
     canvas_old.classList.forEach((cls) => canvas.classList.add(cls));
     canvas_old.replaceWith(canvas);
+
+    if (painter) painter = undefined; // dispose of old painter
     return canvas;
 }
 
 function toggle_energysaving(energysaving: boolean) {
-    let canvas = fresh_canvas();
-    if (energysaving) {
-        let ctx = canvas.getContext("2d");
-        ctx.fillStyle = "#000";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const canvas = fresh_canvas();
+
+    if (!energysaving) {
+        painter = new Painter(canvas);
     }
 
     if (settings) {
@@ -99,7 +100,6 @@ function toggle_energysaving(energysaving: boolean) {
             settings.checks.get("enable_video").dispatchEvent(new Event("change"));
         } else
             settings.checks.get("enable_video").disabled = false;
-        new PointerHandler();
     }
 }
 
@@ -182,7 +182,6 @@ class Settings {
 
         let upd_pointer = () => {
             this.save_settings();
-            new PointerHandler();
         }
         this.checks.get("enable_mouse").onchange = upd_pointer;
         this.checks.get("enable_stylus").onchange = upd_pointer;
@@ -277,9 +276,7 @@ class Settings {
                 document.getElementById("canvas").classList.remove("vanish");
             }
 
-            if (this.checks.get("energysaving").checked) {
-                toggle_energysaving(true);
-            }
+            toggle_energysaving(!!this.checks.get("energysaving").checked);
 
             if (!this.checks.get("enable_virtual_keys").checked) {
                 document.getElementById("vk-container").classList.add("hidden");
@@ -299,15 +296,11 @@ class Settings {
         return this.checks.get("stretch").checked
     }
 
-    pointer_types() {
-        let ptrs = [];
-        if (this.checks.get("enable_mouse").checked)
-            ptrs.push("mouse");
-        if (this.checks.get("enable_stylus").checked)
-            ptrs.push("pen");
-        if (this.checks.get("enable_touch").checked)
-            ptrs.push("touch");
-        return ptrs;
+    is_pointer_type_enabled(ptr_type: string) {
+        if (ptr_type === 'mouse') return !!this.checks.get("enable_mouse").checked;
+        if (ptr_type === 'pen') return !!this.checks.get("enable_stylus").checked;
+        if (ptr_type === 'touch') return !!this.checks.get("enable_touch").checked;
+        return false;
     }
 
     frame_update_limit() {
@@ -364,8 +357,7 @@ class PEvent {
     width: number;
     height: number;
 
-    constructor(eventType: string, event: PointerEvent, target: HTMLElement) {
-        let targetRect = target.getBoundingClientRect();
+    constructor(eventType: string, event: PointerEvent, targetRect: DOMRect) {
         let diag_len = Math.sqrt(targetRect.width * targetRect.width + targetRect.height * targetRect.height)
         this.event_type = eventType.toString();
         this.pointer_id = event.pointerId;
@@ -592,7 +584,9 @@ class Painter {
 
     onmove(event: PointerEvent) {
         if (this.lines_active.has(event.pointerId))
-            this.appendEventToLine(event);
+            for (const e of event.getCoalescedEvents()) {
+                this.appendEventToLine(e);
+            }
     }
 
     onstop(event: PointerEvent) {
@@ -605,70 +599,56 @@ class Painter {
     }
 }
 
+let painter: Painter | undefined   // be undefined in power-save mode
+
 class PointerHandler {
-    pointerTypes: string[];
-
     constructor() {
-        let video = document.getElementById("video");
-        let canvas = document.getElementById("canvas");
-        this.pointerTypes = settings.pointer_types();
+        let el = document.getElementById("pointer-event-receiver");
 
-        video.onpointerenter = (e) => this.onEvent(e, "pointerenter");
-        video.onpointerleave = (e) => this.onEvent(e, "pointerleave");
-        video.onpointerdown = (e) => this.onEvent(e, "pointerdown");
-        video.onpointerup = (e) => this.onEvent(e, "pointerup");
-        video.onpointercancel = (e) => this.onEvent(e, "pointercancel");
-        video.onpointermove = (e) => this.onEvent(e, "pointermove");
-
-        let painter: Painter;
-        if (!settings.checks.get("energysaving").checked)
-            painter = new Painter(canvas as HTMLCanvasElement);
-
-        if (painter && painter.initialized) {
-            canvas.onpointerenter = (e) => this.onEvent(e, "pointerenter");
-            canvas.onpointerleave = (e) => this.onEvent(e, "pointerleave");
-            canvas.onpointerdown = (e) => { this.onEvent(e, "pointerdown"); painter.onstart(e); };
-            canvas.onpointerup = (e) => { this.onEvent(e, "pointerup"); painter.onstop(e); };
-            canvas.onpointercancel = (e) => { this.onEvent(e, "pointercancel"); painter.onstop(e); };
-            canvas.onpointermove = (e) => { this.onEvent(e, "pointermove"); painter.onmove(e); };
-        } else {
-            canvas.onpointerenter = (e) => this.onEvent(e, "pointerenter");
-            canvas.onpointerleave = (e) => this.onEvent(e, "pointerleave");
-            canvas.onpointerdown = (e) => this.onEvent(e, "pointerdown");
-            canvas.onpointerup = (e) => this.onEvent(e, "pointerup");
-            canvas.onpointercancel = (e) => this.onEvent(e, "pointercancel");
-            canvas.onpointermove = (e) => this.onEvent(e, "pointermove");
-        }
-
-        // This is a workaround for the following Safari/WebKit bug:
-        // https://bugs.webkit.org/show_bug.cgi?id=217430
-        // I have no idea why this works but it does.
-        video.ontouchmove = (e) => e.preventDefault();
-        canvas.ontouchmove = (e) => e.preventDefault();
-
-        for (let elem of [video, canvas]) {
-            elem.onwheel = (e) => {
-                webSocket.send(JSON.stringify({ "WheelEvent": new WEvent(e) }));
-            }
+        el.onpointerenter = (e) => this.onEvent(e, "pointerenter");
+        el.onpointerleave = (e) => this.onEvent(e, "pointerleave");
+        el.onpointerdown = (e) => { this.onEvent(e, "pointerdown"); painter?.onstart(e); };
+        el.onpointerup = (e) => { this.onEvent(e, "pointerup"); painter?.onstop(e); };
+        el.onpointercancel = (e) => { this.onEvent(e, "pointercancel"); painter?.onstop(e); };
+        el.addEventListener('pointermove', (e) => { this.onEvent(e, "pointermove"); painter?.onmove(e); }, { passive: true });
+        el.onwheel = (e) => {
+            webSocket.send(JSON.stringify({ "WheelEvent": new WEvent(e) }));
+            e.preventDefault();
         }
     }
 
+    /** since getBoundingClientRect() is slow, we only compute once when pointer is down */
+    targetRect: DOMRect;
+
     onEvent(event: PointerEvent, event_type: string) {
-        if (this.pointerTypes.includes(event.pointerType)) {
+        if (!settings.is_pointer_type_enabled(event.pointerType))
+            return;
+
+        if (event_type === "pointerdown") {
+            const el = event.currentTarget as HTMLElement;
+            el.setPointerCapture(event.pointerId);
+            event.preventDefault();
+            this.targetRect = el.getBoundingClientRect();
+        }
+
+        const events = event_type === "pointermove" ? event.getCoalescedEvents() : [event];
+
+        for (let event of events) {
             webSocket.send(
                 JSON.stringify(
                     {
                         "PointerEvent": new PEvent(
                             event_type,
                             event,
-                            event.target as HTMLElement
+                            this.targetRect
                         )
                     }
                 )
             );
-            if (settings.visible) {
-                settings.toggle();
-            }
+        }
+
+        if (settings.visible) {
+            settings.toggle();
         }
     }
 }
@@ -857,7 +837,10 @@ function init(access_code: string, websocket_port: number) {
     const connectingNotice = document.getElementById("connecting-notice") as HTMLDivElement;
 
     const video = document.getElementById("video") as HTMLVideoElement;
-    const canvas = document.getElementById("canvas") as HTMLCanvasElement;
+    const getCanvas = () => document.getElementById("canvas") as HTMLCanvasElement; // canvas may rebuild
+
+    new KeyboardHandler();
+    new PointerHandler();
 
     let is_connected = false;
 
@@ -911,8 +894,6 @@ function init(access_code: string, websocket_port: number) {
         let config_ok_received = false;
         handle_messages(webSocket, video, () => {
             if (!config_ok_received) {
-                new KeyboardHandler();
-                new PointerHandler();
                 frame_timer();
                 config_ok_received = true;
             }
@@ -950,6 +931,7 @@ function init(access_code: string, websocket_port: number) {
 
     window.onresize = () => {
         stretch_video();
+        const canvas = getCanvas();
         canvas.width = window.innerWidth * window.devicePixelRatio;
         canvas.height = window.innerHeight * window.devicePixelRatio;
         let [w, h] = calc_max_video_resolution(settings.scale_video_input.valueAsNumber);
@@ -964,12 +946,19 @@ function init(access_code: string, websocket_port: number) {
 // object-fit: fill; <-- this is unfortunately not supported on iOS, so we use the following
 // workaround
 function stretch_video() {
-    let video = document.getElementById("video") as HTMLVideoElement;
-    if (settings.stretched_video()) {
-        video.style.transform = "scaleX(" + document.body.clientWidth / video.clientWidth + ") scaleY(" + document.body.clientHeight / video.clientHeight + ")";
+    const video = document.getElementById("video") as HTMLVideoElement;
+    const is_stretched = settings.stretched_video();
+
+    if (navigator.userAgent.includes("iPad") || navigator.userAgent.includes("iPhone")) {
+        const windowRatio = window.innerWidth / window.innerHeight;
+        const videoRatio = video.videoWidth / video.videoHeight;
+        if (windowRatio > videoRatio) {
+            video.style.transform = "scaleX(" + (windowRatio / videoRatio) + ")";
+        } else {
+            video.style.transform = "scaleY(" + (videoRatio / windowRatio) + ")";
+        }
     } else {
-        let scale = Math.min(document.body.clientWidth / video.clientWidth, document.body.clientHeight / video.clientHeight);
-        video.style.transform = "scale(" + scale + ")";
+        video.style.objectFit = is_stretched ? "fill" : "contain";
     }
 }
 

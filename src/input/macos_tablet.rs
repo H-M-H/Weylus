@@ -175,19 +175,6 @@ pub fn macos_send_tablet_event(
             event.post(CGEventTapLocation::HID);
         },
         _ => {
-            if pe_type == MacosPenEventType::Move {
-                // send a TabletPointer event first
-                let event = make_event(CGEventType::MouseMoved).unwrap();
-                event.set_type(CGEventType::TabletPointer);
-                event.set_integer_value_field(
-                    EventField::MOUSE_EVENT_SUB_TYPE,
-                    NX_SUBTYPE_TABLET_POINT,
-                );
-                populate_tablet_proximity_event(&event, true, false);
-                populate_tablet_point_event(&event, buttons, point, pressure);
-                event.post(CGEventTapLocation::HID);
-            }
-
             // then send a MouseMoved event
             let event_type: CGEventType = match pe_type {
                 MacosPenEventType::Down => match button {
@@ -201,6 +188,7 @@ pub fn macos_send_tablet_event(
                     _ => CGEventType::OtherMouseUp,
                 },
                 _ => match buttons {
+                    0 => CGEventType::MouseMoved,
                     1 => CGEventType::LeftMouseDragged,
                     2 => CGEventType::RightMouseDragged,
                     _ => CGEventType::OtherMouseDragged,

@@ -77,21 +77,17 @@ main {
   padding: 0;
   overflow: hidden;
   display: flex;
+  position: relative;
+  background: #000;
 }
 
-video {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
-  display: block;
-  margin: auto auto;
-}
-
-canvas {
+#canvas, #video, #pointer-event-receiver {
   position: absolute;
+  left: 0;
+  top: 0;
   width: 100%;
   height: 100%;
+  transform-origin: center center; // for video stretching
 }
 
 input[type="text"] {
