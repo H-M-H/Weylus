@@ -583,10 +583,12 @@ class Painter {
     }
 
     onmove(event: PointerEvent) {
-        if (this.lines_active.has(event.pointerId))
-            for (const e of event.getCoalescedEvents()) {
+        if (this.lines_active.has(event.pointerId)) {
+            const events = typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [event];
+            for (const e of events) {
                 this.appendEventToLine(e);
             }
+        }
     }
 
     onstop(event: PointerEvent) {
@@ -631,7 +633,7 @@ class PointerHandler {
             this.targetRect = el.getBoundingClientRect();
         }
 
-        const events = event_type === "pointermove" ? event.getCoalescedEvents() : [event];
+        const events = event_type === "pointermove" && typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [event];
 
         for (let event of events) {
             webSocket.send(
