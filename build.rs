@@ -29,10 +29,23 @@ fn build_ffmpeg(dist_dir: &Path) {
 fn build_www() {
     let www_dir = Path::new("www");
 
+    #[cfg(not(target_os = "windows"))]
+    let shell = "bash";
+
+    #[cfg(not(target_os = "windows"))]
+    let shell_flag = "-c";
+
+    #[cfg(target_os = "windows")]
+    let shell = "cmd";
+
+    #[cfg(target_os = "windows")]
+    let shell_flag = "/c";
+
+
     // try `pnpm` first, then `npm`
     if !www_dir.join("node_modules").exists() {
-        let pnpm_install_success = match Command::new("bash")
-            .args(["-c", "pnpm install"])
+        let pnpm_install_success = match Command::new(shell)
+            .args([shell_flag, "pnpm install"])
             .current_dir(www_dir)
             .status()
         {
@@ -41,8 +54,8 @@ fn build_www() {
         };
 
         if !pnpm_install_success {
-            let npm_install_result = Command::new("bash")
-                .args(["-c", "npm install"])
+            let npm_install_result = Command::new(shell)
+                .args([shell_flag, "npm install"])
                 .current_dir(www_dir)
                 .status()
                 .expect("Failed to run npm or pnpm!");
@@ -56,8 +69,8 @@ fn build_www() {
         }
     }
 
-    let build_result = Command::new("bash")
-        .args(["-c", "npm run build"])
+    let build_result = Command::new(shell)
+        .args([shell_flag, "npm run build"])
         .current_dir(www_dir)
         .status()
         .expect("Failed to build www!");
@@ -69,6 +82,7 @@ fn build_www() {
         );
     }
 }
+
 
 fn main() {
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
