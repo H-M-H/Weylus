@@ -176,7 +176,7 @@ impl Weylus {
         self.channels = None;
     }
 
-    pub fn wait(&mut self) {
+    fn wait(&mut self) {
         if let Some(t) = self.ws_thread.take() {
             if t.join().is_err() {
                 error!("Websocket thread panicked.");

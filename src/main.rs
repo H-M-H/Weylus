@@ -5,7 +5,12 @@ extern crate test;
 #[macro_use]
 extern crate bitflags;
 
-use tracing::{error, warn};
+#[cfg(unix)]
+use signal_hook::{
+    consts::{SIGINT, SIGTERM},
+    iterator::Signals,
+};
+use tracing::{error, info, warn};
 
 use std::sync::mpsc;
 
@@ -67,9 +72,7 @@ fn main() {
         }
     }
 
-    if !conf.no_gui {
-        gui::run(&conf, receiver);
-    } else {
+    if conf.no_gui {
         let mut weylus = crate::weylus::Weylus::new();
         weylus.start(
             &conf,
@@ -80,7 +83,23 @@ fn main() {
                 }
             },
         );
-        weylus.wait();
+        #[cfg(unix)]
+        {
+            let mut signals = Signals::new(&[SIGINT, SIGTERM]).unwrap();
+            for sig in signals.forever() {
+                weylus.stop();
+                info!("Shutting down after receiving signal ({sig}).");
+                break;
+            }
+        }
+        #[cfg(not(unix))]
+        {
+            loop {
+                std::thread::park();
+            }
+        }
+    } else {
+        gui::run(&conf, receiver);
     }
 }
 
