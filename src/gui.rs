@@ -6,7 +6,7 @@ use std::sync::{mpsc, Arc, Mutex};
 use tracing::{error, info};
 
 use fltk::{
-    app::App,
+    app::{awake_callback, App},
     button::{Button, CheckButton},
     frame::Frame,
     input::{Input, IntInput},
@@ -220,7 +220,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     }
                 }
                 if !weylus.start(&config, |message| match message {
-                    UInputInaccessible => {
+                    UInputInaccessible => awake_callback(move || {
                         let w = 500;
                         let h = 300;
                         let mut pop_up = Window::default()
@@ -239,8 +239,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                         pop_up.end();
                         pop_up.make_modal(true);
                         pop_up.show();
-                    }
-                    _ => {}
+                    }),
                 }) {
                     return Ok(());
                 }
