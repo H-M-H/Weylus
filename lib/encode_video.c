@@ -313,8 +313,9 @@ void open_video(VideoContext* ctx, Error* err)
 				av_opt_set(ctx->c->priv_data, "preset", "p1", 0);
 				av_opt_set(ctx->c->priv_data, "zerolatency", "1", 0);
 				av_opt_set(ctx->c->priv_data, "tune", "ull", 0);
-				av_opt_set(ctx->c->priv_data, "rc", "vbr", 0);
+				av_opt_set(ctx->c->priv_data, "rc", "cbr", 0);
 				av_opt_set(ctx->c->priv_data, "cq", "21", 0);
+				av_opt_set(ctx->c->priv_data, "delay", "0", 0);
 				set_codec_params(ctx);
 				int ret = avcodec_open2(ctx->c, codec, NULL);
 				if (ret == 0)
