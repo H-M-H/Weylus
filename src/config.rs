@@ -14,8 +14,6 @@ pub struct Config {
     pub bind_address: IpAddr,
     #[structopt(long, default_value = "1701", help = "Web port")]
     pub web_port: u16,
-    #[structopt(long, default_value = "9001", help = "Websocket port")]
-    pub websocket_port: u16,
     #[cfg(target_os = "linux")]
     #[structopt(
         long,

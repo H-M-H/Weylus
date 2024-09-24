@@ -30,7 +30,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
 
     let app = App::default().with_scheme(fltk::app::AppScheme::Gtk);
     let mut wind = Window::default()
-        .with_size(660, 620)
+        .with_size(660, 600)
         .center_screen()
         .with_label(&format!("Weylus - {}", env!("CARGO_PKG_VERSION")));
     wind.set_xclass("weylus");
@@ -61,15 +61,9 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         .with_label("Port");
     input_port.set_value(&config.web_port.to_string());
 
-    let mut input_ws_port = IntInput::default()
-        .with_size(width, height)
-        .below_of(&input_port, padding)
-        .with_label("Websocket Port");
-    input_ws_port.set_value(&config.websocket_port.to_string());
-
     let mut check_auto_start = CheckButton::default()
         .with_size(70, height)
-        .below_of(&input_ws_port, padding)
+        .below_of(&input_port, padding + 5)
         .with_label("Auto Start");
     check_auto_start.set_tooltip("Start Weylus server immediately on program start.");
     check_auto_start.set_checked(config.auto_start);
@@ -195,11 +189,9 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     };
                     let bind_addr: IpAddr = input_bind_addr.value().parse()?;
                     let web_port: u16 = input_port.value().parse()?;
-                    let ws_port: u16 = input_ws_port.value().parse()?;
 
                     config.access_code = access_code.map(|s| s.to_string());
                     config.web_port = web_port;
-                    config.websocket_port = ws_port;
                     config.bind_address = bind_addr;
                     config.auto_start = check_auto_start.is_checked();
                     #[cfg(target_os = "linux")]
