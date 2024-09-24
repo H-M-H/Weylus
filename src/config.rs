@@ -1,5 +1,5 @@
-use std::fs;
 use std::net::IpAddr;
+use std::{fs, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
@@ -69,16 +69,16 @@ pub struct Config {
         help = "Use custom template of index.html to be served by Weylus."
     )]
     #[serde(skip)]
-    pub custom_index_html: Option<String>,
+    pub custom_index_html: Option<PathBuf>,
     #[structopt(long, help = "Use custom access.html to be served by Weylus.")]
     #[serde(skip)]
-    pub custom_access_html: Option<String>,
+    pub custom_access_html: Option<PathBuf>,
     #[structopt(long, help = "Use custom style.css to be served by Weylus.")]
     #[serde(skip)]
-    pub custom_style_css: Option<String>,
+    pub custom_style_css: Option<PathBuf>,
     #[structopt(long, help = "Use custom lib.js to be served by Weylus.")]
     #[serde(skip)]
-    pub custom_lib_js: Option<String>,
+    pub custom_lib_js: Option<PathBuf>,
 
     #[structopt(long, help = "Print shell completions for given shell.")]
     #[serde(skip)]

@@ -19,7 +19,7 @@ use fltk::{
 use pnet_datalink as datalink;
 
 use crate::config::{write_config, Config};
-use crate::websocket::Ws2UiMessage;
+use crate::web::Web2UiMessage::UInputInaccessible;
 
 pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     let width = 200;
@@ -218,33 +218,29 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                         config.try_mediafoundation = check_native_hw_accel.is_checked();
                     }
                 }
-                if !weylus.start(
-                    &config,
-                    |_| {},
-                    |message| match message {
-                        Ws2UiMessage::UInputInaccessible => {
-                            let w = 500;
-                            let h = 300;
-                            let mut pop_up = Window::default()
-                                .with_size(w, h)
-                                .center_screen()
-                                .with_label("Weylus - UInput inaccessible!");
-                            pop_up.set_xclass("weylus");
+                if !weylus.start(&config, |message| match message {
+                    UInputInaccessible => {
+                        let w = 500;
+                        let h = 300;
+                        let mut pop_up = Window::default()
+                            .with_size(w, h)
+                            .center_screen()
+                            .with_label("Weylus - UInput inaccessible!");
+                        pop_up.set_xclass("weylus");
 
-                            let buf = TextBuffer::default();
-                            let mut pop_up_text = TextDisplay::default().with_size(w, h);
-                            pop_up_text.set_buffer(buf);
-                            pop_up_text.wrap_mode(fltk::text::WrapMode::AtBounds, 5);
-                            let mut buf = pop_up_text.buffer().unwrap();
-                            buf.set_text(std::include_str!("strings/uinput_error.txt"));
+                        let buf = TextBuffer::default();
+                        let mut pop_up_text = TextDisplay::default().with_size(w, h);
+                        pop_up_text.set_buffer(buf);
+                        pop_up_text.wrap_mode(fltk::text::WrapMode::AtBounds, 5);
+                        let mut buf = pop_up_text.buffer().unwrap();
+                        buf.set_text(std::include_str!("strings/uinput_error.txt"));
 
-                            pop_up.end();
-                            pop_up.make_modal(true);
-                            pop_up.show();
-                        }
-                        _ => {}
-                    },
-                ) {
+                        pop_up.end();
+                        pop_up.make_modal(true);
+                        pop_up.show();
+                    }
+                    _ => {}
+                }) {
                     return Ok(());
                 }
                 is_server_running = true;
@@ -349,4 +345,8 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     but_toggle.set_callback(toggle_server);
 
     app.run().expect("Failed to run Gui!");
+
+    // TODO: Remove when https://github.com/fltk-rs/fltk-rs/issues/1480 is fixed
+    // this is required to drop the callback and do a graceful shutdown of the web server
+    but_toggle.set_callback(|_| ());
 }

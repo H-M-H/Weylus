@@ -72,15 +72,11 @@ fn main() {
 
     if conf.no_gui {
         let mut weylus = crate::weylus::Weylus::new();
-        weylus.start(
-            &conf,
-            |_| {},
-            |msg| {
-                if let crate::websocket::Ws2UiMessage::UInputInaccessible = msg {
-                    warn!(std::include_str!("strings/uinput_error.txt"));
-                }
-            },
-        );
+        weylus.start(&conf, |msg| {
+            if let crate::web::Web2UiMessage::UInputInaccessible = msg {
+                warn!(std::include_str!("strings/uinput_error.txt"));
+            }
+        });
         #[cfg(unix)]
         {
             let mut signals = Signals::new(TERM_SIGNALS).unwrap();

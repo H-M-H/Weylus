@@ -70,7 +70,7 @@ pub struct VideoEncoder {
     height_in: usize,
     width_out: usize,
     height_out: usize,
-    write_data: Box<dyn Fn(&[u8])>,
+    write_data: Box<dyn FnMut(&[u8])>,
     start_time: Instant,
 }
 
@@ -80,7 +80,7 @@ impl VideoEncoder {
         height_in: usize,
         width_out: usize,
         height_out: usize,
-        write_data: impl Fn(&[u8]) + 'static,
+        mut write_data: impl FnMut(&[u8]) + 'static,
         options: EncoderOptions,
     ) -> Result<Box<Self>, CError> {
         let mut video_encoder = Box::new(Self {

@@ -16,7 +16,7 @@ let last_fps_calc: number = performance.now();
 
 let check_video: HTMLInputElement;
 
-function run(access_code: string, websocket_port: number, level: string) {
+function run(level: string) {
     window.onload = () => {
         log_pre = document.getElementById("log") as HTMLPreElement;
         log_pre.textContent = "";
@@ -39,7 +39,7 @@ function run(access_code: string, websocket_port: number, level: string) {
             }
             return false;
         }, true)
-        init(access_code, websocket_port)
+        init();
     };
 }
 
@@ -53,12 +53,12 @@ function log(level: LogLevel, msg: string) {
     log_pre.textContent += LogLevel[level] + ": " + msg + "\n";
 }
 
-function frame_update_scale(x: number) {
-    return Math.pow(x / 100, 3);
+function frame_rate_scale(x: number) {
+    return Math.pow(x / 100, 1.5);
 }
 
-function frame_update_scale_inv(x: number) {
-    return 100 * Math.pow(x, 1 / 3);
+function frame_rate_scale_inv(x: number) {
+    return 100 * Math.pow(x, 2 / 3);
 }
 
 
@@ -101,8 +101,8 @@ class Settings {
     webSocket: WebSocket;
     checks: Map<string, HTMLInputElement>;
     capturable_select: HTMLSelectElement;
-    frame_update_limit_input: HTMLInputElement;
-    frame_update_limit_output: HTMLOutputElement;
+    frame_rate_input: HTMLInputElement;
+    frame_rate_output: HTMLOutputElement;
     scale_video_input: HTMLInputElement;
     scale_video_output: HTMLOutputElement;
     range_min_pressure: HTMLInputElement;
@@ -115,16 +115,16 @@ class Settings {
         this.webSocket = webSocket;
         this.checks = new Map<string, HTMLInputElement>();
         this.capturable_select = document.getElementById("window") as HTMLSelectElement;
-        this.frame_update_limit_input = document.getElementById("frame_update_limit") as HTMLInputElement;
-        this.frame_update_limit_input.min = frame_update_scale_inv(1).toString();
-        this.frame_update_limit_input.max = frame_update_scale_inv(1000).toString();
-        this.frame_update_limit_output = this.frame_update_limit_input.nextElementSibling as HTMLOutputElement;
+        this.frame_rate_input = document.getElementById("frame_rate") as HTMLInputElement;
+        this.frame_rate_input.min = frame_rate_scale_inv(0).toString();
+        this.frame_rate_input.max = frame_rate_scale_inv(120).toString();
+        this.frame_rate_output = this.frame_rate_input.nextElementSibling as HTMLOutputElement;
         this.scale_video_input = document.getElementById("scale_video") as HTMLInputElement;
         this.scale_video_output = this.scale_video_input.nextElementSibling as HTMLOutputElement;
         this.range_min_pressure = document.getElementById("min_pressure") as HTMLInputElement;
         this.client_name_input = document.getElementById("client_name") as HTMLInputElement;
-        this.frame_update_limit_input.oninput = (e) => {
-            this.frame_update_limit_output.value = Math.round(frame_update_scale(this.frame_update_limit_input.valueAsNumber)).toString();
+        this.frame_rate_input.oninput = (e) => {
+            this.frame_rate_output.value = Math.round(frame_rate_scale(this.frame_rate_input.valueAsNumber)).toString();
         }
         this.scale_video_input.oninput = (e) => {
             let [w, h] = calc_max_video_resolution(this.scale_video_input.valueAsNumber)
@@ -189,7 +189,7 @@ class Settings {
             toggle_energysaving((e.target as HTMLInputElement).checked);
         };
 
-        this.frame_update_limit_input.onchange = () => this.save_settings();
+        this.frame_rate_input.onchange = () => this.save_settings();
         this.range_min_pressure.onchange = () => this.save_settings();
 
         // server
@@ -198,6 +198,7 @@ class Settings {
         this.checks.get("capture_cursor").onchange = upd_server_config;
         this.scale_video_input.onchange = upd_server_config;
         this.client_name_input.onchange = upd_server_config;
+        this.frame_rate_input.onchange = upd_server_config;
 
         document.getElementById("refresh").onclick = () => this.webSocket.send('"GetCapturableList"');
         this.capturable_select.onchange = () => this.send_server_config();
@@ -213,6 +214,7 @@ class Settings {
         let [w, h] = calc_max_video_resolution(this.scale_video_input.valueAsNumber);
         config["max_width"] = w;
         config["max_height"] = h;
+        config["frame_rate"] = frame_rate_scale(this.frame_rate_input.valueAsNumber);
         if (this.client_name_input.value)
             config["client_name"] = this.client_name_input.value;
         this.webSocket.send(JSON.stringify({ "Config": config }));
@@ -222,7 +224,7 @@ class Settings {
         let settings = Object(null);
         for (const [key, elem] of this.checks.entries())
             settings[key] = elem.checked;
-        settings["frame_update_limit"] = frame_update_scale(this.frame_update_limit_input.valueAsNumber).toString();
+        settings["frame_rate"] = frame_rate_scale(this.frame_rate_input.valueAsNumber).toString();
         settings["scale_video"] = this.scale_video_input.value;
         settings["min_pressure"] = this.range_min_pressure.value;
         settings["client_name"] = this.client_name_input.value;
@@ -232,8 +234,8 @@ class Settings {
     load_settings() {
         let settings_string = localStorage.getItem("settings");
         if (settings_string === null) {
-            this.frame_update_limit_input.value = frame_update_scale_inv(33).toString();
-            this.frame_update_limit_output.value = (33).toString();
+            this.frame_rate_input.value = frame_rate_scale_inv(30).toString();
+            this.frame_rate_output.value = (30).toString();
             let [w, h] = calc_max_video_resolution(this.scale_video_input.valueAsNumber)
             this.scale_video_output.value = w + "x" + h;
             return;
@@ -244,12 +246,12 @@ class Settings {
                 if (typeof settings[key] === "boolean")
                     elem.checked = settings[key];
             }
-            let upd_limit = settings["frame_update_limit"];
+            let upd_limit = settings["frame_rate"];
             if (upd_limit)
-                this.frame_update_limit_input.value = frame_update_scale_inv(upd_limit).toString();
+                this.frame_rate_input.value = frame_rate_scale_inv(upd_limit).toString();
             else
-                this.frame_update_limit_input.value = frame_update_scale_inv(33).toString();
-            this.frame_update_limit_output.value = Math.round(frame_update_scale(this.frame_update_limit_input.valueAsNumber)).toString();
+                this.frame_rate_input.value = frame_rate_scale_inv(30).toString();
+            this.frame_rate_output.value = Math.round(frame_rate_scale(this.frame_rate_input.valueAsNumber)).toString();
 
             let scale_video = settings["scale_video"];
             if (scale_video)
@@ -302,10 +304,6 @@ class Settings {
         return ptrs;
     }
 
-    frame_update_limit() {
-        return frame_update_scale(this.frame_update_limit_input.valueAsNumber)
-    }
-
     toggle() {
         this.settings.classList.toggle("hide");
         this.visible = !this.visible;
@@ -315,7 +313,7 @@ class Settings {
         let current_selection = undefined;
         if (this.capturable_select.selectedOptions[0])
             current_selection = this.capturable_select.selectedOptions[0].textContent;
-        let new_index;
+        let new_index: number;
         this.capturable_select.innerText = "";
         window_names.forEach((name, i) => {
             let option = document.createElement("option");
@@ -728,27 +726,13 @@ class KeyboardHandler {
     }
 }
 
-function frame_timer(webSocket: WebSocket) {
-    // Closing or closed, so no more frames
-    if (webSocket.readyState > webSocket.OPEN)
-        return;
-
+function frame_rate_stats() {
     let t = performance.now();
-    if (t - last_fps_calc > 1500) {
-        let fps = Math.round(frame_count / (t - last_fps_calc) * 10000) / 10;
-        fps_out.value = fps.toString();
-        frame_count = 0;
-        last_fps_calc = t;
-    }
-
-    if (document.hidden) {
-        requestAnimationFrame(() => frame_timer(webSocket));
-        return;
-    }
-
-    if (webSocket.readyState === webSocket.OPEN && check_video.checked)
-        webSocket.send('"TryGetFrame"');
-    setTimeout(() => frame_timer(webSocket), settings.frame_update_limit());
+    let fps = Math.round(frame_count / (t - last_fps_calc) * 10000) / 10;
+    fps_out.value = fps.toString();
+    frame_count = 0;
+    last_fps_calc = t;
+    setTimeout(() => frame_rate_stats(), 1500);
 }
 
 function handle_messages(
@@ -854,12 +838,11 @@ function check_apis() {
     }
 }
 
-function init(access_code: string, websocket_port: number) {
+function init() {
     check_apis();
 
-    let authed = false;
     let protocol = document.location.protocol == "https:" ? "wss://" : "ws://";
-    let webSocket = new WebSocket(protocol + window.location.hostname + ":" + websocket_port);
+    let webSocket = new WebSocket(protocol + window.location.hostname + ":" + window.location.port + "/ws");
     webSocket.binaryType = "arraybuffer";
 
     settings = new Settings(webSocket);
@@ -904,8 +887,7 @@ function init(access_code: string, websocket_port: number) {
         canvas.height = window.innerHeight * window.devicePixelRatio;
         let [w, h] = calc_max_video_resolution(settings.scale_video_input.valueAsNumber);
         settings.scale_video_output.value = w + "x" + h;
-        if (authed)
-            settings.send_server_config();
+        settings.send_server_config();
     }
     video.controls = false;
     video.onloadeddata = () => stretch_video();
@@ -914,7 +896,6 @@ function init(access_code: string, websocket_port: number) {
         if (!is_connected) {
             new KeyboardHandler(webSocket);
             new PointerHandler(webSocket);
-            frame_timer(webSocket);
             is_connected = true;
         }
     },
@@ -923,12 +904,10 @@ function init(access_code: string, websocket_port: number) {
     );
     window.onunload = () => { webSocket.close(); }
     webSocket.onopen = function(event) {
-        if (access_code)
-            webSocket.send(access_code);
-        authed = true;
         webSocket.send('"GetCapturableList"');
         settings.send_server_config();
     }
+    frame_rate_stats();
 }
 
 // object-fit: fill; <-- this is unfortunately not supported on iOS, so we use the following
