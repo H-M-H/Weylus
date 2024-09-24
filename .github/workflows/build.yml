@@ -13,12 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     container: docker://hhmhh/weylus_build:latest
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/cache@v3
+    - uses: actions/checkout@v4
+    - uses: actions/cache@v4
       with:
         path: deps/dist*
         key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -29,22 +29,22 @@ jobs:
       run: ./docker_build.sh
       shell: bash
     - name: Artifacts1
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: linux
         path: packages/weylus-linux.zip
     - name: Artifacts2
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: linux-deb
         path: packages/Weylus*.deb
     - name: Artifacts3
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: windows
         path: packages/weylus-windows.zip
     - name: Publish
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/')
       with:
           files: |
@@ -59,12 +59,12 @@ jobs:
     runs-on: ubuntu-latest
     container: docker://hhmhh/weylus_build_alpine:latest
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/cache@v3
+    - uses: actions/checkout@v4
+    - uses: actions/cache@v4
       with:
         path: deps/dist*
         key: ${{ runner.os }}-alpine-deps-${{ hashFiles('deps/*') }}
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -75,12 +75,12 @@ jobs:
       run: cargo build --release && cd target/release && tar czf weylus-linux-alpine-musl.tar.gz weylus
       shell: bash
     - name: Artifacts1
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: linux-alpine-musl
         path: target/release/weylus-linux-alpine-musl.tar.gz
     - name: Publish
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/')
       with:
           files: |
@@ -92,12 +92,12 @@ jobs:
   build-macos:
     runs-on: macOS-latest
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/cache@v3
+    - uses: actions/checkout@v4
+    - uses: actions/cache@v4
       with:
         path: deps/dist
         key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -116,14 +116,14 @@ jobs:
     - name: Package
       run: cd target/release/bundle/osx/ && zip -r macOS.zip Weylus.app
     - name: Artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ runner.os }}
         path: |
           target/release/bundle/osx/macOS.zip
     - name: ArtifactsDebug
       if: failure()
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ runner.os }}-ffbuild
         path: |
@@ -136,7 +136,7 @@ jobs:
         SSH_PASS: ${{ secrets.SSH_PASS }}
         NGROK_REGION: eu
     - name: Publish
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/')
       with:
           files: |
