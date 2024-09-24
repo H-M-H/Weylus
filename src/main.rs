@@ -6,10 +6,8 @@ extern crate test;
 extern crate bitflags;
 
 #[cfg(unix)]
-use signal_hook::{
-    consts::{SIGINT, SIGTERM},
-    iterator::Signals,
-};
+use signal_hook::iterator::Signals;
+use signal_hook::{consts::TERM_SIGNALS, low_level::signal_name};
 use tracing::{error, info, warn};
 
 use std::sync::mpsc;
@@ -85,10 +83,23 @@ fn main() {
         );
         #[cfg(unix)]
         {
-            let mut signals = Signals::new(&[SIGINT, SIGTERM]).unwrap();
+            let mut signals = Signals::new(TERM_SIGNALS).unwrap();
             for sig in signals.forever() {
+                info!(
+                    "Shutting down after receiving signal {signame} ({sig})...",
+                    signame = signal_name(sig).unwrap_or("UNKNOWN SIGNAL")
+                );
+                std::thread::spawn(move || {
+                    for sig in signals.forever() {
+                        warn!(
+                            "Received second signal {signame} ({sig}) while shutting down \
+                            gracefully, proceeding with forceful shutdown...",
+                            signame = signal_name(sig).unwrap_or("UNKNOWN SIGNAL")
+                        );
+                        std::process::exit(1);
+                    }
+                });
                 weylus.stop();
-                info!("Shutting down after receiving signal ({sig}).");
                 break;
             }
         }
