@@ -310,7 +310,7 @@ void open_video(VideoContext* ctx, Error* err)
 			if (ctx->c)
 			{
 				ctx->sw_pix_fmt = ctx->c->pix_fmt = AV_PIX_FMT_BGR0;
-				av_opt_set(ctx->c->priv_data, "preset", "fast", 0);
+				av_opt_set(ctx->c->priv_data, "preset", "p1", 0);
 				av_opt_set(ctx->c->priv_data, "zerolatency", "1", 0);
 				av_opt_set(ctx->c->priv_data, "tune", "ull", 0);
 				av_opt_set(ctx->c->priv_data, "rc", "vbr", 0);
