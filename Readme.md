@@ -283,7 +283,7 @@ After npm is installed, typescript must be installed by:
 sudo npm install typescript -g
 ```
 
-Note that building for the first time may take a while as by default ffmpeg needs to be build. On
+Note that building for the first time may take a while as by default ffmpeg needs to be built. On
 Windows only msvc is supported as C compiler; it is, however, possible to cross compile on Linux for
 Windows using minGW.
 

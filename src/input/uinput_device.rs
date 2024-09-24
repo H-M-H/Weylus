@@ -3,7 +3,7 @@ use std::ffi::CString;
 use std::os::raw::{c_char, c_int};
 
 use crate::capturable::x11::X11Context;
-use crate::capturable::Capturable;
+use crate::capturable::{Capturable, Geometry};
 use crate::input::device::{InputDevice, InputDeviceType};
 use crate::protocol::{
     Button, KeyboardEvent, KeyboardEventType, KeyboardLocation, PointerEvent, PointerEventType,
@@ -283,10 +283,10 @@ impl InputDevice for UInputDevice {
             warn!("Failed to activate window, sending no input ({})", err);
             return;
         }
-        let (x, y, width, height) = match self.capturable.geometry_relative() {
-            Ok(g) => g,
-            Err(e) => {
-                warn!("Failed to get window geometry, sending no input ({})", e);
+        let (x, y, width, height) = match self.capturable.geometry().unwrap() {
+            Geometry::Relative(x, y, width, height) => (x, y, width, height),
+            _ => {
+                warn!("Failed to get window geometry, sending no input");
                 return;
             }
         };

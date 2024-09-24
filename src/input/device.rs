@@ -5,6 +5,7 @@ use crate::protocol::{KeyboardEvent, PointerEvent, WheelEvent};
 pub enum InputDeviceType {
     AutoPilotDevice,
     UInputDevice,
+    WindowsInput,
 }
 
 pub trait InputDevice {

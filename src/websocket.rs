@@ -232,10 +232,20 @@ impl<S, R, FnUInput> WeylusClientHandler<S, R, FnUInput> {
                 d.set_capturable(capturable.clone());
             }
 
-            #[cfg(not(target_os = "linux"))]
+            #[cfg(target_os = "macos")]
             if self.input_device.is_none() {
                 self.input_device = Some(Box::new(
                     crate::input::autopilot_device::AutoPilotDevice::new(capturable.clone()),
+                ));
+            } else {
+                self.input_device
+                    .as_mut()
+                    .map(|d| d.set_capturable(capturable.clone()));
+            }
+            #[cfg(target_os = "windows")]
+            if self.input_device.is_none() {
+                self.input_device = Some(Box::new(
+                    crate::input::autopilot_device_win::WindowsInput::new(capturable.clone()),
                 ));
             } else {
                 self.input_device
