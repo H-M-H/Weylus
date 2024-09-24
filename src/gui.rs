@@ -1,3 +1,4 @@
+use std::io::Cursor;
 use std::iter::Iterator;
 use std::net::{IpAddr, SocketAddr};
 
@@ -307,8 +308,9 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                         image::imageops::FilterType::Nearest,
                     );
                     let mut buf = vec![];
+                    let mut cursor = Cursor::new(&mut buf);
                     image
-                        .write_to(&mut buf, image::ImageOutputFormat::Png)
+                        .write_to(&mut cursor, image::ImageFormat::Png)
                         .unwrap();
                     let png = fltk::image::PngImage::from_data(&buf).unwrap();
 

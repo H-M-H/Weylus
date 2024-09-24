@@ -19,12 +19,6 @@ use crate::protocol::{
 use crate::cerror::CErrorCode;
 use crate::video::{EncoderOptions, VideoEncoder};
 
-fn log_send_error<T>(res: Result<(), SendError<T>>) {
-    if let Err(err) = res {
-        warn!("Websocket: Failed to send message to ui: {}", err);
-    }
-}
-
 struct VideoConfig {
     capturable: Box<dyn Capturable>,
     capture_cursor: bool,

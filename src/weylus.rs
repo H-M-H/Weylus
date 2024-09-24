@@ -1,5 +1,5 @@
 use std::net::SocketAddr;
-use std::sync::{mpsc, Arc};
+use std::sync::Arc;
 use tracing::error;
 
 use crate::config::Config;

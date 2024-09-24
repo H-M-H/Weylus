@@ -86,7 +86,7 @@ fn location_from<'de, D: Deserializer<'de>>(deserializer: D) -> Result<KeyboardL
 }
 
 bitflags! {
-    #[derive(Serialize, Deserialize)]
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
     pub struct Button: u8 {
         const NONE = 0b0000_0000;
         const PRIMARY = 0b0000_0001;
