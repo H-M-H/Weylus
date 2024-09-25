@@ -5,6 +5,8 @@ extern crate test;
 #[macro_use]
 extern crate bitflags;
 
+use clap::CommandFactory;
+use clap_complete::generate;
 #[cfg(unix)]
 use signal_hook::iterator::Signals;
 use signal_hook::{consts::TERM_SIGNALS, low_level::signal_name};
@@ -13,7 +15,6 @@ use tracing::{error, info, warn};
 use std::sync::mpsc;
 
 use config::{get_config, Config};
-use structopt::StructOpt;
 
 mod capturable;
 mod cerror;
@@ -35,7 +36,12 @@ fn main() {
     let conf = get_config();
 
     if let Some(shell) = conf.completions {
-        Config::clap().gen_completions_to("weylus", shell, &mut std::io::stdout());
+        generate(
+            shell,
+            &mut Config::command(),
+            "weylus",
+            &mut std::io::stdout(),
+        );
         return;
     }
 
