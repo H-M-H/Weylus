@@ -2,7 +2,7 @@ use fastwebsockets::{FragmentCollectorRead, Frame, OpCode, WebSocket, WebSocketE
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use std::convert::Infallible;
-use std::sync::mpsc::{RecvTimeoutError, SendError};
+use std::sync::mpsc::RecvTimeoutError;
 use std::sync::{mpsc, Arc};
 use std::thread::{spawn, JoinHandle};
 use std::time::{Duration, Instant};

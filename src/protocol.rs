@@ -157,7 +157,4 @@ pub trait WeylusSender {
 
 pub trait WeylusReceiver: Iterator<Item = Result<MessageInbound, Self::Error>> {
     type Error: std::error::Error;
-    fn recv_message(&mut self) -> Option<Result<MessageInbound, Self::Error>> {
-        self.next()
-    }
 }

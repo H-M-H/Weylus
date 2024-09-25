@@ -78,9 +78,9 @@ fn main() {
 
     if conf.no_gui {
         let mut weylus = crate::weylus::Weylus::new();
-        weylus.start(&conf, |msg| {
-            if let crate::web::Web2UiMessage::UInputInaccessible = msg {
-                warn!(std::include_str!("strings/uinput_error.txt"));
+        weylus.start(&conf, |msg| match msg {
+            web::Web2UiMessage::UInputInaccessible => {
+                warn!(std::include_str!("strings/uinput_error.txt"))
             }
         });
         #[cfg(unix)]

@@ -330,7 +330,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                         image
                             .write_to(&mut cursor, image::ImageFormat::Png)
                             .unwrap();
-                        let png = fltk::image::PngImage::from_data(&buf).unwrap();
+                        let png = PngImage::from_data(&buf).unwrap();
                         qr_frame.set_image(Some(png));
                     };
 

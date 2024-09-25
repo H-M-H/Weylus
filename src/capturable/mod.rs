@@ -1,5 +1,3 @@
-pub mod autopilot;
-
 use std::boxed::Box;
 use std::error::Error;
 use tracing::warn;
