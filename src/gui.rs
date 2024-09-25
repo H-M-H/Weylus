@@ -3,6 +3,8 @@ use std::io::Cursor;
 use std::iter::Iterator;
 use std::net::{IpAddr, SocketAddr};
 
+use fltk::image::PngImage;
+use fltk::menu::Choice;
 use std::sync::{mpsc, Arc, Mutex};
 use tracing::{error, info};
 
@@ -20,7 +22,7 @@ use fltk::{
 #[cfg(not(target_os = "windows"))]
 use pnet_datalink as datalink;
 
-use crate::config::{write_config, Config};
+use crate::config::{write_config, Config, ThemeType};
 use crate::web::Web2UiMessage::UInputInaccessible;
 
 pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
@@ -29,6 +31,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     let padding = 10;
 
     let app = App::default().with_scheme(fltk::app::AppScheme::Gtk);
+    config.gui_theme.map(|th| th.apply());
     let mut wind = Window::default()
         .with_size(660, 600)
         .center_screen()
@@ -154,9 +157,18 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     output.set_buffer(output_buf);
     let output_buf = output.buffer().unwrap();
 
-    let mut qr_frame = Frame::default()
-        .with_size(240, 240)
+    let mut choice_theme = Choice::default()
+        .with_size(width, height)
         .right_of(&input_access_code, padding);
+
+    for theme in ThemeType::themes() {
+        choice_theme.add_choice(&theme.name());
+    }
+    choice_theme.set_value(config.gui_theme.unwrap_or(ThemeType::default()).to_index());
+
+    let mut qr_frame = Frame::default()
+        .with_size(235, 235)
+        .right_of(&input_bind_addr, padding);
 
     qr_frame.hide();
 
@@ -176,10 +188,23 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     let mut weylus = crate::weylus::Weylus::new();
     let mut is_server_running = false;
     let auto_start = config.auto_start;
-    let mut config = config.clone();
+    let config = Arc::new(Mutex::new(config.clone()));
+
+    {
+        let config = config.clone();
+        choice_theme.set_callback(move |c| {
+            let v = c.value();
+            if v >= 0 {
+                ThemeType::from_index(v).apply();
+                config.lock().unwrap().gui_theme = Some(ThemeType::from_index(v));
+                write_config(&config.lock().unwrap());
+            }
+        });
+    }
 
     let mut toggle_server = move |but: &mut Button| {
         if let Err(err) = || -> Result<(), Box<dyn std::error::Error>> {
+            let mut config = config.lock().unwrap();
             if !is_server_running {
                 {
                     let access_code_string = input_access_code.value();
@@ -194,6 +219,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     config.web_port = web_port;
                     config.bind_address = bind_addr;
                     config.auto_start = check_auto_start.is_checked();
+                    config.gui_theme = Some(ThemeType::from_index(choice_theme.value()));
                     #[cfg(target_os = "linux")]
                     {
                         config.try_vaapi = check_native_hw_accel.is_checked();
@@ -291,20 +317,29 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                             .to_string(),
                         );
                     }
-                    let code = QrCode::new(&url_string).unwrap();
-                    let img_buf = code.render::<Luma<u8>>().build();
-                    let image = image::DynamicImage::ImageLuma8(img_buf);
-                    let dims = min(qr_frame.width(), qr_frame.height()) as u32;
-                    let image =
-                        image.resize_exact(dims, dims, image::imageops::FilterType::Nearest);
-                    let mut buf = vec![];
-                    let mut cursor = Cursor::new(&mut buf);
-                    image
-                        .write_to(&mut cursor, image::ImageFormat::Png)
-                        .unwrap();
-                    let png = fltk::image::PngImage::from_data(&buf).unwrap();
 
-                    qr_frame.set_image(Some(png));
+                    let cb = move |qr_frame: &mut Frame, _, _, w, h| {
+                        let code = QrCode::new(&url_string).unwrap();
+                        let img_buf = code.render::<Luma<u8>>().build();
+                        let image = image::DynamicImage::ImageLuma8(img_buf);
+                        let dims = min(w, h) as u32;
+                        let image =
+                            image.resize_exact(dims, dims, image::imageops::FilterType::Nearest);
+                        let mut buf = vec![];
+                        let mut cursor = Cursor::new(&mut buf);
+                        image
+                            .write_to(&mut cursor, image::ImageFormat::Png)
+                            .unwrap();
+                        let png = fltk::image::PngImage::from_data(&buf).unwrap();
+                        qr_frame.set_image(Some(png));
+                    };
+
+                    let x = qr_frame.x();
+                    let y = qr_frame.y();
+                    let w = qr_frame.width();
+                    let h = qr_frame.height();
+                    cb(&mut qr_frame, x, y, w, h);
+                    qr_frame.resize_callback(cb);
                     qr_frame.show();
                 }
                 #[cfg(target_os = "windows")]
@@ -321,6 +356,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                 weylus.stop();
                 but.set_label("Start");
                 output_server_addr.hide();
+                qr_frame.resize_callback(|_, _, _, _, _| {});
                 qr_frame.hide();
                 is_server_running = false;
             }

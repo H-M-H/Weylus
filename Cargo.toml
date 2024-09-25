@@ -14,7 +14,8 @@ clap = { version = "4.5.18", features = ["derive"] }
 clap_complete = "4.5.29"
 dirs = "^5.0"
 fastwebsockets = { version = "0.8.0", features = ["upgrade", "unstable-split"] }
-fltk = { version = "^1", features = ["no-pango"] }
+fltk = { version = "^1" }
+fltk-theme = "0.7.3"
 handlebars = "^6.1"
 http-body-util = "0.1.2"
 hyper = { version = "^1.4", features = ["server", "http1", "http2"] }
