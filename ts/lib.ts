@@ -849,7 +849,10 @@ function init() {
     check_apis();
 
     let protocol = document.location.protocol == "https:" ? "wss://" : "ws://";
-    let webSocket = new WebSocket(protocol + window.location.hostname + ":" + window.location.port + "/ws");
+    let webSocket = new WebSocket(
+        protocol + window.location.hostname + ":" +
+        window.location.port + "/ws" + window.location.search
+    );
     webSocket.binaryType = "arraybuffer";
 
     settings = new Settings(webSocket);
