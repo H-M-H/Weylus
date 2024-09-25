@@ -575,6 +575,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fltk-theme"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03302d43154c9c51b4297a96f40c85ea913bb15ea27b6a38665284ddae8ac3d7"
+dependencies = [
+ "fltk",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2230,6 +2239,7 @@ dependencies = [
  "dirs",
  "fastwebsockets",
  "fltk",
+ "fltk-theme",
  "gstreamer",
  "gstreamer-app",
  "gstreamer-video",

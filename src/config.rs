@@ -1,9 +1,73 @@
 use std::net::IpAddr;
+use std::str::FromStr;
 use std::{fs, path::PathBuf};
 
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
+
+#[derive(clap::ValueEnum, Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ThemeType {
+    Aero,
+    AquaClassic,
+    Blue,
+    Classic,
+    Dark,
+    Greybird,
+    HighContrast,
+    Metro,
+}
+
+const THEME_LIST: [ThemeType; 8] = [
+    ThemeType::Aero,
+    ThemeType::AquaClassic,
+    ThemeType::Blue,
+    ThemeType::Classic,
+    ThemeType::Dark,
+    ThemeType::Greybird,
+    ThemeType::HighContrast,
+    ThemeType::Metro,
+];
+
+impl Default for ThemeType {
+    fn default() -> Self {
+        Self::Greybird
+    }
+}
+
+impl ThemeType {
+    pub fn apply(&self) {
+        let theme = match self {
+            ThemeType::Classic => fltk_theme::ThemeType::Classic,
+            ThemeType::Aero => fltk_theme::ThemeType::Aero,
+            ThemeType::Metro => fltk_theme::ThemeType::Metro,
+            ThemeType::AquaClassic => fltk_theme::ThemeType::AquaClassic,
+            ThemeType::Greybird => fltk_theme::ThemeType::Greybird,
+            ThemeType::Blue => fltk_theme::ThemeType::Blue,
+            ThemeType::Dark => fltk_theme::ThemeType::Dark,
+            ThemeType::HighContrast => fltk_theme::ThemeType::HighContrast,
+        };
+        let theme = fltk_theme::WidgetTheme::new(theme);
+        theme.apply();
+    }
+
+    pub fn name(&self) -> String {
+        format!("{self:?}")
+    }
+
+    pub fn to_index(&self) -> i32 {
+        THEME_LIST.iter().position(|th| th == self).unwrap() as i32
+    }
+
+    pub fn from_index(i: i32) -> Self {
+        let i = i.clamp(0, THEME_LIST.len() as i32 - 1) as usize;
+        THEME_LIST[i]
+    }
+
+    pub fn themes() -> &'static [ThemeType] {
+        &THEME_LIST
+    }
+}
 
 #[derive(Serialize, Deserialize, Parser, Debug, Clone)]
 #[command(version, about, long_about = None)]
@@ -41,6 +105,8 @@ pub struct Config {
     #[arg(long, help = "Start Weylus server immediately on program start.")]
     #[serde(default)]
     pub auto_start: bool,
+    #[arg(long, help = "Gui Theme")]
+    pub gui_theme: Option<ThemeType>,
     #[arg(long, help = "Run Weylus without gui and start immediately.")]
     #[serde(default)]
     pub no_gui: bool,
