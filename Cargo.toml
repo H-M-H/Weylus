@@ -39,21 +39,21 @@ wio = "0.2.2"
 captrs = "^0.3.1"
 
 [build-dependencies]
-cc = "^1.0"
-num_cpus = "^1.13"
+cc = "^1.1"
+num_cpus = "^1.16"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 dbus = "^0.9"
-gstreamer = "^0.18"
-gstreamer-app = { version = "^0.18", features = ["v1_10"] }
-gstreamer-video = "^0.18"
+gstreamer = "^0.23"
+gstreamer-app = { version = "^0.23", features = ["v1_16"] }
+gstreamer-video = "^0.23"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
-pnet_datalink = "^0.31"
+pnet_datalink = "^0.35"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-core-foundation = "^0.9"
-core-graphics = "^0.22"
+core-foundation = "^0.10"
+core-graphics = "^0.24"
 
 [features]
 bench = []
