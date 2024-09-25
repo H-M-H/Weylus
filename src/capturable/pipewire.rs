@@ -122,9 +122,9 @@ pub struct PipeWireRecorder {
 
 impl PipeWireRecorder {
     pub fn new(capturable: PipeWireCapturable) -> Result<Self, Box<dyn Error>> {
-        let pipeline = gst::Pipeline::new(None);
+        let pipeline = gst::Pipeline::new();
 
-        let src = gst::ElementFactory::make("pipewiresrc", None)?;
+        let src = gst::ElementFactory::make("pipewiresrc").build()?;
         src.set_property("fd", &capturable.fd.as_raw_fd());
         src.set_property("path", &format!("{}", capturable.path));
 
@@ -132,7 +132,7 @@ impl PipeWireRecorder {
         // see: https://gitlab.freedesktop.org/pipewire/pipewire/-/issues/982
         src.set_property("always-copy", &true);
 
-        let sink = gst::ElementFactory::make("appsink", None)?;
+        let sink = gst::ElementFactory::make("appsink").build()?;
         sink.set_property("drop", &true);
         sink.set_property("max-buffers", &1u32);
 
@@ -142,13 +142,13 @@ impl PipeWireRecorder {
             .dynamic_cast::<AppSink>()
             .map_err(|_| GStreamerError("Sink element is expected to be an appsink!".into()))?;
         let mut caps = gst::Caps::new_empty();
-        caps.merge_structure(gst::structure::Structure::new(
+        caps.merge_structure(gst::structure::Structure::from_iter(
             "video/x-raw",
-            &[("format", &"BGRx")],
+            [("format", "BGRx".into())],
         ));
-        caps.merge_structure(gst::structure::Structure::new(
+        caps.merge_structure(gst::structure::Structure::from_iter(
             "video/x-raw",
-            &[("format", &"RGBx")],
+            [("format", "RGBx".into())],
         ));
         appsink.set_caps(Some(&caps));
 
