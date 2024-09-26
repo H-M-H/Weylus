@@ -1,3 +1,7 @@
+interface Window {
+    ManagedMediaSource: any;
+}
+
 enum LogLevel {
     ERROR = 0,
     WARN,
@@ -783,12 +787,13 @@ function handle_messages(
             let msg = JSON.parse(event.data);
             if (typeof msg == "string") {
                 if (msg == "NewVideo") {
-                    mediaSource = new MediaSource();
+                    let MS = window.ManagedMediaSource ? window.ManagedMediaSource : window.MediaSource;
+                    mediaSource = new MS();
                     sourceBuffer = null;
                     video.src = URL.createObjectURL(mediaSource);
                     mediaSource.addEventListener("sourceopen", (_) => {
                         let mimeType = 'video/mp4; codecs="avc1.4D403D"';
-                        if (!MediaSource.isTypeSupported(mimeType))
+                        if (!MS.isTypeSupported(mimeType))
                             mimeType = "video/mp4";
                         sourceBuffer = mediaSource.addSourceBuffer(mimeType);
                         sourceBuffer.addEventListener("updateend", upd_buf);
@@ -834,14 +839,25 @@ function handle_messages(
 }
 
 function check_apis() {
-    let apis = {
-        "MediaSource": "This browser doesn't support MSE required to playback video stream, try upgrading!",
-        "PointerEvent": "This browser doesn't support PointerEvents, input will not work, try upgrading!",
-    };
-    for (let n in apis) {
-        if (!(n in window)) {
-            log(LogLevel.ERROR, apis[n]);
+    let apis = [
+        {
+            attrs: ["MediaSource", "ManagedMediaSource"],
+            msg: "This browser doesn't support MSE/MMS required to playback video stream, try upgrading!"
+        },
+        {
+            attrs: ["PointerEvent"],
+            msg: "This browser doesn't support PointerEvents, input will not work, try upgrading!"
+        },
+    ];
+
+    outer:
+    for (let d of apis) {
+        for (let attr of d.attrs) {
+            if (attr in window) {
+                continue outer;
+            }
         }
+        log(LogLevel.ERROR, d.msg);
     }
 }
 
