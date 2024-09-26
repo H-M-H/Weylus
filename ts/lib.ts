@@ -82,25 +82,6 @@ function fresh_canvas() {
     return canvas;
 }
 
-function toggle_energysaving(energysaving: boolean) {
-    let canvas = fresh_canvas();
-    if (energysaving) {
-        let ctx = canvas.getContext("2d");
-        ctx.fillStyle = "#000";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-
-    if (settings) {
-        if (energysaving) {
-            settings.checks.get("enable_video").checked = false;
-            settings.checks.get("enable_video").disabled = true;
-            settings.checks.get("enable_video").dispatchEvent(new Event("change"));
-        } else
-            settings.checks.get("enable_video").disabled = false;
-        new PointerHandler(settings.webSocket);
-    }
-}
-
 class Settings {
     webSocket: WebSocket;
     checks: Map<string, HTMLInputElement>;
@@ -175,9 +156,15 @@ class Settings {
         };
 
         this.checks.get("enable_video").onchange = (e) => {
-            document.getElementById("video").classList.toggle("vanish", !(e.target as HTMLInputElement).checked);
-            document.getElementById("canvas").classList.toggle("vanish", (e.target as HTMLInputElement).checked);
+            let enabled = (e.target as HTMLInputElement).checked;
+            document.getElementById("video").classList.toggle("vanish", !enabled);
+            document.getElementById("canvas").classList.toggle("vanish", enabled);
             this.save_settings();
+            if (enabled) {
+                this.webSocket.send('"ResumeVideo"');
+            } else {
+                this.webSocket.send('"PauseVideo"');
+            }
         }
 
         let upd_pointer = () => {
@@ -190,7 +177,7 @@ class Settings {
 
         this.checks.get("energysaving").onchange = (e) => {
             this.save_settings();
-            toggle_energysaving((e.target as HTMLInputElement).checked);
+            this.toggle_energysaving((e.target as HTMLInputElement).checked);
         };
 
         this.frame_rate_input.onchange = () => this.save_settings();
@@ -280,7 +267,7 @@ class Settings {
             }
 
             if (this.checks.get("energysaving").checked) {
-                toggle_energysaving(true);
+                this.toggle_energysaving(true);
             }
 
             let client_name = settings["client_name"];
@@ -332,6 +319,28 @@ class Settings {
         else if (current_selection)
             // Can't find the window, so don't select anything
             this.capturable_select.value = "";
+    }
+
+    toggle_energysaving(energysaving: boolean) {
+        let canvas = fresh_canvas();
+        if (energysaving) {
+            let ctx = canvas.getContext("2d");
+            ctx.fillStyle = "#000";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        if (energysaving) {
+            this.checks.get("enable_video").checked = false;
+            this.checks.get("enable_video").disabled = true;
+            this.checks.get("enable_video").dispatchEvent(new Event("change"));
+        } else
+            this.checks.get("enable_video").disabled = false;
+        if (settings)
+            new PointerHandler(this.webSocket);
+    }
+
+    video_enabled(): boolean {
+        return this.checks.get("enable_video").checked;
     }
 }
 
@@ -931,7 +940,18 @@ function init() {
     window.onunload = () => { webSocket.close(); }
     webSocket.onopen = function(event) {
         webSocket.send('"GetCapturableList"');
+        if (!settings.video_enabled())
+            webSocket.send('"PauseVideo"');
+
         settings.send_server_config();
+
+        document.onvisibilitychange = () => {
+            if (document.hidden) {
+                webSocket.send('"PauseVideo"');
+            } else if (settings.video_enabled()) {
+                webSocket.send('"ResumeVideo"');
+            }
+        };
     }
     frame_rate_stats();
 }

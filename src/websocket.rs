@@ -29,6 +29,8 @@ struct VideoConfig {
 
 enum VideoCommands {
     Start(VideoConfig),
+    Pause,
+    Resume,
 }
 
 fn send_message<S>(sender: &mut S, message: MessageOutbound)
@@ -109,6 +111,12 @@ impl<S, R, FnUInput> WeylusClientHandler<S, R, FnUInput> {
                     MessageInbound::KeyboardEvent(event) => self.process_keyboard_event(&event),
                     MessageInbound::GetCapturableList => self.send_capturable_list(),
                     MessageInbound::Config(config) => self.update_config(config),
+                    MessageInbound::PauseVideo => {
+                        self.video_sender.send(VideoCommands::Pause).unwrap()
+                    }
+                    MessageInbound::ResumeVideo => {
+                        self.video_sender.send(VideoCommands::Resume).unwrap()
+                    }
                 },
                 Err(err) => {
                     warn!("Failed to read message {err}!");
@@ -276,15 +284,16 @@ fn handle_video<S: WeylusSender + Clone + 'static>(
     mut sender: S,
     encoder_options: EncoderOptions,
 ) {
-    const EFFECTIVE_INIFINIT: Duration = Duration::from_secs(3600 * 24 * 365 * 200);
+    const EFFECTIVE_INIFINITY: Duration = Duration::from_secs(3600 * 24 * 365 * 200);
 
     let mut recorder: Option<Box<dyn Recorder>> = None;
     let mut video_encoder: Option<Box<VideoEncoder>> = None;
 
     let mut max_width = 1920;
     let mut max_height = 1080;
-    let mut frame_duration = EFFECTIVE_INIFINIT;
+    let mut frame_duration = EFFECTIVE_INIFINITY;
     let mut last_frame = Instant::now();
+    let mut paused = false;
 
     loop {
         let now = Instant::now();
@@ -298,7 +307,7 @@ fn handle_video<S: WeylusSender + Clone + 'static>(
             debug!("Dropped {frames_passed} frame(s)!");
         }
 
-        match receiver.recv_timeout(timeout) {
+        match receiver.recv_timeout(if paused { EFFECTIVE_INIFINITY } else { timeout }) {
             Ok(VideoCommands::Start(config)) => {
                 #[allow(unused_assignments)]
                 {
@@ -336,9 +345,15 @@ fn handle_video<S: WeylusSender + Clone + 'static>(
                 frame_duration = if d.is_finite() {
                     Duration::from_secs_f64(d)
                 } else {
-                    EFFECTIVE_INIFINIT
+                    EFFECTIVE_INIFINITY
                 };
-                frame_duration = frame_duration.min(EFFECTIVE_INIFINIT);
+                frame_duration = frame_duration.min(EFFECTIVE_INIFINITY);
+            }
+            Ok(VideoCommands::Pause) => {
+                paused = true;
+            }
+            Ok(VideoCommands::Resume) => {
+                paused = false;
             }
             Err(RecvTimeoutError::Timeout) => {
                 if recorder.is_none() {

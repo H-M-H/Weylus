@@ -19,6 +19,8 @@ pub enum MessageInbound {
     KeyboardEvent(KeyboardEvent),
     GetCapturableList,
     Config(ClientConfiguration),
+    PauseVideo,
+    ResumeVideo,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
