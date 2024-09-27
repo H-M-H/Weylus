@@ -7,7 +7,7 @@ use std::sync::{mpsc, Arc};
 use std::thread::{spawn, JoinHandle};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::channel;
-use tracing::{debug, error, warn};
+use tracing::{debug, error, trace, warn};
 
 use crate::capturable::{get_capturables, Capturable, Recorder};
 use crate::input::device::{InputDevice, InputDeviceType};
@@ -105,19 +105,22 @@ impl<S, R, FnUInput> WeylusClientHandler<S, R, FnUInput> {
     {
         for message in self.receiver.take().unwrap() {
             match message {
-                Ok(message) => match message {
-                    MessageInbound::PointerEvent(event) => self.process_pointer_event(&event),
-                    MessageInbound::WheelEvent(event) => self.process_wheel_event(&event),
-                    MessageInbound::KeyboardEvent(event) => self.process_keyboard_event(&event),
-                    MessageInbound::GetCapturableList => self.send_capturable_list(),
-                    MessageInbound::Config(config) => self.update_config(config),
-                    MessageInbound::PauseVideo => {
-                        self.video_sender.send(VideoCommands::Pause).unwrap()
+                Ok(message) => {
+                    trace!("Received message: {message:?}");
+                    match message {
+                        MessageInbound::PointerEvent(event) => self.process_pointer_event(&event),
+                        MessageInbound::WheelEvent(event) => self.process_wheel_event(&event),
+                        MessageInbound::KeyboardEvent(event) => self.process_keyboard_event(&event),
+                        MessageInbound::GetCapturableList => self.send_capturable_list(),
+                        MessageInbound::Config(config) => self.update_config(config),
+                        MessageInbound::PauseVideo => {
+                            self.video_sender.send(VideoCommands::Pause).unwrap()
+                        }
+                        MessageInbound::ResumeVideo => {
+                            self.video_sender.send(VideoCommands::Resume).unwrap()
+                        }
                     }
-                    MessageInbound::ResumeVideo => {
-                        self.video_sender.send(VideoCommands::Resume).unwrap()
-                    }
-                },
+                }
                 Err(err) => {
                     warn!("Failed to read message {err}!");
                     self.send_message(MessageOutbound::Error(
