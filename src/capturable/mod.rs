@@ -7,7 +7,7 @@ pub mod core_graphics;
 #[cfg(target_os = "linux")]
 pub mod pipewire;
 #[cfg(target_os = "linux")]
-pub mod pipewire_dbus;
+pub mod remote_desktop_dbus;
 pub mod testsrc;
 
 #[cfg(target_os = "windows")]

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::error::Error;
 use std::os::unix::io::AsRawFd;
-use std::sync::{atomic::AtomicBool, Arc, Mutex};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tracing::{debug, trace, warn};
 
@@ -19,8 +19,9 @@ use gstreamer_app::AppSink;
 use crate::capturable::{Capturable, Geometry, Recorder};
 use crate::video::PixelProvider;
 
-use crate::capturable::pipewire_dbus::{
-    OrgFreedesktopPortalRequestResponse, OrgFreedesktopPortalScreenCast,
+use crate::capturable::remote_desktop_dbus::{
+    OrgFreedesktopPortalRemoteDesktop, OrgFreedesktopPortalRequestResponse,
+    OrgFreedesktopPortalScreenCast,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -257,16 +258,17 @@ impl Drop for PipeWireRecorder {
 }
 
 fn handle_response<F>(
-    conn: &SyncConnection,
+    portal: Proxy<&SyncConnection>,
     path: dbus::Path<'static>,
+    context: Arc<Mutex<CallBackContext>>,
     mut f: F,
-    failure_out: Arc<AtomicBool>,
 ) -> Result<dbus::channel::Token, dbus::Error>
 where
     F: FnMut(
             OrgFreedesktopPortalRequestResponse,
-            &SyncConnection,
+            Proxy<&SyncConnection>,
             &Message,
+            Arc<Mutex<CallBackContext>>,
         ) -> Result<(), Box<dyn Error>>
         + Send
         + Sync
@@ -277,27 +279,30 @@ where
     m.msg_type = Some(MessageType::Signal);
     m.sender = Some("org.freedesktop.portal.Desktop".into());
     m.interface = Some("org.freedesktop.portal.Request".into());
-    conn.add_match(m, move |r: OrgFreedesktopPortalRequestResponse, c, m| {
-        debug!("Response from DBus: response: {:?}, message: {:?}", r, m);
-        match r.response {
-            0 => {}
-            1 => {
-                warn!("DBus response: User cancelled interaction.");
-                failure_out.store(true, std::sync::atomic::Ordering::Relaxed);
-                return true;
+    portal
+        .connection
+        .add_match(m, move |r: OrgFreedesktopPortalRequestResponse, c, m| {
+            let portal = get_portal(c);
+            debug!("Response from DBus: response: {:?}, message: {:?}", r, m);
+            match r.response {
+                0 => {}
+                1 => {
+                    context.lock().unwrap().failure = true;
+                    warn!("DBus response: User cancelled interaction.");
+                    return true;
+                }
+                c => {
+                    context.lock().unwrap().failure = true;
+                    warn!("DBus response: Unknown error, code: {}.", c);
+                    return true;
+                }
             }
-            c => {
-                warn!("DBus response: Unknown error, code: {}.", c);
-                failure_out.store(true, std::sync::atomic::Ordering::Relaxed);
-                return true;
+            if let Err(err) = f(r, portal, m, context.clone()) {
+                context.lock().unwrap().failure = true;
+                warn!("Error requesting screen capture via dbus: {}", err);
             }
-        }
-        if let Err(err) = f(r, c, m) {
-            warn!("Error requesting screen capture via dbus: {}", err);
-            failure_out.store(true, std::sync::atomic::Ordering::Relaxed);
-        }
-        true
-    })
+            true
+        })
 }
 
 fn get_portal(conn: &SyncConnection) -> Proxy<&SyncConnection> {
@@ -308,7 +313,7 @@ fn get_portal(conn: &SyncConnection) -> Proxy<&SyncConnection> {
     )
 }
 
-fn streams_from_response(response: OrgFreedesktopPortalRequestResponse) -> Vec<PwStreamInfo> {
+fn streams_from_response(response: &OrgFreedesktopPortalRequestResponse) -> Vec<PwStreamInfo> {
     (move || {
         Some(
             response
@@ -348,127 +353,241 @@ fn streams_from_response(response: OrgFreedesktopPortalRequestResponse) -> Vec<P
     .unwrap_or_default()
 }
 
-// mostly inspired by https://gitlab.gnome.org/snippets/19
-fn request_screen_cast(
+// mostly inspired by https://gitlab.gnome.org/snippets/19 and
+// https://gitlab.gnome.org/-/snippets/39
+struct CallBackContext {
+    capture_cursor: bool,
+    session: dbus::Path<'static>,
+    streams: Vec<PwStreamInfo>,
+    fd: Option<OwnedFd>,
+    restore_token: Option<String>,
+    is_plasma: bool,
+    failure: bool,
+}
+
+fn on_create_session_response(
+    r: OrgFreedesktopPortalRequestResponse,
+    portal: Proxy<&SyncConnection>,
+    _msg: &Message,
+    context: Arc<Mutex<CallBackContext>>,
+) -> Result<(), Box<dyn Error>> {
+    debug!("on_create_session_response");
+    let session: dbus::Path = r
+        .results
+        .get("session_handle")
+        .ok_or_else(|| {
+            DBusError(format!(
+                "Failed to obtain session_handle from response: {:?}",
+                r
+            ))
+        })?
+        .as_str()
+        .ok_or_else(|| DBusError("Failed to convert session_handle to string.".into()))?
+        .to_string()
+        .into();
+
+    context.lock().unwrap().session = session.clone();
+    if context.lock().unwrap().is_plasma {
+        select_sources(portal, context)
+    } else {
+        select_devices(portal, context)
+    }
+}
+
+fn select_devices(
+    portal: Proxy<&SyncConnection>,
+    context: Arc<Mutex<CallBackContext>>,
+) -> Result<(), Box<dyn Error>> {
+    let mut args: PropMap = HashMap::new();
+    let t: usize = rand::random();
+    args.insert(
+        "handle_token".to_string(),
+        Variant(Box::new(format!("weylus{t}"))),
+    );
+
+    // TODO
+    //args.insert(
+    //    "restore_token".to_string(),
+    //    Variant(Box::new(format!("weylus{t}"))),
+    //);
+
+    // persist modes:
+    // 0: Do not persist (default)
+    // 1: Permissions persist as long as the application is running
+    // 2: Permissions persist until explicitly revoked
+    args.insert("persist_mode".to_string(), Variant(Box::new(2 as u32)));
+
+    // device types
+    // 1: KEYBOARD
+    // 2: POINTER
+    // 4: TOUCHSCREEN
+    let device_types = portal.available_device_types()?;
+    debug!("Available device types: {device_types}.");
+    args.insert("types".to_string(), Variant(Box::new(device_types)));
+
+    let path = portal.select_devices(context.lock().unwrap().session.clone(), args)?;
+    handle_response(portal, path, context, |_, portal, _, context| {
+        select_sources(portal, context)
+    })?;
+    Ok(())
+}
+
+fn select_sources(
+    portal: Proxy<&SyncConnection>,
+    context: Arc<Mutex<CallBackContext>>,
+) -> Result<(), Box<dyn Error>> {
+    debug!("select_sources");
+    let mut args: PropMap = HashMap::new();
+
+    let t: usize = rand::random();
+    args.insert(
+        "handle_token".to_string(),
+        Variant(Box::new(format!("weylus{t}"))),
+    );
+    // https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.ScreenCast.html#org-freedesktop-portal-screencast-selectsources
+    // allow multiple sources
+    args.insert("multiple".into(), Variant(Box::new(true)));
+
+    // 1: MONITOR
+    // 2: WINDOW
+    // 4: VIRTUAL
+    let source_types = portal.available_source_types()?;
+    debug!("Available source types: {source_types}.");
+    args.insert("types".into(), Variant(Box::new(source_types)));
+
+    let capture_cursor = context.lock().unwrap().capture_cursor;
+    // 1: Hidden. The cursor is not part of the screen cast stream.
+    // 2: Embedded: The cursor is embedded as part of the stream buffers.
+    // 4: Metadata: The cursor is not part of the screen cast stream, but sent as PipeWire stream metadata.
+    let cursor_mode = if capture_cursor { 2u32 } else { 1u32 };
+
+    if context.lock().unwrap().is_plasma && capture_cursor {
+        // Warn the user if capturing the cursor is tried on kde as this can crash
+        // kwin_wayland and tear down the plasma desktop, see:
+        // https://bugs.kde.org/show_bug.cgi?id=435042
+        warn!(
+            "You are attempting to capture the cursor under KDE Plasma, this may crash your \
+                    desktop, see https://bugs.kde.org/show_bug.cgi?id=435042 for details! \
+                    You have been warned."
+        );
+    }
+    args.insert("cursor_mode".into(), Variant(Box::new(cursor_mode)));
+
+    let path = portal.select_sources(context.lock().unwrap().session.clone(), args)?;
+    handle_response(portal, path, context, on_select_sources_response)?;
+    Ok(())
+}
+
+fn on_select_sources_response(
+    _r: OrgFreedesktopPortalRequestResponse,
+    portal: Proxy<&SyncConnection>,
+    _msg: &Message,
+    context: Arc<Mutex<CallBackContext>>,
+) -> Result<(), Box<dyn Error>> {
+    debug!("on_select_sources_response");
+    let mut args: PropMap = HashMap::new();
+    let t: usize = rand::random();
+    args.insert(
+        "handle_token".to_string(),
+        Variant(Box::new(format!("weylus{t}"))),
+    );
+    let path = if context.lock().unwrap().is_plasma {
+        OrgFreedesktopPortalScreenCast::start(
+            &portal,
+            context.lock().unwrap().session.clone(),
+            "",
+            args,
+        )?
+    } else {
+        OrgFreedesktopPortalRemoteDesktop::start(
+            &portal,
+            context.lock().unwrap().session.clone(),
+            "",
+            args,
+        )?
+    };
+    handle_response(portal, path, context, on_start_response)?;
+    Ok(())
+}
+
+fn on_start_response(
+    r: OrgFreedesktopPortalRequestResponse,
+    portal: Proxy<&SyncConnection>,
+    _msg: &Message,
+    context: Arc<Mutex<CallBackContext>>,
+) -> Result<(), Box<dyn Error>> {
+    debug!("on_start_response");
+    let mut context = context.lock().unwrap();
+    context.streams.append(&mut streams_from_response(&r));
+    let session = context.session.clone();
+    context
+        .fd
+        .replace(portal.open_pipe_wire_remote(session.clone(), HashMap::new())?);
+    if let Some(Some(t)) = r.results.get("restore_token").map(|t| t.as_str()) {
+        context.restore_token = Some(t.to_string());
+    }
+    dbg!(&context.restore_token);
+    if context.is_plasma {
+        debug!("Screen Cast Session started");
+    } else {
+        debug!("Remote Desktop Session started");
+    }
+    Ok(())
+}
+
+fn request_remote_desktop(
     capture_cursor: bool,
 ) -> Result<(SyncConnection, OwnedFd, Vec<PwStreamInfo>), Box<dyn Error>> {
     let conn = SyncConnection::new_session()?;
     let portal = get_portal(&conn);
+
+    let is_plasma = std::env::var("DESKTOP_SESSION").map_or(false, |s| s.contains("plasma"));
+
+    let context = CallBackContext {
+        capture_cursor,
+        session: Default::default(),
+        streams: Default::default(),
+        fd: None,
+        restore_token: None,
+        is_plasma,
+        failure: false,
+    };
+    let context = Arc::new(Mutex::new(context));
+
     let mut args: PropMap = HashMap::new();
-    let fd: Arc<Mutex<Option<OwnedFd>>> = Arc::new(Mutex::new(None));
-    let fd_res = fd.clone();
-    let streams: Arc<Mutex<Vec<PwStreamInfo>>> = Arc::new(Mutex::new(Vec::new()));
-    let streams_res = streams.clone();
-    let failure = Arc::new(AtomicBool::new(false));
-    let failure_res = failure.clone();
+    let t1: usize = rand::random();
+    let t2: usize = rand::random();
     args.insert(
         "session_handle_token".to_string(),
-        Variant(Box::new("u1".to_string())),
+        Variant(Box::new(format!("weylus{t1}"))),
     );
     args.insert(
         "handle_token".to_string(),
-        Variant(Box::new("u1".to_string())),
+        Variant(Box::new(format!("weylus{t2}"))),
     );
-    let path = portal.create_session(args)?;
-    handle_response(
-        &conn,
-        path,
-        move |r: OrgFreedesktopPortalRequestResponse, c, _| {
-            let portal = get_portal(c);
-            let mut args: PropMap = HashMap::new();
-            args.insert(
-                "handle_token".to_string(),
-                Variant(Box::new("u2".to_string())),
-            );
-            // https://flatpak.github.io/xdg-desktop-portal/portal-docs.html#gdbus-method-org-freedesktop-portal-ScreenCast.SelectSources
-            args.insert("multiple".into(), Variant(Box::new(true)));
-            args.insert("types".into(), Variant(Box::new(1u32 | 2u32)));
+    let path = if is_plasma {
+        OrgFreedesktopPortalScreenCast::create_session(&portal, args)?
+    } else {
+        OrgFreedesktopPortalRemoteDesktop::create_session(&portal, args)?
+    };
+    handle_response(portal, path, context.clone(), on_create_session_response)?;
 
-            let cursor_mode = if capture_cursor { 2u32 } else { 1u32 };
-            let plasma = std::env::var("DESKTOP_SESSION").map_or(false, |s| s.contains("plasma"));
-            if plasma && capture_cursor {
-                // Warn the user if capturing the cursor is tried on kde as this can crash
-                // kwin_wayland and tear down the plasma desktop, see:
-                // https://bugs.kde.org/show_bug.cgi?id=435042
-                warn!("You are attempting to capture the cursor under KDE Plasma, this may crash your \
-                    desktop, see https://bugs.kde.org/show_bug.cgi?id=435042 for details! \
-                    You have been warned.");
-            }
-            args.insert("cursor_mode".into(), Variant(Box::new(cursor_mode)));
-            let session: dbus::Path = r
-                .results
-                .get("session_handle")
-                .ok_or_else(|| {
-                    DBusError(format!(
-                        "Failed to obtain session_handle from response: {:?}",
-                        r
-                    ))
-                })?
-                .as_str()
-                .ok_or_else(|| DBusError("Failed to convert session_handle to string.".into()))?
-                .to_string()
-                .into();
-            let path = portal.select_sources(session.clone(), args)?;
-            let fd = fd.clone();
-            let streams = streams.clone();
-            let failure = failure.clone();
-            let failure_out = failure.clone();
-            handle_response(
-                c,
-                path,
-                move |_: OrgFreedesktopPortalRequestResponse, c, _| {
-                    let portal = get_portal(c);
-                    let mut args: PropMap = HashMap::new();
-                    args.insert(
-                        "handle_token".to_string(),
-                        Variant(Box::new("u3".to_string())),
-                    );
-                    let path = portal.start(session.clone(), "", args)?;
-                    let session = session.clone();
-                    let fd = fd.clone();
-                    let streams = streams.clone();
-                    let failure_out = failure.clone();
-                    handle_response(
-                        c,
-                        path,
-                        move |r: OrgFreedesktopPortalRequestResponse, c, _| {
-                            streams
-                                .clone()
-                                .lock()
-                                .unwrap()
-                                .append(&mut streams_from_response(r));
-                            let portal = get_portal(c);
-                            fd.clone().lock().unwrap().replace(
-                                portal.open_pipe_wire_remote(session.clone(), HashMap::new())?,
-                            );
-                            Ok(())
-                        },
-                        failure_out,
-                    )?;
-                    Ok(())
-                },
-                failure_out,
-            )?;
-            Ok(())
-        },
-        failure_res.clone(),
-    )?;
     // wait 3 minutes for user interaction
     for _ in 0..1800 {
         conn.process(Duration::from_millis(100))?;
+        let context = context.lock().unwrap();
         // Once we got a file descriptor we are done!
-        if fd_res.lock().unwrap().is_some() {
+        if context.fd.is_some() {
             break;
         }
 
-        if failure_res.load(std::sync::atomic::Ordering::Relaxed) {
+        if context.failure {
             break;
         }
     }
-    let fd_res = fd_res.lock().unwrap();
-    let streams_res = streams_res.lock().unwrap();
-    if fd_res.is_some() && !streams_res.is_empty() {
-        Ok((conn, fd_res.clone().unwrap(), streams_res.clone()))
+    let context = context.lock().unwrap();
+    if context.fd.is_some() && !context.streams.is_empty() {
+        Ok((conn, context.fd.clone().unwrap(), context.streams.clone()))
     } else {
         Err(Box::new(DBusError(
             "Failed to obtain screen capture.".into(),
@@ -477,7 +596,7 @@ fn request_screen_cast(
 }
 
 pub fn get_capturables(capture_cursor: bool) -> Result<Vec<PipeWireCapturable>, Box<dyn Error>> {
-    let (conn, fd, streams) = request_screen_cast(capture_cursor)?;
+    let (conn, fd, streams) = request_remote_desktop(capture_cursor)?;
     let conn = Arc::new(conn);
     Ok(streams
         .into_iter()
