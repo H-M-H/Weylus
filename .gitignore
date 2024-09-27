@@ -1,3 +1,4 @@
+/.vscode
 /target
 /deps/ffmpeg
 /deps/x264
