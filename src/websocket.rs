@@ -292,10 +292,10 @@ impl<S, R, FnUInput> WeylusClientHandler<S, R, FnUInput> {
             .virtual_keys_profiles
             .unwrap_or("[]".into())
             .clone();
-        self.send_msg(&MessageOutbound::VirtualKeysProfiles(profiles));
+        self.send_message(MessageOutbound::VirtualKeysProfiles(profiles));
     }
 
-    fn update_virtual_keys_profiles(&mut self, profiles: Vec<VirtualKeysProfile>)
+    fn update_virtual_keys_profiles(&mut self, profiles: String)
     where
         S: WeylusSender,
     {

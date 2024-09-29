@@ -636,17 +636,19 @@ class PointerHandler {
         }
     }
 
-    /** since getBoundingClientRect() is slow, we only compute once when pointer is down */
+    /** since getBoundingClientRect() is slow, we only compute once when needed */
     targetRect: DOMRect;
 
     onEvent(event: PointerEvent, event_type: string) {
         if (!settings.is_pointer_type_enabled(event.pointerType))
             return;
 
+        const el = event.currentTarget as HTMLElement;
         if (event_type === "pointerdown") {
-            const el = event.currentTarget as HTMLElement;
             el.setPointerCapture(event.pointerId);
             event.preventDefault();
+        }
+        if (event_type === "pointerdown" || event_type === "pointerenter" || !this.targetRect) {
             this.targetRect = el.getBoundingClientRect();
         }
 
