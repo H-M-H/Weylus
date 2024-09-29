@@ -1,0 +1,42 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'weylus'",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=weylus",
+          "--package=weylus"
+        ],
+        "filter": {
+          "name": "weylus",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'weylus'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=weylus",
+          "--package=weylus"
+        ],
+        "filter": {
+          "name": "weylus",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}

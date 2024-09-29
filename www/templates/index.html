@@ -1,80 +1,88 @@
 <!DOCTYPE html>
 <html>
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+        <meta name="mobile-web-app-capable" content="yes">
+        <title>Weylus</title>
+        <link rel="stylesheet" href="style.css">
+        <script src="lib.js"></script>
+        <script>
+            run("{{log_level}}");
+        </script>
+    </head>
 
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="mobile-web-app-capable" content="yes">
-    <title>Weylus</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="lib.js"></script>
-    <script>
-        run("{{log_level}}");
-    </script>
-</head>
+    <body>
+        <main id="main" tabindex="0">
+            <video id="video" autoplay muted defaultMuted playsinline disablePictureInPicture></video>
+            <canvas id="canvas" class="vanish"></canvas>
+            <div id="pointer-event-receiver"></div>
+            
+            <div id="disconnected-notice" class="hidden">
+                <h2>Connection lost</h2>
+                click screen to retry...
+            </div>
+            
+            <div id="connecting-notice" class="hidden">
+                Connecting...
+            </div>
 
-<body>
-    <main id="main">
-        <video id="video" autoplay muted defaultMuted playsinline disablePictureInPicture></video>
-        <canvas id="canvas" class="vanish"></canvas>
-    </main>
-    <div id="settings">
-        <div id="handle">⠿</div>
-        <div id="settings_scroll">
-            <h2>Settings</h2>
-            <section>
-                <label for="window">Capture:</label>
-                <select id="window"></select>
-                <button id="refresh">Refresh List</button>
-            </section>
-            <h3>Video</h3>
-            <section>
-                <label><input type="checkbox" id="enable_video" checked /> <span>Enable Video</span></label>
-                <label><input type="checkbox" id="energysaving" /> <span>Energy Saving (no video, black
-                        screen)</span></label>
-                <label><input type="checkbox" id="stretch" checked /> <span>Stretch Video</span></label>
-                <button id="fullscreen">Toggle Fullscreen</button>
-                <label {{#if (not capture_cursor_enabled)}}class="hide" {{/if}}>
-                    <input type="checkbox" id="capture_cursor" />
-                    <span>Capture Cursor</span>
-                </label>
-                <label><input type="checkbox" id="aggressive_seeking" checked /> <span>Lower Latency<br>(possibly
-                        choppy)</span></label>
-                <label>Max Video Resolution: <br><input type="range" id="scale_video" min="0.1" max="2" step="0.01"
-                        value="1.8" /><output></output></label>
-                <label>Frame Rate: <br><input type="range" id="frame_rate" value="0" /><output>30</output> fps</label>
-            </section>
-            <h3>Input</h3>
-            <section>
-                <label><input type="checkbox" id="enable_mouse" checked /> <span>Enable Mouse</span></label>
-                <label><input type="checkbox" id="enable_stylus" checked /> <span>Enable Stylus</span></label>
-                <label><input type="checkbox" id="enable_touch" checked /> <span>Enable Touch</span></label>
-                <label {{#if (not uinput_enabled)}}class="hide" {{/if}}>
-                    <input type="checkbox" id="uinput_support" checked />
-                    <span>Enable uinput</span>
-                </label>
-                <label>Min pressure to generate: <br><input type="range" id="min_pressure" min="0" max="1" step="0.01"
-                        value="0" /></label>
-            </section>
-            <section {{#if (not uinput_enabled)}}class="hide" {{/if}}>
-                <label><span>Client Name:</span><br><input type="text" id="client_name" /><br><span>Optional, useful to
-                        distinguish multiple devices.</span></label>
-            </section>
-            <section id="displayoptions">
-                <label id="leftylabel"><input type="checkbox" id="lefty" />Swap</label>
-                <label id="vanish">Hide until Reload</label>
-            </section>
-            <section id="stats_section">
-                <label><span>FPS (receiving): </span><output id="fps">0</output></label>
-            </section>
-            <section id="log_section" class="hide">
-                <label>Log
-                    <pre class="log" id="log" />
-                </label>
-            </section>
+            <div id="vk-container-outter">
+            </div>
+        </main>
+        <div id="settings">
+            <div id="handle">⠿</div>
+            <div id="settings_scroll">
+                <h2>Settings</h2>
+                <section>
+                    <label for="window">Capture:</label>
+                    <select id="window"></select>
+                    <button id="refresh">Refresh List</button>
+                </section>
+                <h3>Virtual Keys</h3>
+                <section id="vk-settings-container">
+                </section>
+                <h3>Video</h3>
+                <section>
+                    <label><input type="checkbox" id="enable_video" checked /> <span>Enable Video</span></label>
+                    <label><input type="checkbox" id="energysaving" /> <span>Energy Saving (no video, black screen)</span></label>
+                    <label><input type="checkbox" id="stretch" checked /> <span>Stretch Video</span></label>
+                    <button id="fullscreen">Toggle Fullscreen</button>
+                    <label {{#if (not capture_cursor_enabled)}}class="hide"{{/if}}>
+                        <input type="checkbox" id="capture_cursor" />
+                        <span>Capture Cursor</span>
+                    </label>
+                    <label><input type="checkbox" id="aggressive_seeking" checked /> <span>Lower Latency<br>(possibly choppy)</span></label>
+                    <label>Max Video Resolution: <br><input type="range" id="scale_video" min="0.1" max="2" step="0.01" value="1.8"/><output></output></label>
+                    <label>Frame Rate: <br><input type="range" id="frame_rate" value="0" /><output>30</output> fps</label>
+                </section>
+                <h3>Input</h3>
+                <section>
+                    <label><input type="checkbox" id="enable_mouse" checked /> <span>Enable Mouse</span></label>
+                    <label><input type="checkbox" id="enable_stylus" checked /> <span>Enable Stylus</span></label>
+                    <label><input type="checkbox" id="enable_touch" checked /> <span>Enable Touch</span></label>
+                    <label {{#if (not uinput_enabled)}}class="hide"{{/if}}>
+                        <input type="checkbox" id="uinput_support" checked />
+                        <span>Enable uinput</span>
+                    </label>
+                    <label>Min pressure to generate: <br><input type="range" id="min_pressure" min="0" max="1" step="0.01" value="0"/></label>
+                </section>
+                <section {{#if (not uinput_enabled)}}class="hide"{{/if}}>
+                    <label><span>Client Name:</span><br><input type="text" id="client_name" /><br><span>Optional, useful to distinguish multiple devices.</span></label>
+                </section>
+                <section id="displayoptions">
+                    <label id="leftylabel"><input type="checkbox" id="lefty" />Swap</label>
+                    <label id="vanish">Hide until Reload</label>
+                </section>
+                <section id="stats_section">
+                    <label><span>FPS (receiving): </span><output id="fps">0</output></label>
+                </section>
+                <section id="log_section" class="hide">
+                    <label>Log<pre class="log" id="log"/></label>
+                </section>
+            </div>
         </div>
-    </div>
-</body>
+    </body>
 
 </html>
