@@ -1,3 +1,4 @@
+import { initVirtualKey, setVirtualKeysProfiles } from "./virtualKey";
 import { estimateCoord, resetCoordEstimator } from "precise-client-coord";
 
 window.addEventListener("resize", resetCoordEstimator);
@@ -276,6 +277,10 @@ class Settings {
             }
 
             this.toggle_energysaving(!!this.checks.get("energysaving").checked);
+
+            if (!this.checks.get("enable_virtual_keys").checked) {
+                document.getElementById("vk-container").classList.add("hidden");
+            }
 
             let client_name = settings["client_name"];
             if (client_name)
@@ -809,6 +814,10 @@ function handle_messages(
                 else if ("ConfigError" in msg) {
                     onConfigError(msg["ConfigError"]);
                 }
+                else if ("VirtualKeysProfiles" in msg) {
+                    const profiles = JSON.parse(msg["VirtualKeysProfiles"] || '[]');
+                    setVirtualKeysProfiles(profiles);
+                }
             }
 
             return;
@@ -894,6 +903,7 @@ function init() {
             ws.send('"GetCapturableList"');
             if (!settings.video_enabled()) webSocket.send('"PauseVideo"');
 
+            ws.send('"RequestVirtualKeysProfiles"');
             settings.send_server_config();
 
             document.onvisibilitychange = () => {
@@ -944,6 +954,7 @@ function init() {
     makeConnection();
 
     settings = new Settings();
+    initVirtualKey();
 
     document.body.addEventListener("contextmenu", (event) => {
         event.preventDefault();

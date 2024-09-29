@@ -302,3 +302,66 @@ label input:disabled + span {
   0% { opacity: 0; }
   100% { opacity: 1; }
 }
+
+// Virtual Keys
+
+#vk-container {
+  position: absolute;
+  inset: 0;
+  height: 0;
+
+  &:not(.isEditing) {
+    .vk-editing-notice {
+      display: none;
+    }
+  }
+}
+
+$vk-editing-rgb: 255, 200, 100;
+
+.vk-editing-notice {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  padding: 4px 8px;
+  background: #{"rgba" }($vk-editing-rgb, 1);
+}
+
+.vk-key {
+  --opacity: 0.5;
+  position: fixed;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, var(--opacity));
+  border-radius: 8px;
+  border: 4px solid rgba(0, 0, 0, var(--opacity));
+  color: #000;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: all;
+  overflow: hidden;
+  transition: transform 0.2s;
+
+  #vk-container.isEditing & {
+    background: rgba($vk-editing-rgb, var(--opacity));
+
+    &.isActive {
+      outline: 2px solid $accent-color;
+    }
+  }
+
+  &.inCombo {
+    border-style: double;
+  }
+
+  &.justPressed {
+    transform: translate(-50%, -50%) scale(0.9);
+    transition-duration: 0s;
+  }
+
+  &:hover {
+    --opacity: 0.75;
+  }
+}

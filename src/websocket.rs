@@ -119,6 +119,8 @@ impl<S, R, FnUInput> WeylusClientHandler<S, R, FnUInput> {
                         MessageInbound::ResumeVideo => {
                             self.video_sender.send(VideoCommands::Resume).unwrap()
                         }
+                        MessageInbound::RequestVirtualKeysProfiles => self.send_virtual_keys_profiles(),
+                        MessageInbound::SetVirtualKeysProfiles(profiles) => self.update_virtual_keys_profiles(profiles),
                     }
                 }
                 Err(err) => {
@@ -279,6 +281,30 @@ impl<S, R, FnUInput> WeylusClientHandler<S, R, FnUInput> {
                 "Invalid id for capturable!".to_string(),
             ));
         }
+    }
+
+    fn send_virtual_keys_profiles(&mut self) 
+    where
+        S: WeylusSender,
+    {
+        use crate::config;
+        let profiles = config::get_config()
+            .virtual_keys_profiles
+            .unwrap_or("[]".into())
+            .clone();
+        self.send_message(MessageOutbound::VirtualKeysProfiles(profiles));
+    }
+
+    fn update_virtual_keys_profiles(&mut self, profiles: String)
+    where
+        S: WeylusSender,
+    {
+        use crate::config::{self, write_config};
+        let mut config = config::get_config().clone();
+        config.virtual_keys_profiles = Some(profiles.clone());
+        write_config(&config);
+
+        // TODO: broadcast to all clients
     }
 }
 

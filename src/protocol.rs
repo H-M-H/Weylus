@@ -19,6 +19,8 @@ pub enum MessageInbound {
     KeyboardEvent(KeyboardEvent),
     GetCapturableList,
     Config(ClientConfiguration),
+    RequestVirtualKeysProfiles,
+    SetVirtualKeysProfiles(String),
     PauseVideo,
     ResumeVideo,
 }
@@ -26,6 +28,7 @@ pub enum MessageInbound {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum MessageOutbound {
     CapturableList(Vec<String>),
+    VirtualKeysProfiles(String),
     NewVideo,
     ConfigOk,
     ConfigError(String),
