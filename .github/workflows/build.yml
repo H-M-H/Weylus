@@ -106,7 +106,6 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
     - name: Download deps
       run: |
-        npm install -g typescript
         brew install nasm
         cargo install cargo-bundle
       shell: bash

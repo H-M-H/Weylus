@@ -6,8 +6,6 @@ RUN apk add --no-cache libx11-dev libxext-dev libxft-dev libxinerama-dev libxcur
     autoconf libtool pkgconfig libdrm-dev pango-dev gst-plugins-base-dev gstreamer-dev dbus-libs \
     dbus-dev cmake build-base nasm npm ffmpeg-dev libva-dev curl git bash automake tar
 
-RUN npm install --global typescript
-
 RUN ln -s /usr/bin/x86_64-alpine-linux-musl-gcc /usr/bin/musl-gcc
 RUN ln -s /usr/bin/x86_64-alpine-linux-musl-g++ /usr/bin/musl-g++
 

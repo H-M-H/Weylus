@@ -16,8 +16,7 @@ RUN curl -LO "https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/nasm-2.16.03.ta
     tar xf "nasm-2.16.03.tar.xz" && cd "nasm-2.16.03" && \
     ./configure --prefix=/usr && make -j$(nproc) && make install && cd .. && rm -rf "nasm-2.16.03*"
 RUN curl -sL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
-    npm install -g typescript
+    apt-get install -y nodejs
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
     sh -s -- -y --default-toolchain stable-x86_64-unknown-linux-gnu
 RUN cargo install cargo-deb
