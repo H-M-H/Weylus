@@ -1,4 +1,7 @@
 import { initVirtualKey, setVirtualKeysProfiles } from "./virtualKey";
+import { estimateCoord, resetCoordEstimator } from "precise-client-coord";
+
+window.addEventListener("resize", resetCoordEstimator);
 
 enum LogLevel {
     ERROR = 0,
@@ -373,8 +376,12 @@ class PEvent {
             btn = 2;
         this.button = (btn < 0 ? 0 : 1 << btn);
         this.buttons = event.buttons;
-        this.x = (event.clientX - targetRect.left) / targetRect.width;
-        this.y = (event.clientY - targetRect.top) / targetRect.height;
+
+        // smooth the coordinates. works well for HiDPI screen especially Windows Pad
+        const { clientX, clientY } = estimateCoord(event);
+        this.x = (clientX - targetRect.left) / targetRect.width;
+        this.y = (clientY - targetRect.top) / targetRect.height;
+
         this.movement_x = event.movementX ? event.movementX : 0;
         this.movement_y = event.movementY ? event.movementY : 0;
         this.pressure = Math.max(event.pressure, settings.range_min_pressure.valueAsNumber);

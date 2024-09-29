@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@preact/signals": "^1.3.0",
+    "precise-client-coord": "^1.0.0",
     "yon-utils": "^0.1.23"
   }
 }

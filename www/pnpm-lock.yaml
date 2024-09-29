@@ -8,6 +8,9 @@ dependencies:
   '@preact/signals':
     specifier: ^1.3.0
     version: 1.3.0(preact@10.22.1)
+  precise-client-coord:
+    specifier: ^1.0.0
+    version: 1.0.0
   yon-utils:
     specifier: ^0.1.23
     version: 0.1.23
@@ -968,6 +971,10 @@ packages:
 
   /preact@10.22.1:
     resolution: {integrity: sha512-jRYbDDgMpIb5LHq3hkI0bbl+l/TQ9UnkdQ0ww+lp+4MMOdqaUYdFc5qeyP+IV8FAd/2Em7drVPeKdQxsiWCf/A==}
+
+  /precise-client-coord@1.0.0:
+    resolution: {integrity: sha512-jZui82t53Rl8kne3daY/1f13zRbEPQ4DR8jqHqKVDBja2nAPHJR0VH3hj5hlixaNvUJV9H20iVr0XWt0S6hfYg==}
+    dev: false
 
   /read-pkg@3.0.0:
     resolution: {integrity: sha512-BLq/cCO9two+lBgiTYNqD6GdtK8s4NpaWrl6/rCO9w0TUS8oJl7cmToOZfRYllKTISY6nt1U7jQ53brmKqY6BA==}
