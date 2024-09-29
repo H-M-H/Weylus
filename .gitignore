@@ -1,3 +1,4 @@
+/.vscode
 /target
 /deps/ffmpeg
 /deps/x264
@@ -11,3 +12,6 @@ node_modules
 /www/static/lib.js
 /www/static/style.css
 /www/static/*.map
+*.js
+*.js.map
+*.tar.gz

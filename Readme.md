@@ -270,7 +270,20 @@ libxfixes-dev libxtst-dev libxrandr-dev libxcomposite-dev libxi-dev libxv-dev au
 nvidia-cuda-dev pkg-config libdrm-dev libpango1.0-dev libgstreamer1.0-dev \
 libgstreamer-plugins-base1.0-dev libdbus-1-dev
 ```
-Note that building for the first time may take a while as by default ffmpeg needs to be build. On
+
+On Fedora, they can be installed via:
+```sh
+sudo dnf install libXext-devel libXft-devel libXinerama-devel libXcursor-devel libXrender-devel \
+libXfixes-devel libXtst-devel libXrandr-devel libXcomposite-devel libXi-devel libXv-devel autoconf libtool \
+pkg-config libdrm-devel pango-devel gstreamer1-devel \
+gstreamer1-plugins-base-devel dbus-devel nasm npm
+```
+After npm is installed, typescript must be installed by:
+```sh
+sudo npm install typescript -g
+```
+
+Note that building for the first time may take a while as by default ffmpeg needs to be built. On
 Windows only msvc is supported as C compiler; it is, however, possible to cross compile on Linux for
 Windows using minGW.
 

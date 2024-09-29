@@ -1,11 +1,15 @@
+use std::cmp::min;
+use std::io::Cursor;
 use std::iter::Iterator;
 use std::net::{IpAddr, SocketAddr};
 
+use fltk::image::PngImage;
+use fltk::menu::Choice;
 use std::sync::{mpsc, Arc, Mutex};
 use tracing::{error, info};
 
 use fltk::{
-    app::App,
+    app::{awake_callback, App},
     button::{Button, CheckButton},
     frame::Frame,
     input::{Input, IntInput},
@@ -18,8 +22,8 @@ use fltk::{
 #[cfg(not(target_os = "windows"))]
 use pnet_datalink as datalink;
 
-use crate::config::{write_config, Config};
-use crate::websocket::Ws2UiMessage;
+use crate::config::{write_config, Config, ThemeType};
+use crate::web::Web2UiMessage::UInputInaccessible;
 
 pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     let width = 200;
@@ -27,8 +31,9 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     let padding = 10;
 
     let app = App::default().with_scheme(fltk::app::AppScheme::Gtk);
+    config.gui_theme.map(|th| th.apply());
     let mut wind = Window::default()
-        .with_size(660, 620)
+        .with_size(660, 600)
         .center_screen()
         .with_label(&format!("Weylus - {}", env!("CARGO_PKG_VERSION")));
     wind.set_xclass("weylus");
@@ -59,15 +64,9 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         .with_label("Port");
     input_port.set_value(&config.web_port.to_string());
 
-    let mut input_ws_port = IntInput::default()
-        .with_size(width, height)
-        .below_of(&input_port, padding)
-        .with_label("Websocket Port");
-    input_ws_port.set_value(&config.websocket_port.to_string());
-
     let mut check_auto_start = CheckButton::default()
         .with_size(70, height)
-        .below_of(&input_ws_port, padding)
+        .below_of(&input_port, padding + 5)
         .with_label("Auto Start");
     check_auto_start.set_tooltip("Start Weylus server immediately on program start.");
     check_auto_start.set_checked(config.auto_start);
@@ -158,9 +157,18 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     output.set_buffer(output_buf);
     let output_buf = output.buffer().unwrap();
 
-    let mut qr_frame = Frame::default()
-        .with_size(240, 240)
+    let mut choice_theme = Choice::default()
+        .with_size(width, height)
         .right_of(&input_access_code, padding);
+
+    for theme in ThemeType::themes() {
+        choice_theme.add_choice(&theme.name());
+    }
+    choice_theme.set_value(config.gui_theme.unwrap_or(ThemeType::default()).to_index());
+
+    let mut qr_frame = Frame::default()
+        .with_size(235, 235)
+        .right_of(&input_bind_addr, padding);
 
     qr_frame.hide();
 
@@ -180,10 +188,23 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     let mut weylus = crate::weylus::Weylus::new();
     let mut is_server_running = false;
     let auto_start = config.auto_start;
-    let mut config = config.clone();
+    let config = Arc::new(Mutex::new(config.clone()));
+
+    {
+        let config = config.clone();
+        choice_theme.set_callback(move |c| {
+            let v = c.value();
+            if v >= 0 {
+                ThemeType::from_index(v).apply();
+                config.lock().unwrap().gui_theme = Some(ThemeType::from_index(v));
+                write_config(&config.lock().unwrap());
+            }
+        });
+    }
 
     let mut toggle_server = move |but: &mut Button| {
         if let Err(err) = || -> Result<(), Box<dyn std::error::Error>> {
+            let mut config = config.lock().unwrap();
             if !is_server_running {
                 {
                     let access_code_string = input_access_code.value();
@@ -193,13 +214,12 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     };
                     let bind_addr: IpAddr = input_bind_addr.value().parse()?;
                     let web_port: u16 = input_port.value().parse()?;
-                    let ws_port: u16 = input_ws_port.value().parse()?;
 
                     config.access_code = access_code.map(|s| s.to_string());
                     config.web_port = web_port;
-                    config.websocket_port = ws_port;
                     config.bind_address = bind_addr;
                     config.auto_start = check_auto_start.is_checked();
+                    config.gui_theme = Some(ThemeType::from_index(choice_theme.value()));
                     #[cfg(target_os = "linux")]
                     {
                         config.try_vaapi = check_native_hw_accel.is_checked();
@@ -218,33 +238,28 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                         config.try_mediafoundation = check_native_hw_accel.is_checked();
                     }
                 }
-                if !weylus.start(
-                    &config,
-                    |_| {},
-                    |message| match message {
-                        Ws2UiMessage::UInputInaccessible => {
-                            let w = 500;
-                            let h = 300;
-                            let mut pop_up = Window::default()
-                                .with_size(w, h)
-                                .center_screen()
-                                .with_label("Weylus - UInput inaccessible!");
-                            pop_up.set_xclass("weylus");
+                if !weylus.start(&config, |message| match message {
+                    UInputInaccessible => awake_callback(move || {
+                        let w = 500;
+                        let h = 300;
+                        let mut pop_up = Window::default()
+                            .with_size(w, h)
+                            .center_screen()
+                            .with_label("Weylus - UInput inaccessible!");
+                        pop_up.set_xclass("weylus");
 
-                            let buf = TextBuffer::default();
-                            let mut pop_up_text = TextDisplay::default().with_size(w, h);
-                            pop_up_text.set_buffer(buf);
-                            pop_up_text.wrap_mode(fltk::text::WrapMode::AtBounds, 5);
-                            let mut buf = pop_up_text.buffer().unwrap();
-                            buf.set_text(std::include_str!("strings/uinput_error.txt"));
+                        let buf = TextBuffer::default();
+                        let mut pop_up_text = TextDisplay::default().with_size(w, h);
+                        pop_up_text.set_buffer(buf);
+                        pop_up_text.wrap_mode(fltk::text::WrapMode::AtBounds, 5);
+                        let mut buf = pop_up_text.buffer().unwrap();
+                        buf.set_text(std::include_str!("strings/uinput_error.txt"));
 
-                            pop_up.end();
-                            pop_up.make_modal(true);
-                            pop_up.show();
-                        }
-                        _ => {}
-                    },
-                ) {
+                        pop_up.end();
+                        pop_up.make_modal(true);
+                        pop_up.show();
+                    }),
+                }) {
                     return Ok(());
                 }
                 is_server_running = true;
@@ -302,21 +317,29 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                             .to_string(),
                         );
                     }
-                    let code = QrCode::new(&url_string).unwrap();
-                    let img_buf = code.render::<Luma<u8>>().build();
-                    let image = image::DynamicImage::ImageLuma8(img_buf);
-                    let image = image.resize_exact(
-                        qr_frame.width() as u32,
-                        qr_frame.height() as u32,
-                        image::imageops::FilterType::Nearest,
-                    );
-                    let mut buf = vec![];
-                    image
-                        .write_to(&mut buf, image::ImageOutputFormat::Png)
-                        .unwrap();
-                    let png = fltk::image::PngImage::from_data(&buf).unwrap();
 
-                    qr_frame.set_image(Some(png));
+                    let cb = move |qr_frame: &mut Frame, _, _, w, h| {
+                        let code = QrCode::new(&url_string).unwrap();
+                        let img_buf = code.render::<Luma<u8>>().build();
+                        let image = image::DynamicImage::ImageLuma8(img_buf);
+                        let dims = min(w, h) as u32;
+                        let image =
+                            image.resize_exact(dims, dims, image::imageops::FilterType::Nearest);
+                        let mut buf = vec![];
+                        let mut cursor = Cursor::new(&mut buf);
+                        image
+                            .write_to(&mut cursor, image::ImageFormat::Png)
+                            .unwrap();
+                        let png = PngImage::from_data(&buf).unwrap();
+                        qr_frame.set_image(Some(png));
+                    };
+
+                    let x = qr_frame.x();
+                    let y = qr_frame.y();
+                    let w = qr_frame.width();
+                    let h = qr_frame.height();
+                    cb(&mut qr_frame, x, y, w, h);
+                    qr_frame.resize_callback(cb);
                     qr_frame.show();
                 }
                 #[cfg(target_os = "windows")]
@@ -333,6 +356,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                 weylus.stop();
                 but.set_label("Start");
                 output_server_addr.hide();
+                qr_frame.resize_callback(|_, _, _, _, _| {});
                 qr_frame.hide();
                 is_server_running = false;
             }
@@ -349,4 +373,8 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     but_toggle.set_callback(toggle_server);
 
     app.run().expect("Failed to run Gui!");
+
+    // TODO: Remove when https://github.com/fltk-rs/fltk-rs/issues/1480 is fixed
+    // this is required to drop the callback and do a graceful shutdown of the web server
+    but_toggle.set_callback(|_| ());
 }

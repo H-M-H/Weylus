@@ -3,7 +3,7 @@ use std::ffi::CString;
 use std::os::raw::{c_char, c_int};
 
 use crate::capturable::x11::X11Context;
-use crate::capturable::Capturable;
+use crate::capturable::{Capturable, Geometry};
 use crate::input::device::{InputDevice, InputDeviceType};
 use crate::protocol::{
     Button, KeyboardEvent, KeyboardEventType, KeyboardLocation, PointerEvent, PointerEventType,
@@ -34,6 +34,7 @@ pub struct UInputDevice {
     touch_fd: c_int,
     touches: [Option<MultiTouch>; 5],
     tool_pen_active: bool,
+    pen_touching: bool,
     capturable: Box<dyn Capturable>,
     x: f64,
     y: f64,
@@ -100,6 +101,7 @@ impl UInputDevice {
             touch_fd,
             touches: Default::default(),
             tool_pen_active: false,
+            pen_touching: false,
             capturable,
             x: 0.0,
             y: 0.0,
@@ -262,9 +264,9 @@ impl InputDevice for UInputDevice {
             self.mouse_fd,
             ET_RELATIVE,
             EC_REL_HWHEEL,
-            direction(event.dy),
+            direction(event.dx),
         );
-        self.send(self.mouse_fd, ET_RELATIVE, EC_REL_WHEEL_HI_RES, event.dx);
+        self.send(self.mouse_fd, ET_RELATIVE, EC_REL_WHEEL_HI_RES, event.dy);
         self.send(self.mouse_fd, ET_RELATIVE, EC_REL_HWHEEL_HI_RES, event.dx);
 
         self.send(
@@ -281,10 +283,10 @@ impl InputDevice for UInputDevice {
             warn!("Failed to activate window, sending no input ({})", err);
             return;
         }
-        let (x, y, width, height) = match self.capturable.geometry_relative() {
-            Ok(g) => g,
-            Err(e) => {
-                warn!("Failed to get window geometry, sending no input ({})", e);
+        let (x, y, width, height) = match self.capturable.geometry().unwrap() {
+            Geometry::Relative(x, y, width, height) => (x, y, width, height),
+            _ => {
+                warn!("Failed to get window geometry, sending no input");
                 return;
             }
         };
@@ -446,6 +448,7 @@ impl InputDevice for UInputDevice {
                 match event.event_type {
                     PointerEventType::DOWN | PointerEventType::MOVE => {
                         if let PointerEventType::DOWN = event.event_type {
+                            self.pen_touching = true;
                             self.send(self.stylus_fd, ET_KEY, EC_KEY_TOUCH, 1);
                         }
                         if !self.tool_pen_active && !event.buttons.contains(Button::ERASER) {
@@ -474,7 +477,11 @@ impl InputDevice for UInputDevice {
                             self.stylus_fd,
                             ET_ABSOLUTE,
                             EC_ABSOLUTE_PRESSURE,
-                            self.transform_pressure(event.pressure),
+                            if self.pen_touching {
+                                self.transform_pressure(event.pressure)
+                            } else {
+                                0
+                            },
                         );
                         self.send(
                             self.stylus_fd,
@@ -495,6 +502,7 @@ impl InputDevice for UInputDevice {
                         self.send(self.stylus_fd, ET_KEY, EC_KEY_TOOL_RUBBER, 0);
                         self.send(self.stylus_fd, ET_ABSOLUTE, EC_ABSOLUTE_PRESSURE, 0);
                         self.tool_pen_active = false;
+                        self.pen_touching = false;
                     }
                     PointerEventType::ENTER | PointerEventType::LEAVE => ()
                 }

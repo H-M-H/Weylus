@@ -11,7 +11,7 @@ use crate::protocol::{
     WheelEvent,
 };
 
-use crate::capturable::Capturable;
+use crate::capturable::{Capturable, Geometry};
 
 #[cfg(target_os = "macos")]
 use super::macos_tablet::{MacosPenEventType, macos_send_tablet_event};
@@ -47,10 +47,10 @@ impl InputDevice for AutoPilotDevice {
             warn!("Failed to activate window, sending no input ({})", err);
             return;
         }
-        let (x_rel, y_rel, width_rel, height_rel) = match self.capturable.geometry_relative() {
-            Ok(g) => g,
-            Err(e) => {
-                warn!("Failed to get window geometry, sending no input ({})", e);
+        let (x_rel, y_rel, width_rel, height_rel) = match self.capturable.geometry().unwrap() {
+            Geometry::Relative(x, y, width, height) => (x, y, width, height),
+            _ => {
+                warn!("Failed to get window geometry, sending no input");
                 return;
             }
         };

@@ -13,6 +13,7 @@
 #include <stdint.h>
 
 #include "../error.h"
+#include "../log.h"
 #include "xhelper.h"
 
 int clamp(int x, int lb, int ub)
@@ -226,43 +227,51 @@ void capture_screen(CaptureContext* ctx, struct Image* img, int capture_cursor, 
 	if (capture_cursor && ctx->has_xfixes)
 	{
 		XFixesCursorImage* cursor_img = XFixesGetCursorImage(ctx->cap.disp);
-		uint32_t* data = (uint32_t*)ctx->ximg->data;
+		if (cursor_img != NULL)
+		{
+			uint32_t* data = (uint32_t*)ctx->ximg->data;
 
-		// coordinates of cursor inside ximg
-		int x0 = cursor_img->x - cursor_img->xhot - x;
-		int y0 = cursor_img->y - cursor_img->yhot - y;
+			// coordinates of cursor inside ximg
+			int x0 = cursor_img->x - cursor_img->xhot - x;
+			int y0 = cursor_img->y - cursor_img->yhot - y;
 
-		// clamp part of cursor image to draw to the part of the cursor that is inside
-		// the captured area
-		int i0 = clamp(0, -x0, width - x0);
-		int i1 = clamp(cursor_img->width, -x0, width - x0);
-		int j0 = clamp(0, -y0, height - y0);
-		int j1 = clamp(cursor_img->height, -y0, height - y0);
-		// paint cursor image into captured image
-		for (int j = j0; j < j1; ++j)
-			for (int i = i0; i < i1; ++i)
-			{
-				uint32_t c_pixel = cursor_img->pixels[j * cursor_img->width + i];
-				unsigned char a = (c_pixel & 0xff000000) >> 24;
-				if (a)
+			// clamp part of cursor image to draw to the part of the cursor that is inside
+			// the captured area
+			int i0 = clamp(0, -x0, width - x0);
+			int i1 = clamp(cursor_img->width, -x0, width - x0);
+			int j0 = clamp(0, -y0, height - y0);
+			int j1 = clamp(cursor_img->height, -y0, height - y0);
+			// paint cursor image into captured image
+			for (int j = j0; j < j1; ++j)
+				for (int i = i0; i < i1; ++i)
 				{
-					uint32_t d_pixel = data[(j + y0) * width + i + x0];
+					uint32_t c_pixel = cursor_img->pixels[j * cursor_img->width + i];
+					unsigned char a = (c_pixel & 0xff000000) >> 24;
+					if (a)
+					{
+						uint32_t d_pixel = data[(j + y0) * width + i + x0];
 
-					unsigned char c1 = (c_pixel & 0x00ff0000) >> 16;
-					unsigned char c2 = (c_pixel & 0x0000ff00) >> 8;
-					unsigned char c3 = (c_pixel & 0x000000ff) >> 0;
-					unsigned char d1 = (d_pixel & 0x00ff0000) >> 16;
-					unsigned char d2 = (d_pixel & 0x0000ff00) >> 8;
-					unsigned char d3 = (d_pixel & 0x000000ff) >> 0;
-					// colors from the cursor image are premultiplied with the alpha channel
-					unsigned char f1 = c1 + d1 * (255 - a) / 255;
-					unsigned char f2 = c2 + d2 * (255 - a) / 255;
-					unsigned char f3 = c3 + d3 * (255 - a) / 255;
-					data[(j + y0) * width + i + x0] = (f1 << 16) | (f2 << 8) | (f3 << 0);
+						unsigned char c1 = (c_pixel & 0x00ff0000) >> 16;
+						unsigned char c2 = (c_pixel & 0x0000ff00) >> 8;
+						unsigned char c3 = (c_pixel & 0x000000ff) >> 0;
+						unsigned char d1 = (d_pixel & 0x00ff0000) >> 16;
+						unsigned char d2 = (d_pixel & 0x0000ff00) >> 8;
+						unsigned char d3 = (d_pixel & 0x000000ff) >> 0;
+						// colors from the cursor image are premultiplied with the alpha channel
+						unsigned char f1 = c1 + d1 * (255 - a) / 255;
+						unsigned char f2 = c2 + d2 * (255 - a) / 255;
+						unsigned char f3 = c3 + d3 * (255 - a) / 255;
+						data[(j + y0) * width + i + x0] = (f1 << 16) | (f2 << 8) | (f3 << 0);
+					}
 				}
-			}
 
-		XFree(cursor_img);
+			XFree(cursor_img);
+		}
+		else
+		{
+			log_warn(
+				"Failed to obtain cursor image, XFixesGetCursorImage has returned a null pointer.");
+		}
 	}
 
 	img->width = ctx->ximg->width;

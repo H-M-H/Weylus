@@ -16,7 +16,7 @@ if [ "$OS" == "Windows_NT" ]; then
     export HOST_OS="windows"
 fi
 
-[ -z "$DIST" ] && export DIST="dist"
+[ -z "$DIST" ] && export DIST="$PWD/dist"
 [ -z "$TARGET_OS" ] && export TARGET_OS="$HOST_OS"
 
 export NPROCS="$(nproc || echo 4)"

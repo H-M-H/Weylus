@@ -59,7 +59,7 @@ typedef struct VideoContext
 } VideoContext;
 
 // this is a rust function and lives in src/video.rs
-int write_video_packet(void* rust_ctx, uint8_t* buf, int buf_size);
+int write_video_packet(void* rust_ctx, const uint8_t* buf, int buf_size);
 
 #if defined(__clang__) || defined(__GNUC__)
 void log_callback(__attribute__((unused)) void* _ptr, int level, const char* fmt_orig, va_list args)
@@ -310,11 +310,12 @@ void open_video(VideoContext* ctx, Error* err)
 			if (ctx->c)
 			{
 				ctx->sw_pix_fmt = ctx->c->pix_fmt = AV_PIX_FMT_BGR0;
-				av_opt_set(ctx->c->priv_data, "preset", "fast", 0);
+				av_opt_set(ctx->c->priv_data, "preset", "p1", 0);
 				av_opt_set(ctx->c->priv_data, "zerolatency", "1", 0);
 				av_opt_set(ctx->c->priv_data, "tune", "ull", 0);
-				av_opt_set(ctx->c->priv_data, "rc", "vbr", 0);
+				av_opt_set(ctx->c->priv_data, "rc", "cbr", 0);
 				av_opt_set(ctx->c->priv_data, "cq", "21", 0);
+				av_opt_set(ctx->c->priv_data, "delay", "0", 0);
 				set_codec_params(ctx);
 				int ret = avcodec_open2(ctx->c, codec, NULL);
 				if (ret == 0)

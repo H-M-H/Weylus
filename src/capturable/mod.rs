@@ -1,4 +1,3 @@
-pub mod autopilot;
 use std::boxed::Box;
 use std::error::Error;
 use tracing::warn;
@@ -8,11 +7,15 @@ pub mod core_graphics;
 #[cfg(target_os = "linux")]
 pub mod pipewire;
 #[cfg(target_os = "linux")]
-pub mod pipewire_dbus;
+pub mod remote_desktop_dbus;
 pub mod testsrc;
+
+#[cfg(target_os = "windows")]
+pub mod captrs_capture;
+#[cfg(target_os = "windows")]
+pub mod win_ctx;
 #[cfg(target_os = "linux")]
 pub mod x11;
-
 pub trait Recorder {
     fn capture(&mut self) -> Result<crate::video::PixelProvider, Box<dyn Error>>;
 }
@@ -29,14 +32,20 @@ where
         Box::new(self.clone())
     }
 }
+/// Relative: x, y, width, height of the Capturable as floats relative to the absolute size of the
+/// screen. For example x=0.5, y=0.0, width=0.5, height=1.0 means the right half of the screen.
+/// VirtualScreen: offset_x, offset_y, width, height for a capturable using a virtual screen. (Windows)
+pub enum Geometry {
+    Relative(f64, f64, f64, f64),
+    VirtualScreen(i32, i32, u32, u32, i32, i32),
+}
 
 pub trait Capturable: Send + BoxCloneCapturable {
     /// Name of the Capturable, for example the window title, if it is a window.
     fn name(&self) -> String;
 
-    /// Return x, y, width, height of the Capturable as floats relative to the absolute size of the
-    /// screen. For example x=0.5, y=0.0, width=0.5, height=1.0 means the right half of the screen.
-    fn geometry_relative(&self) -> Result<(f64, f64, f64, f64), Box<dyn Error>>;
+    /// Return Geometry of the Capturable.
+    fn geometry(&self) -> Result<Geometry, Box<dyn Error>>;
 
     /// Callback that is called right before input is simulated.
     /// Useful to focus the window on input.
@@ -112,8 +121,21 @@ pub fn get_capturables(
         }
     }
 
-    use crate::capturable::autopilot::AutoPilotCapturable;
-    capturables.push(Box::new(AutoPilotCapturable::new()));
+    #[cfg(target_os = "windows")]
+    {
+        use crate::capturable::captrs_capture::CaptrsCapturable;
+        use crate::capturable::win_ctx::WinCtx;
+        let winctx = WinCtx::new();
+        for (i, o) in winctx.get_outputs().iter().enumerate() {
+            let captr = CaptrsCapturable::new(
+                i as u8,
+                String::from_utf16_lossy(o.DeviceName.as_ref()),
+                o.DesktopCoordinates,
+                winctx.get_union_rect().clone(),
+            );
+            capturables.push(Box::new(captr));
+        }
+    }
 
     if crate::log::get_log_level() >= tracing::Level::DEBUG {
         for (width, height) in [

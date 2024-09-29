@@ -3,6 +3,12 @@ import { estimateCoord, resetCoordEstimator } from "precise-client-coord";
 
 window.addEventListener("resize", resetCoordEstimator);
 
+declare global {
+    interface Window {
+        ManagedMediaSource: any;
+    }
+}
+
 enum LogLevel {
     ERROR = 0,
     WARN,
@@ -25,7 +31,7 @@ let webSocket: WebSocket;
 export const getWebSocket = () => webSocket;
 export const sendWsMessage = (msg: object) => webSocket.send(JSON.stringify(msg));
 
-function run(access_code: string, websocket_port: number, level: string) {
+function run(level: string) {
     window.onload = () => {
         log_pre = document.getElementById("log") as HTMLPreElement;
         log_pre.textContent = "";
@@ -48,7 +54,7 @@ function run(access_code: string, websocket_port: number, level: string) {
             }
             return false;
         }, true)
-        init(access_code, websocket_port)
+        init()
     };
 }
 
@@ -62,12 +68,12 @@ function log(level: LogLevel, msg: string) {
     log_pre.textContent += LogLevel[level] + ": " + msg + "\n";
 }
 
-function frame_update_scale(x: number) {
-    return Math.pow(x / 100, 3);
+function frame_rate_scale(x: number) {
+    return Math.pow(x / 100, 1.5);
 }
 
-function frame_update_scale_inv(x: number) {
-    return 100 * Math.pow(x, 1 / 3);
+function frame_rate_scale_inv(x: number) {
+    return 100 * Math.pow(x, 2 / 3);
 }
 
 
@@ -89,28 +95,11 @@ function fresh_canvas() {
     return canvas;
 }
 
-function toggle_energysaving(energysaving: boolean) {
-    const canvas = fresh_canvas();
-
-    if (!energysaving) {
-        painter = new Painter(canvas);
-    }
-
-    if (settings) {
-        if (energysaving) {
-            settings.checks.get("enable_video").checked = false;
-            settings.checks.get("enable_video").disabled = true;
-            settings.checks.get("enable_video").dispatchEvent(new Event("change"));
-        } else
-            settings.checks.get("enable_video").disabled = false;
-    }
-}
-
 class Settings {
     checks: Map<string, HTMLInputElement>;
     capturable_select: HTMLSelectElement;
-    frame_update_limit_input: HTMLInputElement;
-    frame_update_limit_output: HTMLOutputElement;
+    frame_rate_input: HTMLInputElement;
+    frame_rate_output: HTMLOutputElement;
     scale_video_input: HTMLInputElement;
     scale_video_output: HTMLOutputElement;
     range_min_pressure: HTMLInputElement;
@@ -122,16 +111,16 @@ class Settings {
     constructor() {
         this.checks = new Map<string, HTMLInputElement>();
         this.capturable_select = document.getElementById("window") as HTMLSelectElement;
-        this.frame_update_limit_input = document.getElementById("frame_update_limit") as HTMLInputElement;
-        this.frame_update_limit_input.min = frame_update_scale_inv(1).toString();
-        this.frame_update_limit_input.max = frame_update_scale_inv(1000).toString();
-        this.frame_update_limit_output = this.frame_update_limit_input.nextElementSibling as HTMLOutputElement;
+        this.frame_rate_input = document.getElementById("frame_rate") as HTMLInputElement;
+        this.frame_rate_input.min = frame_rate_scale_inv(0).toString();
+        this.frame_rate_input.max = frame_rate_scale_inv(120).toString();
+        this.frame_rate_output = this.frame_rate_input.nextElementSibling as HTMLOutputElement;
         this.scale_video_input = document.getElementById("scale_video") as HTMLInputElement;
         this.scale_video_output = this.scale_video_input.nextElementSibling as HTMLOutputElement;
         this.range_min_pressure = document.getElementById("min_pressure") as HTMLInputElement;
         this.client_name_input = document.getElementById("client_name") as HTMLInputElement;
-        this.frame_update_limit_input.oninput = (e) => {
-            this.frame_update_limit_output.value = Math.round(frame_update_scale(this.frame_update_limit_input.valueAsNumber)).toString();
+        this.frame_rate_input.oninput = (e) => {
+            this.frame_rate_output.value = Math.round(frame_rate_scale(this.frame_rate_input.valueAsNumber)).toString();
         }
         this.scale_video_input.oninput = (e) => {
             let [w, h] = calc_max_video_resolution(this.scale_video_input.valueAsNumber)
@@ -178,9 +167,15 @@ class Settings {
         };
 
         this.checks.get("enable_video").onchange = (e) => {
-            document.getElementById("video").classList.toggle("vanish", !(e.target as HTMLInputElement).checked);
-            document.getElementById("canvas").classList.toggle("vanish", (e.target as HTMLInputElement).checked);
+            let enabled = (e.target as HTMLInputElement).checked;
+            document.getElementById("video").classList.toggle("vanish", !enabled);
+            document.getElementById("canvas").classList.toggle("vanish", enabled);
             this.save_settings();
+            if (enabled) {
+                webSocket.send('"ResumeVideo"');
+            } else {
+                webSocket.send('"PauseVideo"');
+            }
         }
 
         let upd_pointer = () => {
@@ -192,10 +187,10 @@ class Settings {
 
         this.checks.get("energysaving").onchange = (e) => {
             this.save_settings();
-            toggle_energysaving((e.target as HTMLInputElement).checked);
+            this.toggle_energysaving((e.target as HTMLInputElement).checked);
         };
 
-        this.frame_update_limit_input.onchange = () => this.save_settings();
+        this.frame_rate_input.onchange = () => this.save_settings();
         this.range_min_pressure.onchange = () => this.save_settings();
 
         // server
@@ -204,6 +199,7 @@ class Settings {
         this.checks.get("capture_cursor").onchange = upd_server_config;
         this.scale_video_input.onchange = upd_server_config;
         this.client_name_input.onchange = upd_server_config;
+        this.frame_rate_input.onchange = upd_server_config;
 
         document.getElementById("refresh").onclick = () => webSocket.send('"GetCapturableList"');
         this.capturable_select.onchange = () => this.send_server_config();
@@ -219,6 +215,7 @@ class Settings {
         let [w, h] = calc_max_video_resolution(this.scale_video_input.valueAsNumber);
         config["max_width"] = w;
         config["max_height"] = h;
+        config["frame_rate"] = frame_rate_scale(this.frame_rate_input.valueAsNumber);
         if (this.client_name_input.value)
             config["client_name"] = this.client_name_input.value;
         webSocket.send(JSON.stringify({ "Config": config }));
@@ -228,7 +225,7 @@ class Settings {
         let settings = Object(null);
         for (const [key, elem] of this.checks.entries())
             settings[key] = elem.checked;
-        settings["frame_update_limit"] = frame_update_scale(this.frame_update_limit_input.valueAsNumber).toString();
+        settings["frame_rate"] = frame_rate_scale(this.frame_rate_input.valueAsNumber).toString();
         settings["scale_video"] = this.scale_video_input.value;
         settings["min_pressure"] = this.range_min_pressure.value;
         settings["client_name"] = this.client_name_input.value;
@@ -238,8 +235,8 @@ class Settings {
     load_settings() {
         let settings_string = localStorage.getItem("settings");
         if (settings_string === null) {
-            this.frame_update_limit_input.value = frame_update_scale_inv(33).toString();
-            this.frame_update_limit_output.value = (33).toString();
+            this.frame_rate_input.value = frame_rate_scale_inv(30).toString();
+            this.frame_rate_output.value = (30).toString();
             let [w, h] = calc_max_video_resolution(this.scale_video_input.valueAsNumber)
             this.scale_video_output.value = w + "x" + h;
             return;
@@ -250,12 +247,12 @@ class Settings {
                 if (typeof settings[key] === "boolean")
                     elem.checked = settings[key];
             }
-            let upd_limit = settings["frame_update_limit"];
+            let upd_limit = settings["frame_rate"];
             if (upd_limit)
-                this.frame_update_limit_input.value = frame_update_scale_inv(upd_limit).toString();
+                this.frame_rate_input.value = frame_rate_scale_inv(upd_limit).toString();
             else
-                this.frame_update_limit_input.value = frame_update_scale_inv(33).toString();
-            this.frame_update_limit_output.value = Math.round(frame_update_scale(this.frame_update_limit_input.valueAsNumber)).toString();
+                this.frame_rate_input.value = frame_rate_scale_inv(30).toString();
+            this.frame_rate_output.value = Math.round(frame_rate_scale(this.frame_rate_input.valueAsNumber)).toString();
 
             let scale_video = settings["scale_video"];
             if (scale_video)
@@ -279,7 +276,7 @@ class Settings {
                 document.getElementById("canvas").classList.remove("vanish");
             }
 
-            toggle_energysaving(!!this.checks.get("energysaving").checked);
+            this.toggle_energysaving(!!this.checks.get("energysaving").checked);
 
             if (!this.checks.get("enable_virtual_keys").checked) {
                 document.getElementById("vk-container").classList.add("hidden");
@@ -306,10 +303,6 @@ class Settings {
         return false;
     }
 
-    frame_update_limit() {
-        return frame_update_scale(this.frame_update_limit_input.valueAsNumber)
-    }
-
     toggle() {
         this.settings.classList.toggle("hide");
         this.visible = !this.visible;
@@ -319,7 +312,7 @@ class Settings {
         let current_selection = undefined;
         if (this.capturable_select.selectedOptions[0])
             current_selection = this.capturable_select.selectedOptions[0].textContent;
-        let new_index;
+        let new_index: number;
         this.capturable_select.innerText = "";
         window_names.forEach((name, i) => {
             let option = document.createElement("option");
@@ -336,7 +329,24 @@ class Settings {
             this.capturable_select.value = "";
     }
 
+    toggle_energysaving(energysaving: boolean) {
+        const canvas = fresh_canvas();
 
+        if (!energysaving) {
+            painter = new Painter(canvas);
+        }
+
+        if (energysaving) {
+            this.checks.get("enable_video").checked = false;
+            this.checks.get("enable_video").disabled = true;
+            this.checks.get("enable_video").dispatchEvent(new Event("change"));
+        } else
+            this.checks.get("enable_video").disabled = false;
+    }
+
+    video_enabled(): boolean {
+        return this.checks.get("enable_video").checked;
+    }
 }
 
 let settings: Settings;
@@ -686,19 +696,37 @@ export class KEvent {
 
 class KeyboardHandler {
     constructor() {
-        let m = document.getElementById("main");
+        let d = document;
+        let s = document.getElementById("settings")
 
-        m.onkeydown = (e) => {
+        // Consume all KeyboardEvents, except the settings menu is open.
+        // this avoids making the main/video/canvas element focusable by using
+        // a tabindex which interferes with PointerEvent than can be considered
+        // hovering.
+
+        function settings_hidden() {
+            return s.classList.contains("hide") || s.classList.contains("vanish");
+        }
+
+        d.onkeydown = (e) => {
+            if (!settings_hidden())
+                return true;
             if (e.repeat)
                 return this.onEvent(e, "repeat");
             return this.onEvent(e, "down");
         };
-        m.onkeyup = (e) => { return this.onEvent(e, "up") };
-        m.onkeypress = (e) => {
+        d.onkeyup = (e) => {
+            if (!settings_hidden())
+                return true;
+            return this.onEvent(e, "up");
+        };
+        d.onkeypress = (e) => {
+            if (!settings_hidden())
+                return true;
             e.preventDefault();
             e.stopPropagation();
             return false;
-        }
+        };
     }
 
     onEvent(event: KeyboardEvent, event_type: string) {
@@ -709,27 +737,13 @@ class KeyboardHandler {
     }
 }
 
-function frame_timer() {
-    // Closing or closed, so no more frames
-    if (webSocket.readyState > webSocket.OPEN)
-        return;
-
+function frame_rate_stats() {
     let t = performance.now();
-    if (t - last_fps_calc > 1500) {
-        let fps = Math.round(frame_count / (t - last_fps_calc) * 10000) / 10;
-        fps_out.value = fps.toString();
-        frame_count = 0;
-        last_fps_calc = t;
-    }
-
-    if (document.hidden) {
-        requestAnimationFrame(() => frame_timer());
-        return;
-    }
-
-    if (webSocket.readyState === webSocket.OPEN && check_video.checked)
-        webSocket.send('"TryGetFrame"');
-    setTimeout(() => frame_timer(), settings.frame_update_limit());
+    let fps = Math.round(frame_count / (t - last_fps_calc) * 10000) / 10;
+    fps_out.value = fps.toString();
+    frame_count = 0;
+    last_fps_calc = t;
+    setTimeout(() => frame_rate_stats(), 1500);
 }
 
 function handle_messages(
@@ -773,12 +787,13 @@ function handle_messages(
             let msg = JSON.parse(event.data);
             if (typeof msg == "string") {
                 if (msg == "NewVideo") {
-                    mediaSource = new MediaSource();
+                    let MS: typeof MediaSource = window.ManagedMediaSource ? window.ManagedMediaSource : window.MediaSource;
+                    mediaSource = new MS();
                     sourceBuffer = null;
                     video.src = URL.createObjectURL(mediaSource);
                     mediaSource.addEventListener("sourceopen", (_) => {
                         let mimeType = 'video/mp4; codecs="avc1.4D403D"';
-                        if (!MediaSource.isTypeSupported(mimeType))
+                        if (!MS.isTypeSupported(mimeType))
                             mimeType = "video/mp4";
                         sourceBuffer = mediaSource.addSourceBuffer(mimeType);
                         sourceBuffer.addEventListener("updateend", upd_buf);
@@ -828,18 +843,29 @@ function handle_messages(
 }
 
 function check_apis() {
-    let apis = {
-        "MediaSource": "This browser doesn't support MSE required to playback video stream, try upgrading!",
-        "PointerEvent": "This browser doesn't support PointerEvents, input will not work, try upgrading!",
-    };
-    for (let n in apis) {
-        if (!(n in window)) {
-            log(LogLevel.ERROR, apis[n]);
+    let apis = [
+        {
+            attrs: ["MediaSource", "ManagedMediaSource"],
+            msg: "This browser doesn't support MSE/MMS required to playback video stream, try upgrading!"
+        },
+        {
+            attrs: ["PointerEvent"],
+            msg: "This browser doesn't support PointerEvents, input will not work, try upgrading!"
+        },
+    ];
+
+    outer:
+    for (let d of apis) {
+        for (let attr of d.attrs) {
+            if (attr in window) {
+                continue outer;
+            }
         }
+        log(LogLevel.ERROR, d.msg);
     }
 }
 
-function init(access_code: string, websocket_port: number) {
+function init() {
     check_apis();
 
     const disconnectedNotice = document.getElementById("disconnected-notice") as HTMLDivElement;
@@ -862,21 +888,34 @@ function init(access_code: string, websocket_port: number) {
         disconnectedNotice.classList.add("hidden");
 
         const protocol = document.location.protocol == "https:" ? "wss://" : "ws://";
-        const ws = webSocket = new WebSocket(protocol + window.location.hostname + ":" + websocket_port);
+        const ws = webSocket = new WebSocket(
+            protocol + window.location.hostname + ":" +
+            window.location.port + "/ws" + window.location.search
+        );
 
         ws.binaryType = "arraybuffer";
         ws.onopen = function () {
             if (webSocket !== ws) return;
-            if (access_code) ws.send(access_code);
             is_connected = true;
 
             ws.send('"GetCapturableList"');
+            if (!settings.video_enabled()) webSocket.send('"PauseVideo"');
+
             ws.send('"RequestVirtualKeysProfiles"');
             settings.send_server_config();
+
+            document.onvisibilitychange = () => {
+                if (document.hidden) {
+                    webSocket.send('"PauseVideo"');
+                } else if (settings.video_enabled()) {
+                    webSocket.send('"ResumeVideo"');
+                }
+            };
 
             disconnectedNotice.classList.add("hidden");
             connectingNotice.classList.add("hidden");
         }
+        frame_rate_stats();
 
         let disconnected = false;
         let handle_disconnect = (msg: string) => {
@@ -903,7 +942,6 @@ function init(access_code: string, websocket_port: number) {
         let config_ok_received = false;
         handle_messages(webSocket, video, () => {
             if (!config_ok_received) {
-                frame_timer();
                 config_ok_received = true;
             }
         },

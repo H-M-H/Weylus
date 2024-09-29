@@ -1,90 +1,153 @@
-use std::fs;
 use std::net::IpAddr;
+use std::{fs, path::PathBuf};
 
+use clap::Parser;
 use serde::{Deserialize, Serialize};
-use structopt::StructOpt;
-use tracing::warn;
+use tracing::{debug, warn};
 
-#[derive(Serialize, Deserialize, StructOpt, Debug, Clone)]
-#[structopt(name = "weylus")]
+#[derive(clap::ValueEnum, Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ThemeType {
+    Aero,
+    AquaClassic,
+    Blue,
+    Classic,
+    Dark,
+    Greybird,
+    HighContrast,
+    Metro,
+}
+
+const THEME_LIST: [ThemeType; 8] = [
+    ThemeType::Aero,
+    ThemeType::AquaClassic,
+    ThemeType::Blue,
+    ThemeType::Classic,
+    ThemeType::Dark,
+    ThemeType::Greybird,
+    ThemeType::HighContrast,
+    ThemeType::Metro,
+];
+
+impl Default for ThemeType {
+    fn default() -> Self {
+        Self::Greybird
+    }
+}
+
+impl ThemeType {
+    pub fn apply(&self) {
+        let theme = match self {
+            ThemeType::Classic => fltk_theme::ThemeType::Classic,
+            ThemeType::Aero => fltk_theme::ThemeType::Aero,
+            ThemeType::Metro => fltk_theme::ThemeType::Metro,
+            ThemeType::AquaClassic => fltk_theme::ThemeType::AquaClassic,
+            ThemeType::Greybird => fltk_theme::ThemeType::Greybird,
+            ThemeType::Blue => fltk_theme::ThemeType::Blue,
+            ThemeType::Dark => fltk_theme::ThemeType::Dark,
+            ThemeType::HighContrast => fltk_theme::ThemeType::HighContrast,
+        };
+        let theme = fltk_theme::WidgetTheme::new(theme);
+        theme.apply();
+    }
+
+    pub fn name(&self) -> String {
+        format!("{self:?}")
+    }
+
+    pub fn to_index(&self) -> i32 {
+        THEME_LIST.iter().position(|th| th == self).unwrap() as i32
+    }
+
+    pub fn from_index(i: i32) -> Self {
+        let i = i.clamp(0, THEME_LIST.len() as i32 - 1) as usize;
+        THEME_LIST[i]
+    }
+
+    pub fn themes() -> &'static [ThemeType] {
+        &THEME_LIST
+    }
+}
+
+#[derive(Serialize, Deserialize, Parser, Debug, Clone)]
+#[command(version, about, long_about = None)]
 pub struct Config {
-    #[structopt(long, help = "Access code")]
+    #[arg(long, help = "Access code")]
     pub access_code: Option<String>,
-    #[structopt(long, default_value = "0.0.0.0", help = "Bind address")]
+    #[arg(long, default_value = "0.0.0.0", help = "Bind address")]
     pub bind_address: IpAddr,
-    #[structopt(long, default_value = "1701", help = "Web port")]
+    #[arg(long, default_value = "1701", help = "Web port")]
     pub web_port: u16,
-    #[structopt(long, default_value = "9001", help = "Websocket port")]
-    pub websocket_port: u16,
     #[cfg(target_os = "linux")]
-    #[structopt(
+    #[arg(
         long,
         help = "Try to use hardware acceleration through the Video Acceleration API."
     )]
     pub try_vaapi: bool,
     #[cfg(any(target_os = "linux", target_os = "windows"))]
-    #[structopt(long, help = "Try to use Nvidia's NVENC to encode the video via GPU.")]
+    #[arg(long, help = "Try to use Nvidia's NVENC to encode the video via GPU.")]
     #[serde(default)]
     pub try_nvenc: bool,
     #[cfg(target_os = "macos")]
-    #[structopt(
+    #[arg(
         long,
         help = "Try to use hardware acceleration through the VideoToolbox API."
     )]
     #[serde(default)]
     pub try_videotoolbox: bool,
     #[cfg(target_os = "windows")]
-    #[structopt(
+    #[arg(
         long,
         help = "Try to use hardware acceleration through the MediaFoundation API."
     )]
     #[serde(default)]
     pub try_mediafoundation: bool,
-    #[structopt(long, help = "Start Weylus server immediately on program start.")]
+    #[arg(long, help = "Start Weylus server immediately on program start.")]
     #[serde(default)]
     pub auto_start: bool,
-    #[structopt(long, help = "Run Weylus without gui and start immediately.")]
+    #[arg(long, help = "Gui Theme")]
+    pub gui_theme: Option<ThemeType>,
+    #[arg(long, help = "Run Weylus without gui and start immediately.")]
     #[serde(default)]
     pub no_gui: bool,
     #[cfg(target_os = "linux")]
-    #[structopt(long, help = "Wayland/PipeWire Support.")]
+    #[arg(long, help = "Wayland/PipeWire Support.")]
     #[serde(default)]
     pub wayland_support: bool,
 
-    #[structopt(long, help = "Print template of index.html served by Weylus.")]
+    #[arg(long, help = "Print template of index.html served by Weylus.")]
     #[serde(skip)]
     pub print_index_html: bool,
-    #[structopt(long, help = "Print access.html served by Weylus.")]
+    #[arg(long, help = "Print access.html served by Weylus.")]
     #[serde(skip)]
     pub print_access_html: bool,
-    #[structopt(long, help = "Print style.css served by Weylus.")]
+    #[arg(long, help = "Print style.css served by Weylus.")]
     #[serde(skip)]
     pub print_style_css: bool,
-    #[structopt(long, help = "Print lib.js served by Weylus.")]
+    #[arg(long, help = "Print lib.js served by Weylus.")]
     #[serde(skip)]
     pub print_lib_js: bool,
 
     pub virtual_keys_profiles: Option<String>,
 
-    #[structopt(
+    #[arg(
         long,
         help = "Use custom template of index.html to be served by Weylus."
     )]
     #[serde(skip)]
-    pub custom_index_html: Option<String>,
-    #[structopt(long, help = "Use custom access.html to be served by Weylus.")]
+    pub custom_index_html: Option<PathBuf>,
+    #[arg(long, help = "Use custom access.html to be served by Weylus.")]
     #[serde(skip)]
-    pub custom_access_html: Option<String>,
-    #[structopt(long, help = "Use custom style.css to be served by Weylus.")]
+    pub custom_access_html: Option<PathBuf>,
+    #[arg(long, help = "Use custom style.css to be served by Weylus.")]
     #[serde(skip)]
-    pub custom_style_css: Option<String>,
-    #[structopt(long, help = "Use custom lib.js to be served by Weylus.")]
+    pub custom_style_css: Option<PathBuf>,
+    #[arg(long, help = "Use custom lib.js to be served by Weylus.")]
     #[serde(skip)]
-    pub custom_lib_js: Option<String>,
+    pub custom_lib_js: Option<PathBuf>,
 
-    #[structopt(long, help = "Print shell completions for given shell.")]
+    #[arg(long, help = "Print shell completions for given shell.")]
     #[serde(skip)]
-    pub completions: Option<structopt::clap::Shell>,
+    pub completions: Option<clap_complete::Shell>,
 }
 
 pub fn read_config() -> Option<Config> {
@@ -100,7 +163,12 @@ pub fn read_config() -> Option<Config> {
                 }
             },
             Err(err) => {
-                warn!("Failed to read configuration file: {}", err);
+                match err.kind() {
+                    std::io::ErrorKind::NotFound => {
+                        debug!("Failed to read configuration file: {}", err)
+                    }
+                    _ => warn!("Failed to read configuration file: {}", err),
+                }
                 None
             }
         }
@@ -134,14 +202,13 @@ pub fn write_config(conf: &Config) {
 }
 
 pub fn get_config() -> Config {
-    // TODO: once https://github.com/clap-rs/clap/issues/748 is resolved use
-    // the configfile to provide default values that override hardcoded defaults
-
-    // read config from file if no args are specified
-    if std::env::args().len() == 1 {
-        // (ab)use parsing an empty args array to provide a default config
-        read_config().unwrap_or_else(crate::config::Config::from_args)
+    let args = std::env::args();
+    if let Some(mut config) = read_config() {
+        if args.len() > 1 {
+            config.update_from(args);
+        }
+        config
     } else {
-        crate::config::Config::from_args()
+        Config::parse()
     }
 }
