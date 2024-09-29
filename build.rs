@@ -26,6 +26,64 @@ fn build_ffmpeg(dist_dir: &Path) {
     }
 }
 
+fn build_www() {
+    let www_dir = Path::new("www");
+
+    #[cfg(not(target_os = "windows"))]
+    let shell = "bash";
+
+    #[cfg(not(target_os = "windows"))]
+    let shell_flag = "-c";
+
+    #[cfg(target_os = "windows")]
+    let shell = "cmd";
+
+    #[cfg(target_os = "windows")]
+    let shell_flag = "/c";
+
+
+    // try `pnpm` first, then `npm`
+    if !www_dir.join("node_modules").exists() {
+        let pnpm_install_success = match Command::new(shell)
+            .args([shell_flag, "pnpm install"])
+            .current_dir(www_dir)
+            .status()
+        {
+            Ok(e) => e.success(),
+            Err(_) => false,
+        };
+
+        if !pnpm_install_success {
+            let npm_install_result = Command::new(shell)
+                .args([shell_flag, "npm install"])
+                .current_dir(www_dir)
+                .status()
+                .expect("Failed to run npm or pnpm!");
+
+            if !npm_install_result.success() {
+                panic!(
+                    "Failed to install npm dependencies! npm exited with code {}",
+                    npm_install_result.code().unwrap_or(-1)
+                );
+            }
+        }
+    }
+
+    let build_result = Command::new(shell)
+        .args([shell_flag, "npm run build"])
+        .current_dir(www_dir)
+        .status()
+        .expect("Failed to build www!");
+
+    if !build_result.success() {
+        panic!(
+            "Failed to build www! npm exited with code {}",
+            build_result.code().unwrap_or(-1)
+        );
+    }
+}
+
+
 fn main() {
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
 
@@ -38,39 +96,8 @@ fn main() {
         build_ffmpeg(&dist_dir);
     }
 
-    println!("cargo:rerun-if-changed=ts/lib.ts");
-
-    #[cfg(not(target_os = "windows"))]
-    let mut tsc_command = Command::new("tsc");
-
-    #[cfg(target_os = "windows")]
-    let mut tsc_command = Command::new("bash");
-    #[cfg(target_os = "windows")]
-    tsc_command.args(&["-c", "tsc"]);
-
-    let js_needs_update = || -> Result<bool, Box<dyn std::error::Error>> {
-        Ok(Path::new("ts/lib.ts").metadata()?.modified()?
-            > Path::new("www/static/lib.js").metadata()?.modified()?)
-    }()
-    .unwrap_or(true);
-
-    if js_needs_update {
-        match tsc_command.status() {
-            Err(err) => {
-                println!("cargo:warning=Failed to call tsc: {}", err);
-                std::process::exit(1);
-            }
-            Ok(status) => {
-                if !status.success() {
-                    match status.code() {
-                        Some(code) => println!("cargo:warning=tsc failed with exitcode: {}", code),
-                        None => println!("cargo:warning=tsc terminated by signal."),
-                    };
-                    std::process::exit(2);
-                }
-            }
-        }
-    }
+    println!("cargo:rerun-if-changed=www/src/");
+    build_www();
 
     println!("cargo:rerun-if-changed=lib/encode_video.c");
     let mut cc_video = cc::Build::new();
