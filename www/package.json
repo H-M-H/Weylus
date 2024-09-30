@@ -1,0 +1,33 @@
+{
+  "name": "www",
+  "private": true,
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "run-p -l build:*",
+    "build:ts": "npm run esbuild -- --minify",
+    "build:sass": "npm run sass -- --no-source-map --style=compressed",
+    "watch": "run-p -l watch:*",
+    "watch:ts": "npm run esbuild -- --sourcemap=inline --watch",
+    "watch:sass": "npm run sass -- --style=expanded --watch",
+    "----": "",
+    "esbuild": "esbuild --bundle --outfile=static/lib.js --jsx-factory=h --target=es2019 src/index.ts",
+    "sass": "sass src/style.scss:static/style.css"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "^0.23.0",
+    "npm-run-all": "^4.1.5",
+    "preact": "^10.22.1",
+    "sass": "^1.77.7",
+    "typescript": "^5.5.3"
+  },
+  "dependencies": {
+    "@preact/signals": "^1.3.0",
+    "precise-client-coord": "^1.0.0",
+    "yon-utils": "^0.1.23"
+  }
+}

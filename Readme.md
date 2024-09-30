@@ -260,7 +260,7 @@ Weylus can make use of Nvidias NVENC as well as Microsoft's MediaFoundation for 
 video encoding. Due to widely varying quality it is disabled by default.
 
 ## Building
-To build Weylus you need to install Rust, Typescript, make, git, a C compiler, nasm and bash. `cargo
+To build Weylus you need to install Rust, NodeJS, make, git, a C compiler, nasm and bash. `cargo
 build` builds the project. By default Weylus is build in debug mode, if you want a release build run
 `cargo build --release`. On Linux some additional dependencies are required to build Weylus. On
 Debian or Ubuntu they can be installed via:
@@ -277,10 +277,6 @@ sudo dnf install libXext-devel libXft-devel libXinerama-devel libXcursor-devel l
 libXfixes-devel libXtst-devel libXrandr-devel libXcomposite-devel libXi-devel libXv-devel autoconf libtool \
 pkg-config libdrm-devel pango-devel gstreamer1-devel \
 gstreamer1-plugins-base-devel dbus-devel nasm npm
-```
-After npm is installed, typescript must be installed by:
-```sh
-sudo npm install typescript -g
 ```
 
 Note that building for the first time may take a while as by default ffmpeg needs to be built. On

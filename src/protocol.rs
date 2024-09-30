@@ -19,6 +19,8 @@ pub enum MessageInbound {
     KeyboardEvent(KeyboardEvent),
     GetCapturableList,
     Config(ClientConfiguration),
+    RequestVirtualKeysProfiles,
+    SetVirtualKeysProfiles(String),
     PauseVideo,
     ResumeVideo,
 }
@@ -26,13 +28,14 @@ pub enum MessageInbound {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum MessageOutbound {
     CapturableList(Vec<String>),
+    VirtualKeysProfiles(String),
     NewVideo,
     ConfigOk,
     ConfigError(String),
     Error(String),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum PointerType {
     #[serde(rename = "")]
     Unknown,
@@ -54,6 +57,10 @@ pub enum PointerEventType {
     CANCEL,
     #[serde(rename = "pointermove")]
     MOVE,
+    #[serde(rename = "pointerenter")]
+    ENTER,
+    #[serde(rename = "pointerleave")]
+    LEAVE,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
