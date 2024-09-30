@@ -57,13 +57,23 @@ impl InputDevice for WindowsInput {
             (event.y * height as f64) as i32 + offset_y,
         );
         let mut pointer_flags = match event.event_type {
+            PointerEventType::ENTER => {
+                POINTER_FLAG_INRANGE | POINTER_FLAG_NEW
+            }
             PointerEventType::DOWN => {
                 POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT | POINTER_FLAG_DOWN
             }
-            PointerEventType::MOVE => POINTER_FLAG_INRANGE | POINTER_FLAG_UPDATE,
-            PointerEventType::UP => POINTER_FLAG_UP,
+            PointerEventType::MOVE => {
+                POINTER_FLAG_INRANGE | POINTER_FLAG_UPDATE // POINTER_FLAG_INCONTACT see below "buttons" part
+            }
+            PointerEventType::UP => {
+                POINTER_FLAG_INRANGE | POINTER_FLAG_UP
+            }
             PointerEventType::CANCEL => {
-                POINTER_FLAG_INRANGE | POINTER_FLAG_UPDATE | POINTER_FLAG_CANCELED
+                POINTER_FLAG_CANCELED | POINTER_FLAG_UP
+            }
+            PointerEventType::LEAVE => {
+                POINTER_FLAG_NONE // anything but POINTER_FLAG_INRANGE
             }
         };
         let button_change_type = match event.buttons {
@@ -157,6 +167,10 @@ impl InputDevice for WindowsInput {
                         PointerEventType::UP | PointerEventType::CANCEL => {
                             self.multitouch_map.remove(&event.pointer_id);
                         }
+
+                        PointerEventType::ENTER | PointerEventType::LEAVE => {
+                            // nothing to do with touch
+                        }
                     }
                 }
             }
@@ -198,6 +212,9 @@ impl InputDevice for WindowsInput {
                     },
                     PointerEventType::CANCEL => {
                         dw_flags |= MOUSEEVENTF_LEFTUP;
+                    },
+                    PointerEventType::ENTER | PointerEventType::LEAVE => {
+                        // nothing to do with mouse
                     }
                 }
                 unsafe { mouse_event(dw_flags, 0 as u32, 0 as u32, 0, 0) };

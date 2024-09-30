@@ -623,6 +623,8 @@ class PointerHandler {
         video.onpointerup = (e) => this.onEvent(e, "pointerup");
         video.onpointercancel = (e) => this.onEvent(e, "pointercancel");
         video.onpointermove = (e) => this.onEvent(e, "pointermove");
+        video.onpointerenter = (e) => this.onEvent(e, "pointerenter");
+        video.onpointerleave = (e) => this.onEvent(e, "pointerleave");
 
         let painter: Painter;
         if (!settings.checks.get("energysaving").checked)
@@ -639,6 +641,8 @@ class PointerHandler {
             canvas.onpointercancel = (e) => this.onEvent(e, "pointercancel");
             canvas.onpointermove = (e) => this.onEvent(e, "pointermove");
         }
+        canvas.onpointerenter = (e) => this.onEvent(e, "pointerenter");
+        canvas.onpointerleave = (e) => this.onEvent(e, "pointerleave");
 
         // This is a workaround for the following Safari/WebKit bug:
         // https://bugs.webkit.org/show_bug.cgi?id=217430

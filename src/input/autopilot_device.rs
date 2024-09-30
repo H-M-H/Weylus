@@ -3,20 +3,30 @@ use autopilot::mouse;
 use autopilot::mouse::ScrollDirection;
 use autopilot::screen::size as screen_size;
 
-use tracing::warn;
+use tracing::{debug, warn};
 
 use crate::input::device::{InputDevice, InputDeviceType};
-use crate::protocol::{Button, KeyboardEvent, KeyboardEventType, PointerEvent, WheelEvent};
+use crate::protocol::{
+    Button, KeyboardEvent, KeyboardEventType, PointerEvent, PointerEventType, PointerType,
+    WheelEvent,
+};
 
 use crate::capturable::{Capturable, Geometry};
 
+#[cfg(target_os = "macos")]
+use super::macos_tablet::{MacosPenEventType, macos_send_tablet_event};
+
 pub struct AutoPilotDevice {
+    tablet_down: bool,
     capturable: Box<dyn Capturable>,
 }
 
 impl AutoPilotDevice {
     pub fn new(capturable: Box<dyn Capturable>) -> Self {
-        Self { capturable }
+        Self {
+            tablet_down: false,
+            capturable,
+        }
     }
 }
 
@@ -30,7 +40,7 @@ impl InputDevice for AutoPilotDevice {
     }
 
     fn send_pointer_event(&mut self, event: &PointerEvent) {
-        if !event.is_primary {
+        if !event.is_primary && event.pointer_type != PointerType::Pen {
             return;
         }
         if let Err(err) = self.capturable.before_input() {
@@ -54,12 +64,62 @@ impl InputDevice for AutoPilotDevice {
                 return;
             }
         };
-        if let Err(err) = mouse::move_to(autopilot::geometry::Point::new(
+
+        let point = autopilot::geometry::Point::new(
             (event.x * width_rel + x_rel) * width,
             (event.y * height_rel + y_rel) * height,
-        )) {
+        );
+
+        // MacOS only: send tablet (stylus) events
+        #[cfg(target_os = "macos")]
+        if event.pointer_type == PointerType::Pen {
+            let pe_type = match event.event_type {
+                PointerEventType::DOWN => MacosPenEventType::Down,
+                PointerEventType::UP => MacosPenEventType::Up,
+                PointerEventType::CANCEL => MacosPenEventType::Up,
+                PointerEventType::ENTER => MacosPenEventType::Enter,
+                PointerEventType::LEAVE => MacosPenEventType::Leave,
+                _ => MacosPenEventType::Move,
+            };
+
+            match event.event_type {
+                PointerEventType::DOWN => {
+                    self.tablet_down = true;
+                }
+                PointerEventType::CANCEL | PointerEventType::UP | PointerEventType::LEAVE => {
+                    self.tablet_down = false;
+                }
+                _ => (),
+            }
+
+            match event.event_type {
+                PointerEventType::ENTER => {
+                    debug!("Entering tablet");
+                }
+                PointerEventType::LEAVE => {
+                    debug!("Leaving tablet");
+                }
+                _ => (),
+            }
+
+            let buttons = if self.tablet_down { 1 } else { 0 };
+            if let Err(err) = macos_send_tablet_event(
+                point,
+                pe_type,
+                event.button.bits().into(),
+                buttons,
+                event.pressure,
+            ) {
+                warn!("Could not send pressure: {}", err);
+            }
+
+            return;
+        }
+
+        if let Err(err) = mouse::move_to(point) {
             warn!("Could not move mouse: {}", err);
         }
+
         match event.button {
             Button::PRIMARY => {
                 mouse::toggle(mouse::Button::Left, event.buttons.contains(event.button))
