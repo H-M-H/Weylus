@@ -8,3 +8,6 @@ pub mod uinput_device;
 #[cfg(target_os = "linux")]
 #[allow(dead_code)]
 pub mod uinput_keys;
+
+#[cfg(target_os = "macos")]
+mod macos_tablet;

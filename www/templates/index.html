@@ -15,9 +15,19 @@
 </head>
 
 <body>
-    <main id="main">
+    <main id="main" tabindex="0">
         <video id="video" autoplay muted defaultMuted playsinline disablePictureInPicture></video>
         <canvas id="canvas" class="vanish"></canvas>
+        <div id="pointer-event-receiver"></div>
+        
+        <div id="disconnected-notice" class="hidden">
+            <h2>Connection lost</h2>
+            click screen to retry...
+        </div>
+        
+        <div id="connecting-notice" class="hidden">
+            Connecting...
+        </div>
     </main>
     <div id="settings">
         <div id="handle">⠿</div>

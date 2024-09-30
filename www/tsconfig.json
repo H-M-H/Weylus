@@ -3,10 +3,13 @@
     "target": "es2020",
     "lib": ["es2020", "dom", "es6"],
     "module": "commonjs",
-    "outDir": "www/static",
+    "outDir": "static",
+    "rootDir": "src",
+    "jsx": "react",
+    "jsxFactory": "h",
     "sourceMap": false
   },
   "include": [
-    "ts/**/*.ts"
+    "src/**/*"
   ]
 }
