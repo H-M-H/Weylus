@@ -56,6 +56,11 @@
                 </label>
                 <label>Min pressure to generate: <br><input type="range" id="min_pressure" min="0" max="1" step="0.01"
                         value="0" /></label>
+                <button id="custom_input_areas" {{#if (not enable_custom_input_areas)}}class="hide" {{/if}}>Custom Input
+                    Area</button>
+                <label {{#if (not enable_custom_input_areas)}}class="hide" {{/if}}><input type="checkbox"
+                        id="enable_custom_input_areas" /> <span>Enable Custom Input
+                        Area</span></label>
             </section>
             <section {{#if (not uinput_enabled)}}class="hide" {{/if}}>
                 <label><span>Client Name:</span><br><input type="text" id="client_name" /><br><span>Optional, useful to

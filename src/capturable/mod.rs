@@ -7,6 +7,7 @@ pub mod core_graphics;
 #[cfg(target_os = "linux")]
 pub mod pipewire;
 #[cfg(target_os = "linux")]
+#[allow(dead_code)]
 pub mod remote_desktop_dbus;
 pub mod testsrc;
 
@@ -37,6 +38,7 @@ where
 /// VirtualScreen: offset_x, offset_y, width, height for a capturable using a virtual screen. (Windows)
 pub enum Geometry {
     Relative(f64, f64, f64, f64),
+    #[cfg(target_os = "windows")]
     VirtualScreen(i32, i32, u32, u32, i32, i32),
 }
 

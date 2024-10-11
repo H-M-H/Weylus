@@ -39,6 +39,7 @@ impl InputDevice for AutoPilotDevice {
         }
         let (x_rel, y_rel, width_rel, height_rel) = match self.capturable.geometry().unwrap() {
             Geometry::Relative(x, y, width, height) => (x, y, width, height),
+            #[cfg(target_os = "windows")]
             _ => {
                 warn!("Failed to get window geometry, sending no input");
                 return;

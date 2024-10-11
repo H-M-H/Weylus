@@ -61,11 +61,16 @@ impl Weylus {
                 custom_access_html: config.custom_access_html.clone(),
                 custom_style_css: config.custom_style_css.clone(),
                 custom_lib_js: config.custom_lib_js.clone(),
+                #[cfg(target_os = "linux")]
+                enable_custom_input_areas: config.wayland_support,
+                #[cfg(not(target_os = "linux"))]
+                enable_custom_input_areas: false,
             },
             WeylusClientConfig {
                 encoder_options,
                 #[cfg(target_os = "linux")]
                 wayland_support: config.wayland_support,
+                no_gui: config.no_gui,
             },
         );
 

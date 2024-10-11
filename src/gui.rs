@@ -2,11 +2,14 @@ use std::cmp::min;
 use std::io::Cursor;
 use std::iter::Iterator;
 use std::net::{IpAddr, SocketAddr};
+use std::sync::atomic::AtomicBool;
 
+use fltk::app;
+use fltk::enums::{FrameType, LabelType};
 use fltk::image::PngImage;
 use fltk::menu::Choice;
 use std::sync::{mpsc, Arc, Mutex};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use fltk::{
     app::{awake_callback, App},
@@ -23,6 +26,7 @@ use fltk::{
 use pnet_datalink as datalink;
 
 use crate::config::{write_config, Config, ThemeType};
+use crate::protocol::{CustomInputAreas, Rect};
 use crate::web::Web2UiMessage::UInputInaccessible;
 
 pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
@@ -37,6 +41,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         .center_screen()
         .with_label(&format!("Weylus - {}", env!("CARGO_PKG_VERSION")));
     wind.set_xclass("weylus");
+    wind.set_callback(move |_win| app.quit());
 
     let mut input_access_code = Input::default()
         .with_pos(130, 30)
@@ -377,4 +382,402 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     // TODO: Remove when https://github.com/fltk-rs/fltk-rs/issues/1480 is fixed
     // this is required to drop the callback and do a graceful shutdown of the web server
     but_toggle.set_callback(|_| ());
+}
+
+const BORDER: i32 = 30;
+static WINCTX: Mutex<Option<InputAreaWindowContext>> = Mutex::new(None);
+
+struct InputAreaWindowContext {
+    win: Window,
+    choice_mouse: Choice,
+    choice_touch: Choice,
+    choice_pen: Choice,
+    workspaces: Vec<Rect>,
+}
+
+pub fn get_input_area(
+    no_gui: bool,
+    output_sender: std::sync::mpsc::Sender<crate::protocol::CustomInputAreas>,
+) {
+    // If no gui is running there is no event loop and windows can not be created.
+    // That's why we initialize the fltk app here one the first call.
+    if no_gui {
+        static GUI_INITIALIZED: AtomicBool = AtomicBool::new(false);
+
+        if !GUI_INITIALIZED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+            std::thread::spawn(move || {
+                let _app = App::default().with_scheme(fltk::app::AppScheme::Gtk);
+                let mut winctx = create_custom_input_area_window();
+                custom_input_area_window_handle_events(&mut winctx.win, output_sender.clone());
+                show_overlay_window(&mut winctx);
+                WINCTX.lock().unwrap().replace(winctx);
+                loop {
+                    // calling wait_for ensures that the fltk event loop keeps running even if
+                    // there is no window shown
+                    if let Err(err) = app::wait_for(1.0) {
+                        warn!("Error waiting for fltk events: {err}.");
+                    }
+                }
+            });
+        } else {
+            fltk::app::awake_callback(move || {
+                let mut winctx = WINCTX.lock().unwrap();
+                let winctx = winctx.as_mut().unwrap();
+                custom_input_area_window_handle_events(&mut winctx.win, output_sender.clone());
+                show_overlay_window(winctx);
+            });
+        }
+    } else {
+        fltk::app::awake_callback(move || {
+            let mut winctx = WINCTX.lock().unwrap();
+            if winctx.is_none() {
+                winctx.replace(create_custom_input_area_window());
+            }
+
+            let winctx = winctx.as_mut().unwrap();
+            custom_input_area_window_handle_events(&mut winctx.win, output_sender.clone());
+            show_overlay_window(winctx);
+        });
+    }
+}
+
+fn create_custom_input_area_window() -> InputAreaWindowContext {
+    let mut win = Window::default().with_size(600, 600).center_screen();
+    win.make_resizable(true);
+    win.set_border(false);
+    win.set_frame(FrameType::FlatBox);
+    win.set_color(fltk::enums::Color::from_rgb(240, 240, 240));
+    let mut frame = Frame::default()
+        .with_size(win.w() - 2 * BORDER, win.h() - 2 * BORDER)
+        .center_of_parent()
+        .with_label(
+            "Press Enter to submit\ncurrent selection as\ncustom input area,\nEscape to abort.",
+        );
+    frame.set_label_type(LabelType::Normal);
+    frame.set_label_size(20);
+    frame.set_color(fltk::enums::Color::Black);
+    frame.set_frame(FrameType::BorderFrame);
+    frame.set_label_font(fltk::enums::Font::HelveticaBold);
+    let width = 200;
+    let height = 30;
+    let padding = 10;
+    let tool_tip = "Some systems may have the input device mapped to a specific screen, this screen has to be selected here. Otherwise input mapping will be wrong. Selecting None disables any mapping.";
+    let mut choice_mouse = Choice::default()
+        .with_size(width, height)
+        .with_pos(padding, 4 * padding)
+        .center_x(&frame)
+        .with_id("choice_mouse")
+        .with_label("Map Mouse from:");
+    choice_mouse.set_tooltip(tool_tip);
+    let mut choice_touch = Choice::default()
+        .with_size(width, height)
+        .below_of(&choice_mouse, padding)
+        .with_id("choice_touch")
+        .with_label("Map Touch from:");
+    choice_touch.set_tooltip(tool_tip);
+    let mut choice_pen = Choice::default()
+        .with_size(width, height)
+        .below_of(&choice_touch, padding)
+        .with_id("choice_pen")
+        .with_label("Map Pen from:");
+    choice_pen.set_tooltip(tool_tip);
+
+    frame.handle(|frame, event| match event {
+        fltk::enums::Event::Push => {
+            if app::event_clicks() {
+                if let Some(mut win) = frame.window() {
+                    win.fullscreen(!win.fullscreen_active());
+                }
+                true
+            } else {
+                false
+            }
+        }
+        _ => false,
+    });
+    win.resize_callback(move |_win, _x, _y, w, h| {
+        frame.resize(BORDER, BORDER, w - 2 * BORDER, h - 2 * BORDER)
+    });
+    win.end();
+    InputAreaWindowContext {
+        win,
+        choice_mouse,
+        choice_touch,
+        choice_pen,
+        workspaces: Vec::new(),
+    }
+}
+
+fn custom_input_area_window_handle_events(
+    win: &mut Window,
+    sender: std::sync::mpsc::Sender<crate::protocol::CustomInputAreas>,
+) {
+    #[derive(Debug)]
+    enum MouseFlags {
+        All,
+        Edge(bool, bool),
+        Corner(bool, bool),
+    }
+    fn get_mouse_flags(win: &Window, x: i32, y: i32) -> MouseFlags {
+        let dx0 = (win.x() - x).abs();
+        let dy0 = (win.y() - y).abs();
+        let dx1 = (win.x() + win.w() - x).abs();
+        let dy1 = (win.y() + win.h() - y).abs();
+        let dx = min(dx0, dx1);
+        let dy = min(dy0, dy1);
+        let d = min(dx, dy);
+        if d <= BORDER {
+            if dx <= BORDER && dy <= BORDER {
+                MouseFlags::Corner(dx0 <= dx1, dy0 <= dy1)
+            } else {
+                MouseFlags::Edge(dx <= dy, if dx <= dy { dx0 <= dx1 } else { dy0 <= dy1 })
+            }
+        } else {
+            MouseFlags::All
+        }
+    }
+    fn get_screen_coords_from_event_coords(win: &Window, (x, y): (i32, i32)) -> (i32, i32) {
+        (x + win.x(), y + win.y())
+    }
+    fn set_cursor(
+        win: &mut Window,
+        current_cursor: &mut fltk::enums::Cursor,
+        flags: Option<MouseFlags>,
+    ) {
+        let cursor = match flags {
+            Some(MouseFlags::All) => fltk::enums::Cursor::Move,
+            Some(MouseFlags::Edge(bx, by)) => match (bx, by) {
+                (true, true) => fltk::enums::Cursor::W,
+                (true, false) => fltk::enums::Cursor::E,
+                (false, true) => fltk::enums::Cursor::N,
+                (false, false) => fltk::enums::Cursor::S,
+            },
+            Some(MouseFlags::Corner(bx, by)) => match (bx, by) {
+                (true, true) => fltk::enums::Cursor::NWSE,
+                (true, false) => fltk::enums::Cursor::NESW,
+                (false, true) => fltk::enums::Cursor::NESW,
+                (false, false) => fltk::enums::Cursor::NWSE,
+            },
+            None => fltk::enums::Cursor::Default,
+        };
+        if *current_cursor != cursor {
+            *current_cursor = cursor;
+            win.set_cursor(cursor);
+        }
+    }
+
+    let mut drag_flags = MouseFlags::All;
+    let mut current_cursor = fltk::enums::Cursor::Default;
+    let mut x = 0;
+    let mut y = 0;
+    let mut win_x_drag_start = 0;
+    let mut win_y_drag_start = 0;
+    let mut win_w_drag_start = 0;
+    let mut win_h_drag_start = 0;
+    win.handle(move |win, event| {
+        match event {
+            fltk::enums::Event::Move => {
+                let (x, y) = get_screen_coords_from_event_coords(&win, app::event_coords());
+                let flags = get_mouse_flags(&win, x, y);
+                set_cursor(win, &mut current_cursor, Some(flags));
+                true
+            }
+            fltk::enums::Event::Leave => {
+                win.set_cursor(fltk::enums::Cursor::Default);
+                true
+            }
+            fltk::enums::Event::Push => {
+                (x, y) = get_screen_coords_from_event_coords(&win, app::event_coords());
+                win_x_drag_start = win.x();
+                win_y_drag_start = win.y();
+                win_w_drag_start = win.w();
+                win_h_drag_start = win.h();
+                drag_flags = get_mouse_flags(&win, x, y);
+                true
+            }
+            fltk::enums::Event::Drag => {
+                if win.opacity() == 1.0 {
+                    win.set_opacity(0.5);
+                }
+                let (x_new, y_new) = get_screen_coords_from_event_coords(&win, app::event_coords());
+                let dx = x_new - x;
+                let dy = y_new - y;
+                match drag_flags {
+                    MouseFlags::All => win.set_pos(win_x_drag_start + dx, win_y_drag_start + dy),
+                    MouseFlags::Edge(bx, by) => match (bx, by) {
+                        (true, true) => win.resize(
+                            win_x_drag_start + dx,
+                            win_y_drag_start,
+                            win_w_drag_start - dx,
+                            win_h_drag_start,
+                        ),
+                        (true, false) => win.resize(
+                            win_x_drag_start,
+                            win_y_drag_start,
+                            win_w_drag_start + dx,
+                            win_h_drag_start,
+                        ),
+                        (false, true) => win.resize(
+                            win_x_drag_start,
+                            win_y_drag_start + dy,
+                            win_w_drag_start,
+                            win_h_drag_start - dy,
+                        ),
+                        (false, false) => win.resize(
+                            win_x_drag_start,
+                            win_y_drag_start,
+                            win_w_drag_start,
+                            win_h_drag_start + dy,
+                        ),
+                    },
+                    MouseFlags::Corner(bx, by) => match (bx, by) {
+                        (true, true) => win.resize(
+                            win_x_drag_start + dx,
+                            win_y_drag_start + dy,
+                            win_w_drag_start - dx,
+                            win_h_drag_start - dy,
+                        ),
+
+                        (true, false) => win.resize(
+                            win_x_drag_start + dx,
+                            win_y_drag_start,
+                            win_w_drag_start - dx,
+                            win_h_drag_start + dy,
+                        ),
+                        (false, true) => win.resize(
+                            win_x_drag_start,
+                            win_y_drag_start + dy,
+                            win_w_drag_start + dx,
+                            win_h_drag_start - dy,
+                        ),
+                        (false, false) => win.resize(
+                            win_x_drag_start,
+                            win_y_drag_start,
+                            win_w_drag_start + dx,
+                            win_h_drag_start + dy,
+                        ),
+                    },
+                }
+                true
+            }
+            fltk::enums::Event::Released => {
+                if win.opacity() != 1.0 {
+                    win.set_opacity(1.0);
+                }
+                true
+            }
+            fltk::enums::Event::KeyDown => match app::event_key() {
+                fltk::enums::Key::Enter => {
+                    fn relative_rect(win: &Window, workspace: &Rect) -> Rect {
+                        // clamp rect to workspace and ensure it has non-zero area
+                        let mut rect = crate::protocol::Rect {
+                            x: (win.x() as f64 - workspace.x).min(workspace.w) / workspace.w,
+                            y: (win.y() as f64 - workspace.y).min(workspace.h) / workspace.h,
+                            w: win.w().max(1) as f64 / workspace.w,
+                            h: win.h().max(1) as f64 / workspace.h,
+                        };
+                        rect.w = rect.w.min(1.0 - rect.x);
+                        rect.h = rect.h.min(1.0 - rect.y);
+                        rect
+                    }
+                    win.set_cursor(fltk::enums::Cursor::Default);
+                    win.hide();
+                    let mut areas = CustomInputAreas::default();
+                    let workspaces = WINCTX.lock().unwrap().as_ref().unwrap().workspaces.clone();
+                    for (name, area) in [
+                        ("choice_mouse", &mut areas.mouse),
+                        ("choice_touch", &mut areas.touch),
+                        ("choice_pen", &mut areas.pen),
+                    ] {
+                        let c: Choice = fltk::app::widget_from_id(name).unwrap();
+                        match c.value() {
+                            0 => (),
+                            v @ 1.. if (v as usize) <= workspaces.len() => {
+                                let workspace = workspaces[v as usize - 1];
+                                *area = Some(relative_rect(win, &workspace))
+                            }
+                            v => warn!("Unexpected value in {name}: {v}!"),
+                        }
+                    }
+                    sender.send(areas).unwrap();
+                    true
+                }
+                fltk::enums::Key::Escape => {
+                    win.set_cursor(fltk::enums::Cursor::Default);
+                    win.hide();
+                    true
+                }
+                _ => false,
+            },
+            _ => false,
+        }
+    });
+}
+
+fn show_overlay_window(winctx: &mut InputAreaWindowContext) {
+    let win = &mut winctx.win;
+    if win.shown() {
+        return;
+    }
+    let screens = fltk::app::Screen::all_screens();
+    winctx.workspaces.clear();
+    winctx.workspaces.push(get_full_workspace_rect());
+    for screen in &screens {
+        let fltk::draw::Rect { x, y, w, h } = screen.work_area();
+        winctx.workspaces.push(Rect {
+            x: x as f64,
+            y: y as f64,
+            w: w as f64,
+            h: h as f64,
+        });
+    }
+    for c in [
+        &mut winctx.choice_mouse,
+        &mut winctx.choice_touch,
+        &mut winctx.choice_pen,
+    ] {
+        let v = c.value();
+        c.clear();
+        c.add_choice("None");
+        c.add_choice("Full Workspace");
+        for screen in &screens {
+            c.add_choice(&format!(
+                "Screen {n} at {w}x{h}+{x}+{y}",
+                n = screen.n,
+                w = screen.w(),
+                h = screen.h(),
+                x = screen.x(),
+                y = screen.y()
+            ));
+        }
+        if v >= 0 && (v as usize) < 2 + screens.len() {
+            c.set_value(v);
+        } else {
+            c.set_value(0);
+        }
+    }
+    if win.fullscreen_active() {
+        win.set_size(600, 600);
+        let n = win.screen_num();
+        let screen = app::Screen::new(n).unwrap();
+        win.set_pos(
+            screen.x() + (screen.w() - 600) / 2,
+            screen.y() + (screen.h() - 600) / 2,
+        );
+    }
+    win.show();
+    win.set_on_top();
+    win.set_visible_focus();
+}
+
+pub fn get_full_workspace_rect() -> Rect {
+    let mut rect = Rect::default();
+    for screen in fltk::app::Screen::all_screens() {
+        let fltk::draw::Rect { x, y, w, h } = screen.work_area();
+        rect.x = (x as f64).min(rect.x);
+        rect.y = (y as f64).min(rect.y);
+        rect.w = ((x + w) as f64).max(rect.w);
+        rect.h = ((y + h) as f64).max(rect.h);
+    }
+    rect
 }

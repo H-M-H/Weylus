@@ -45,13 +45,12 @@ impl InputDevice for WindowsInput {
             warn!("Failed to activate window, sending no input ({})", err);
             return;
         }
-        let (offset_x, offset_y, width, height, left, top) =
-            match self.capturable.geometry().unwrap() {
-                Geometry::VirtualScreen(offset_x, offset_y, width, height, left, top) => {
-                    (offset_x, offset_y, width, height, left, top)
-                }
-                _ => unreachable!(),
-            };
+        let Geometry::VirtualScreen(offset_x, offset_y, width, height, left, top) =
+            self.capturable.geometry().unwrap()
+        else {
+            unreachable!()
+        };
+
         let (x, y) = (
             (event.x * width as f64) as i32 + offset_x,
             (event.y * height as f64) as i32 + offset_y,

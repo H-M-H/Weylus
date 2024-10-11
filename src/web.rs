@@ -43,6 +43,7 @@ struct IndexTemplateContext {
     uinput_enabled: bool,
     capture_cursor_enabled: bool,
     log_level: String,
+    enable_custom_input_areas: bool,
 }
 
 fn response_from_str(s: &str, content_type: &str) -> Response<Full<Bytes>> {
@@ -126,6 +127,7 @@ async fn serve(
                 uinput_enabled: cfg!(target_os = "linux"),
                 capture_cursor_enabled: cfg!(not(target_os = "windows")),
                 log_level: crate::log::get_log_level().to_string(),
+                enable_custom_input_areas: context.web_config.enable_custom_input_areas,
             };
 
             let html = if let Some(path) = context.web_config.custom_index_html.as_ref() {
@@ -223,6 +225,7 @@ pub struct WebServerConfig {
     pub custom_access_html: Option<PathBuf>,
     pub custom_style_css: Option<PathBuf>,
     pub custom_lib_js: Option<PathBuf>,
+    pub enable_custom_input_areas: bool,
 }
 
 struct Context<'a> {

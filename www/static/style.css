@@ -151,7 +151,7 @@ form, form input {
     display: block;
     margin-top: 0.5em;
 }
-#settings section.hide, section label.hide {
+#settings section.hide, section label.hide, section button.hide {
     display: none !important;
 }
 select {
