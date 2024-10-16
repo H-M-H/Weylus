@@ -224,7 +224,6 @@ class Settings {
         document.getElementById("refresh").onclick = () => this.webSocket.send('"GetCapturableList"');
         document.getElementById("custom_input_areas").onclick = () => {
             this.webSocket.send('"ChooseCustomInputAreas"');
-            this.checks.get("enable_custom_input_areas").checked = true;
         };
         this.capturable_select.onchange = () => this.send_server_config();
     }
@@ -883,6 +882,7 @@ function handle_messages(
                     onConfigError(msg["ConfigError"]);
                 } else if ("CustomInputAreas" in msg) {
                     settings.custom_input_areas = msg["CustomInputAreas"];
+                    settings.checks.get("enable_custom_input_areas").checked = true;
                     settings.save_settings();
                 }
             }
