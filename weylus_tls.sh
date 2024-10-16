@@ -4,7 +4,6 @@ function die {
     # cleanup to ensure restarting this script doesn't fail because
     # of ports that are still in use
     kill $(jobs -p) > /dev/null 2>&1
-    rm -f index_tls.html
     exit $1
 }
 
@@ -49,28 +48,17 @@ fi
 # cleanup on CTRL+C
 trap die SIGINT
 
-# The TLS proxy will be set up as follows:
-# Proxy all incoming traffic from ports 1701 and 9001 to 1702 and
-# 9002 on which the actual instance of Weylus is running.
-#
-# This means the websocket port that Weylus encodes into the
-# index.html is the unencrypted port 9002 which is changed to the
-# encrypted version on port 9001 by specifiying a custom index html.
-$WEYLUS --print-index-html | sed 's/{{websocket_port}}/9001/' > index_tls.html
+# The TLS proxy will be set up as follows: Proxy all incoming traffic from
+# port 1701 to 1702 on which the actual instance of Weylus is running.
 
 # start Weylus listening only on the local interface
-$WEYLUS --custom-index-html index_tls.html \
-    --bind-address 127.0.0.1 \
-    --web-port 1702 \
-    --websocket-port 9002 \
+$WEYLUS --bind-address "127.0.0.1" \
+    --web-port "1702" \
     --access-code "$ACCESS_CODE" \
     --no-gui &
 
 # start the proxy
-hitch --frontend=[0.0.0.0]:1701 --backend=[127.0.0.1]:1702 \
-    --daemon=off --tls-protos="TLSv1.2 TLSv1.3" weylus.pem &
-
-hitch --frontend=[0.0.0.0]:9001 --backend=[127.0.0.1]:9002 \
-    --daemon=off --tls-protos="TLSv1.2 TLSv1.3" weylus.pem &
+hitch --frontend="[0.0.0.0]:1701" --backend="[127.0.0.1]:1702" \
+    --daemon=off --tls-protos="TLSv1.2 TLSv1.3" "weylus.pem" &
 
 wait
