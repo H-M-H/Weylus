@@ -18,6 +18,7 @@
     <main id="main">
         <video id="video" autoplay muted defaultMuted playsinline disablePictureInPicture></video>
         <canvas id="canvas" class="vanish"></canvas>
+        <div id="debug_overlay" class="hide"></div>
     </main>
     <div id="settings">
         <div id="handle">⠿</div>
@@ -72,6 +73,10 @@
             </section>
             <section id="stats_section">
                 <label><span>FPS (receiving): </span><output id="fps">0</output></label>
+            </section>
+            <section id="debug_section">
+                <label><input type="checkbox" id="enable_debug_overlay" /> <span>Debug
+                        Overlay</span></label>
             </section>
             <section id="log_section" class="hide">
                 <label>Log

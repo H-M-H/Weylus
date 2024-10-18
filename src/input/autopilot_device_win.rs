@@ -59,9 +59,11 @@ impl InputDevice for WindowsInput {
             PointerEventType::DOWN => {
                 POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT | POINTER_FLAG_DOWN
             }
-            PointerEventType::MOVE => POINTER_FLAG_INRANGE | POINTER_FLAG_UPDATE,
+            PointerEventType::MOVE | PointerEventType::OVER | PointerEventType::ENTER => {
+                POINTER_FLAG_INRANGE | POINTER_FLAG_UPDATE
+            }
             PointerEventType::UP => POINTER_FLAG_UP,
-            PointerEventType::CANCEL => {
+            PointerEventType::CANCEL | PointerEventType::LEAVE | PointerEventType::OUT => {
                 POINTER_FLAG_INRANGE | POINTER_FLAG_UPDATE | POINTER_FLAG_CANCELED
             }
         };
@@ -151,9 +153,15 @@ impl InputDevice for WindowsInput {
                     InjectSyntheticPointerInput(self.touch_device_handle, m, len as u32);
 
                     match event.event_type {
-                        PointerEventType::DOWN | PointerEventType::MOVE => {}
+                        PointerEventType::DOWN
+                        | PointerEventType::MOVE
+                        | PointerEventType::OVER
+                        | PointerEventType::ENTER => {}
 
-                        PointerEventType::UP | PointerEventType::CANCEL => {
+                        PointerEventType::UP
+                        | PointerEventType::CANCEL
+                        | PointerEventType::LEAVE
+                        | PointerEventType::OUT => {
                             self.multitouch_map.remove(&event.pointer_id);
                         }
                     }
@@ -180,7 +188,7 @@ impl InputDevice for WindowsInput {
                         }
                         _ => {}
                     },
-                    PointerEventType::MOVE => {
+                    PointerEventType::MOVE | PointerEventType::OVER | PointerEventType::ENTER => {
                         unsafe { SetCursorPos(screen_x, screen_y) };
                     }
                     PointerEventType::UP => match event.button {
@@ -195,7 +203,7 @@ impl InputDevice for WindowsInput {
                         }
                         _ => {}
                     },
-                    PointerEventType::CANCEL => {
+                    PointerEventType::CANCEL | PointerEventType::LEAVE | PointerEventType::OUT => {
                         dw_flags |= MOUSEEVENTF_LEFTUP;
                     }
                 }

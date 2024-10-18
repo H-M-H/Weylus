@@ -1,37 +1,15 @@
 @media (prefers-color-scheme: dark) {
-    body, html {
-        background: #202020;
-    }
-    #settings {
-        color: #ddd;
-        background: #303030;
-    }
-    #handle {
-        background: #303030;
-        color: #ddd;
-    }
-    form {
-        background: #303030;
-        color: #ddd;
-        border: 0.5em solid #252525;
+    :root {
+        --color: #ddd;
+        --background-color-1: #303030;
+        --background-color-2: #202020;
     }
 }
 @media (prefers-color-scheme: light) {
-    body, html {
-        background: #fff;
-    }
-    #settings {
-        color: #111;
-        background: #eee;
-    }
-    #handle {
-        background: #eee;
-        color: #111;
-    }
-    form {
-        background: #eee;
-        color: #111;
-        border: 0.5em solid #f7f7f7;
+    :root {
+        --color: #111;
+        --background-color-1: #eee;
+        --background-color-2: #fff;
     }
 }
 main {
@@ -50,6 +28,8 @@ body, html, main {
     padding: 0;
     overflow: hidden;
     display: flex;
+    color: var(--color);
+    background: var(--background-color-2);
 }
 video {
     max-width: 100%;
@@ -76,16 +56,16 @@ input[type='text'] {
 input[type='range']::-webkit-slider-runnable-track, input[type="range"]::-moz-range-track {
       background-color: #00aaff;
 }
-form, form input {
-    font-size: 1.4em;
-    display: grid;
-}
 .container {
     width: 100%;
     height: 100%;
     display: flex;
     justify-content: center;
     align-items: center;
+}
+#settings, #handle, #debug_overlay {
+    color: var(--color);
+    background: var(--background-color-1);
 }
 #settings_scroll {
     overflow: auto;
@@ -151,7 +131,7 @@ form, form input {
     display: block;
     margin-top: 0.5em;
 }
-#settings section.hide, section label.hide, section button.hide {
+#settings section.hide, section label.hide, section button.hide, #debug_overlay.hide {
     display: none !important;
 }
 select {
@@ -204,4 +184,26 @@ label input:disabled + span {
     -khtml-user-select: text;
     -moz-user-select: text;
     -ms-user-select: text;
+}
+#debug_overlay {
+    --padding: 3px;
+    position: absolute;
+    top:0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin: auto;
+    width: fit-content;
+    height: fit-content;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 75%;
+    padding: var(--padding);
+    border: 2px solid var(--color);
+    white-space: pre;
+    font-size: small;
+    text-align: center;
+}
+#debug_overlay span.updated {
+    color: darkgreen;
 }

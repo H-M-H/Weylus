@@ -82,6 +82,14 @@ pub enum PointerEventType {
     CANCEL,
     #[serde(rename = "pointermove")]
     MOVE,
+    #[serde(rename = "pointerover")]
+    OVER,
+    #[serde(rename = "pointerenter")]
+    ENTER,
+    #[serde(rename = "pointerleave")]
+    LEAVE,
+    #[serde(rename = "pointerout")]
+    OUT,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

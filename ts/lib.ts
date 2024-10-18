@@ -176,6 +176,16 @@ class Settings {
             this.save_settings();
         };
 
+        this.checks.get("enable_debug_overlay").onchange = (e) => {
+            let enabled = (e.target as HTMLInputElement).checked;
+            if (enabled) {
+                debug_overlay.classList.remove("hide");
+            } else {
+                debug_overlay.classList.add("hide");
+            }
+            this.save_settings();
+        };
+
         this.check_aggressive_seek = this.checks.get("aggressive_seeking");
         this.check_aggressive_seek.onchange = () => {
             this.save_settings();
@@ -306,6 +316,11 @@ class Settings {
                 this.toggle_energysaving(true);
             }
 
+            if (this.checks.get("enable_debug_overlay").checked) {
+                debug_overlay.classList.remove("hide");
+            }
+
+
             if (document.getElementById("custom_input_areas").classList.contains("hide")) {
                 this.checks.get("enable_custom_input_areas").checked = false;
             }
@@ -385,6 +400,8 @@ class Settings {
 }
 
 let settings: Settings;
+let debug_overlay: HTMLElement;
+let last_pointer_data: Object;
 
 class PEvent {
     event_type: string;
@@ -683,6 +700,10 @@ class PointerHandler {
         video.onpointerup = (e) => this.onEvent(e, "pointerup");
         video.onpointercancel = (e) => this.onEvent(e, "pointercancel");
         video.onpointermove = (e) => this.onEvent(e, "pointermove");
+        video.onpointerout = (e) => this.onEvent(e, "pointerout");
+        video.onpointerleave = (e) => this.onEvent(e, "pointerleave");
+        video.onpointerenter = (e) => this.onEvent(e, "pointerenter");
+        video.onpointerover = (e) => this.onEvent(e, "pointerover");
 
         let painter: Painter;
         if (!settings.checks.get("energysaving").checked)
@@ -693,11 +714,19 @@ class PointerHandler {
             canvas.onpointerup = (e) => { this.onEvent(e, "pointerup"); painter.onstop(e); };
             canvas.onpointercancel = (e) => { this.onEvent(e, "pointercancel"); painter.onstop(e); };
             canvas.onpointermove = (e) => { this.onEvent(e, "pointermove"); painter.onmove(e); };
+            canvas.onpointerout = (e) => { this.onEvent(e, "pointerout"); painter.onstop(e); };
+            canvas.onpointerleave = (e) => { this.onEvent(e, "pointerleave"); painter.onstop(e); };
+            canvas.onpointerenter = (e) => { this.onEvent(e, "pointerenter"); painter.onmove(e); };
+            canvas.onpointerover = (e) => { this.onEvent(e, "pointerover"); painter.onmove(e); };
         } else {
             canvas.onpointerdown = (e) => this.onEvent(e, "pointerdown");
             canvas.onpointerup = (e) => this.onEvent(e, "pointerup");
             canvas.onpointercancel = (e) => this.onEvent(e, "pointercancel");
             canvas.onpointermove = (e) => this.onEvent(e, "pointermove");
+            canvas.onpointerout = (e) => this.onEvent(e, "pointerout");
+            canvas.onpointerleave = (e) => this.onEvent(e, "pointerleave");
+            canvas.onpointerenter = (e) => this.onEvent(e, "pointerenter");
+            canvas.onpointerover = (e) => this.onEvent(e, "pointerover");
         }
 
         // This is a workaround for the following Safari/WebKit bug:
@@ -714,6 +743,65 @@ class PointerHandler {
     }
 
     onEvent(event: PointerEvent, event_type: string) {
+        if (settings.checks.get("enable_debug_overlay").checked) {
+            let props = [
+                "altKey",
+                "altitudeAngle",
+                "azimuthAngle",
+                "button",
+                "buttons",
+                "clientX",
+                "clientY",
+                "ctrlKey",
+                "height",
+                "isPrimary",
+                "metaKey",
+                "movementX",
+                "movementY",
+                "offsetX",
+                "offsetY",
+                "pageX",
+                "pageY",
+                "pointerId",
+                "pointerType",
+                "pressure",
+                "screenX",
+                "screenY",
+                "shiftKey",
+                "tangentialPressure",
+                "tiltX",
+                "tiltY",
+                "timeStamp",
+                "twist",
+                "type",
+                "width",
+                "x",
+                "y",
+            ];
+            if (!last_pointer_data) {
+                last_pointer_data = {};
+                for (let prop of props) {
+                    let span_id = `prop_${prop}_span`;
+                    let span = document.getElementById(span_id);
+                    span = document.createElement("span");
+                    span.id = span_id;
+                    debug_overlay.appendChild(span);
+                    debug_overlay.appendChild(document.createElement("br"));
+                }
+            }
+            for (let prop of props) {
+                let span_id = `prop_${prop}_span`;
+                let span = document.getElementById(span_id);
+                let v = event[prop];
+                span.textContent = `${prop}: ${v}`;
+                if (last_pointer_data[prop] == v) {
+                    span.classList.remove("updated");
+                } else {
+                    span.classList.add("updated");
+                    last_pointer_data[prop] = v;
+                }
+            }
+        }
         if (this.pointerTypes.includes(event.pointerType)) {
             let rect = (event.target as HTMLElement).getBoundingClientRect();
             const events = event_type === "pointermove" && typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [event];
@@ -944,6 +1032,7 @@ function init() {
     );
     webSocket.binaryType = "arraybuffer";
 
+    debug_overlay = document.getElementById("debug_overlay");
     settings = new Settings(webSocket);
 
     let video = document.getElementById("video") as HTMLVideoElement;
