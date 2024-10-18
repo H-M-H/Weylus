@@ -1043,6 +1043,11 @@ function init() {
         event.stopPropagation();
         return false;
     };
+    canvas.oncontextmenu = function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        return false;
+    };
 
     let toggle_fullscreen_btn = document.getElementById("fullscreen") as HTMLButtonElement;
 
