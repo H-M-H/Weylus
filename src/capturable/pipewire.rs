@@ -361,7 +361,7 @@ struct CallBackContext {
     streams: Vec<PwStreamInfo>,
     fd: Option<OwnedFd>,
     restore_token: Option<String>,
-    is_plasma: bool,
+    has_remote_desktop: bool,
     failure: bool,
 }
 
@@ -387,10 +387,10 @@ fn on_create_session_response(
         .into();
 
     context.lock().unwrap().session = session.clone();
-    if context.lock().unwrap().is_plasma {
-        select_sources(portal, context)
-    } else {
+    if context.lock().unwrap().has_remote_desktop {
         select_devices(portal, context)
+    } else {
+        select_sources(portal, context)
     }
 }
 
@@ -461,7 +461,8 @@ fn select_sources(
     // 4: Metadata: The cursor is not part of the screen cast stream, but sent as PipeWire stream metadata.
     let cursor_mode = if capture_cursor { 2u32 } else { 1u32 };
 
-    if context.lock().unwrap().is_plasma && capture_cursor {
+    let is_plasma = std::env::var("DESKTOP_SESSION").map_or(false, |s| s.contains("plasma"));
+    if is_plasma && capture_cursor {
         // Warn the user if capturing the cursor is tried on kde as this can crash
         // kwin_wayland and tear down the plasma desktop, see:
         // https://bugs.kde.org/show_bug.cgi?id=435042
@@ -491,15 +492,15 @@ fn on_select_sources_response(
         "handle_token".to_string(),
         Variant(Box::new(format!("weylus{t}"))),
     );
-    let path = if context.lock().unwrap().is_plasma {
-        OrgFreedesktopPortalScreenCast::start(
+    let path = if context.lock().unwrap().has_remote_desktop {
+        OrgFreedesktopPortalRemoteDesktop::start(
             &portal,
             context.lock().unwrap().session.clone(),
             "",
             args,
         )?
     } else {
-        OrgFreedesktopPortalRemoteDesktop::start(
+        OrgFreedesktopPortalScreenCast::start(
             &portal,
             context.lock().unwrap().session.clone(),
             "",
@@ -527,10 +528,10 @@ fn on_start_response(
         context.restore_token = Some(t.to_string());
     }
     dbg!(&context.restore_token);
-    if context.is_plasma {
-        debug!("Screen Cast Session started");
-    } else {
+    if context.has_remote_desktop {
         debug!("Remote Desktop Session started");
+    } else {
+        debug!("Screen Cast Session started");
     }
     Ok(())
 }
@@ -541,7 +542,10 @@ fn request_remote_desktop(
     let conn = SyncConnection::new_session()?;
     let portal = get_portal(&conn);
 
-    let is_plasma = std::env::var("DESKTOP_SESSION").map_or(false, |s| s.contains("plasma"));
+    // Disabled for KDE plasma due to https://bugs.kde.org/show_bug.cgi?id=484996
+    // List of supported DEs: https://wiki.archlinux.org/title/XDG_Desktop_Portal#List_of_backends_and_interfaces
+    let has_remote_desktop =
+        std::env::var("DESKTOP_SESSION").map_or(false, |s| s.contains("gnome"));
 
     let context = CallBackContext {
         capture_cursor,
@@ -549,7 +553,7 @@ fn request_remote_desktop(
         streams: Default::default(),
         fd: None,
         restore_token: None,
-        is_plasma,
+        has_remote_desktop,
         failure: false,
     };
     let context = Arc::new(Mutex::new(context));
@@ -565,10 +569,10 @@ fn request_remote_desktop(
         "handle_token".to_string(),
         Variant(Box::new(format!("weylus{t2}"))),
     );
-    let path = if is_plasma {
-        OrgFreedesktopPortalScreenCast::create_session(&portal, args)?
-    } else {
+    let path = if has_remote_desktop {
         OrgFreedesktopPortalRemoteDesktop::create_session(&portal, args)?
+    } else {
+        OrgFreedesktopPortalScreenCast::create_session(&portal, args)?
     };
     handle_response(portal, path, context.clone(), on_create_session_response)?;
 

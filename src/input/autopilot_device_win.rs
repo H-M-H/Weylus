@@ -45,35 +45,26 @@ impl InputDevice for WindowsInput {
             warn!("Failed to activate window, sending no input ({})", err);
             return;
         }
-        let (offset_x, offset_y, width, height, left, top) =
-            match self.capturable.geometry().unwrap() {
-                Geometry::VirtualScreen(offset_x, offset_y, width, height, left, top) => {
-                    (offset_x, offset_y, width, height, left, top)
-                }
-                _ => unreachable!(),
-            };
+        let Geometry::VirtualScreen(offset_x, offset_y, width, height, left, top) =
+            self.capturable.geometry().unwrap()
+        else {
+            unreachable!()
+        };
+
         let (x, y) = (
             (event.x * width as f64) as i32 + offset_x,
             (event.y * height as f64) as i32 + offset_y,
         );
         let mut pointer_flags = match event.event_type {
-            PointerEventType::ENTER => {
-                POINTER_FLAG_INRANGE | POINTER_FLAG_NEW
-            }
             PointerEventType::DOWN => {
                 POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT | POINTER_FLAG_DOWN
             }
-            PointerEventType::MOVE => {
-                POINTER_FLAG_INRANGE | POINTER_FLAG_UPDATE // POINTER_FLAG_INCONTACT see below "buttons" part
+            PointerEventType::MOVE | PointerEventType::OVER | PointerEventType::ENTER => {
+                POINTER_FLAG_INRANGE | POINTER_FLAG_UPDATE
             }
-            PointerEventType::UP => {
-                POINTER_FLAG_INRANGE | POINTER_FLAG_UP
-            }
-            PointerEventType::CANCEL => {
-                POINTER_FLAG_CANCELED | POINTER_FLAG_UP
-            }
-            PointerEventType::LEAVE => {
-                POINTER_FLAG_NONE // anything but POINTER_FLAG_INRANGE
+            PointerEventType::UP => POINTER_FLAG_UP,
+            PointerEventType::CANCEL | PointerEventType::LEAVE | PointerEventType::OUT => {
+                POINTER_FLAG_INRANGE | POINTER_FLAG_UPDATE | POINTER_FLAG_CANCELED
             }
         };
         let button_change_type = match event.buttons {
@@ -162,14 +153,16 @@ impl InputDevice for WindowsInput {
                     InjectSyntheticPointerInput(self.touch_device_handle, m, len as u32);
 
                     match event.event_type {
-                        PointerEventType::DOWN | PointerEventType::MOVE => {}
+                        PointerEventType::DOWN
+                        | PointerEventType::MOVE
+                        | PointerEventType::OVER
+                        | PointerEventType::ENTER => {}
 
-                        PointerEventType::UP | PointerEventType::CANCEL => {
+                        PointerEventType::UP
+                        | PointerEventType::CANCEL
+                        | PointerEventType::LEAVE
+                        | PointerEventType::OUT => {
                             self.multitouch_map.remove(&event.pointer_id);
-                        }
-
-                        PointerEventType::ENTER | PointerEventType::LEAVE => {
-                            // nothing to do with touch
                         }
                     }
                 }
@@ -195,7 +188,7 @@ impl InputDevice for WindowsInput {
                         }
                         _ => {}
                     },
-                    PointerEventType::MOVE => {
+                    PointerEventType::MOVE | PointerEventType::OVER | PointerEventType::ENTER => {
                         unsafe { SetCursorPos(screen_x, screen_y) };
                     }
                     PointerEventType::UP => match event.button {
@@ -210,11 +203,8 @@ impl InputDevice for WindowsInput {
                         }
                         _ => {}
                     },
-                    PointerEventType::CANCEL => {
+                    PointerEventType::CANCEL | PointerEventType::LEAVE | PointerEventType::OUT => {
                         dw_flags |= MOUSEEVENTF_LEFTUP;
-                    },
-                    PointerEventType::ENTER | PointerEventType::LEAVE => {
-                        // nothing to do with mouse
                     }
                 }
                 unsafe { mouse_event(dw_flags, 0 as u32, 0 as u32, 0, 0) };

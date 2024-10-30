@@ -9,6 +9,7 @@ use clap::CommandFactory;
 use clap_complete::generate;
 #[cfg(unix)]
 use signal_hook::iterator::Signals;
+#[cfg(unix)]
 use signal_hook::{consts::TERM_SIGNALS, low_level::signal_name};
 use tracing::{error, info, warn};
 

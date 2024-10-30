@@ -1,13 +1,14 @@
 use std::cmp::Ordering;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_int};
+use std::time::{Duration, Instant};
 
 use crate::capturable::x11::X11Context;
 use crate::capturable::{Capturable, Geometry};
 use crate::input::device::{InputDevice, InputDeviceType};
 use crate::protocol::{
     Button, KeyboardEvent, KeyboardEventType, KeyboardLocation, PointerEvent, PointerEventType,
-    PointerType, WheelEvent,
+    PointerType, Rect, WheelEvent,
 };
 
 use crate::cerror::CError;
@@ -35,11 +36,9 @@ pub struct UInputDevice {
     touches: [Option<MultiTouch>; 5],
     tool_pen_active: bool,
     pen_touching: bool,
+    last_pen_event: Instant,
     capturable: Box<dyn Capturable>,
-    x: f64,
-    y: f64,
-    width: f64,
-    height: f64,
+    geometry: Rect,
     name_mouse_device: String,
     name_stylus_device: String,
     name_touch_device: String,
@@ -102,11 +101,9 @@ impl UInputDevice {
             touches: Default::default(),
             tool_pen_active: false,
             pen_touching: false,
+            last_pen_event: Instant::now(),
             capturable,
-            x: 0.0,
-            y: 0.0,
-            width: 1.0,
-            height: 1.0,
+            geometry: Rect::default(),
             name_mouse_device: name_mouse,
             name_touch_device: name_touch,
             name_stylus_device: name_stylus,
@@ -118,12 +115,12 @@ impl UInputDevice {
     }
 
     fn transform_x(&self, x: f64) -> i32 {
-        let x = (x * self.width + self.x) * ABS_MAX;
+        let x = (x * self.geometry.w + self.geometry.x) * ABS_MAX;
         x as i32
     }
 
     fn transform_y(&self, y: f64) -> i32 {
-        let y = (y * self.height + self.y) * ABS_MAX;
+        let y = (y * self.geometry.h + self.geometry.y) * ABS_MAX;
         y as i32
     }
 
@@ -285,25 +282,58 @@ impl InputDevice for UInputDevice {
         }
         let (x, y, width, height) = match self.capturable.geometry().unwrap() {
             Geometry::Relative(x, y, width, height) => (x, y, width, height),
-            _ => {
-                warn!("Failed to get window geometry, sending no input");
-                return;
-            }
         };
-        self.x = x;
-        self.y = y;
-        self.width = width;
-        self.height = height;
+        self.geometry.x = x;
+        self.geometry.y = y;
+        self.geometry.w = width;
+        self.geometry.h = height;
         match event.pointer_type {
             PointerType::Touch => {
                 if self.num_touch_mapping_tries < MAX_SCREEN_MAPPING_TRIES {
                     if let Some(x11ctx) = &mut self.x11ctx {
-                        x11ctx.map_input_device_to_entire_screen(&self.name_touch_device, false);
+                        // Mapping input does not work on XWayland as xinput list does not expose
+                        // device names and thus we can not identify the devices created by uinput
+                        if let Ok(session_type) = std::env::var("XDG_SESSION_TYPE") {
+                            if session_type != "wayland" {
+                                x11ctx.map_input_device_to_entire_screen(
+                                    &self.name_touch_device,
+                                    false,
+                                );
+                            }
+                        } else {
+                            x11ctx
+                                .map_input_device_to_entire_screen(&self.name_touch_device, false);
+                        }
                     }
                     self.num_touch_mapping_tries += 1;
                 }
+
+                // This is a workaround for browsers that send events when the pen is hovering but
+                // do not send an event when the pen leaves the hovering range. If the pen is left
+                // in this state touch rejection may stay active and touch won't work.
+                // Therefore, we manually remove the pen after a short delay.
+                if self.tool_pen_active
+                    && !self.pen_touching
+                    && (Instant::now() - self.last_pen_event) > Duration::from_millis(50)
+                {
+                    self.tool_pen_active = false;
+                    self.send(self.stylus_fd, ET_KEY, EC_KEY_TOUCH, 0);
+                    self.send(self.stylus_fd, ET_KEY, EC_KEY_TOOL_PEN, 0);
+                    self.send(self.stylus_fd, ET_KEY, EC_KEY_TOOL_RUBBER, 0);
+                    self.send(self.stylus_fd, ET_ABSOLUTE, EC_ABSOLUTE_PRESSURE, 0);
+                    self.send(
+                        self.stylus_fd,
+                        ET_MSC,
+                        EC_MSC_TIMESTAMP,
+                        (event.timestamp % (i32::MAX as u64 + 1)) as i32,
+                    );
+                    self.send(self.stylus_fd, ET_SYNC, EC_SYNC_REPORT, 0);
+                }
                 match event.event_type {
-                    PointerEventType::DOWN | PointerEventType::MOVE => {
+                    PointerEventType::DOWN
+                    | PointerEventType::MOVE
+                    | PointerEventType::OVER
+                    | PointerEventType::ENTER => {
                         let slot: usize;
                         // check if this event is already assigned to one of our 10 multitouch slots
                         if let Some(s) = self.find_slot(event.pointer_id) {
@@ -411,7 +441,10 @@ impl InputDevice for UInputDevice {
                         );
                         self.send(self.touch_fd, ET_SYNC, EC_SYNC_REPORT, 0);
                     }
-                    PointerEventType::CANCEL | PointerEventType::UP => {
+                    PointerEventType::CANCEL
+                    | PointerEventType::UP
+                    | PointerEventType::LEAVE
+                    | PointerEventType::OUT => {
                         // remove from slot
                         if let Some(slot) = self.find_slot(event.pointer_id) {
                             self.send(self.touch_fd, ET_ABSOLUTE, EC_ABS_MT_SLOT, slot as i32);
@@ -435,18 +468,33 @@ impl InputDevice for UInputDevice {
                             self.touches[slot] = None;
                         }
                     }
-                    PointerEventType::ENTER | PointerEventType::LEAVE => ()
                 };
             }
             PointerType::Pen => {
+                self.last_pen_event = Instant::now();
                 if self.num_stylus_mapping_tries < MAX_SCREEN_MAPPING_TRIES {
                     if let Some(x11ctx) = &mut self.x11ctx {
-                        x11ctx.map_input_device_to_entire_screen(&self.name_stylus_device, true);
+                        // Mapping input does not work on XWayland as xinput list does not expose
+                        // device names and thus we can not identify the devices created by uinput
+                        if let Ok(session_type) = std::env::var("XDG_SESSION_TYPE") {
+                            if session_type != "wayland" {
+                                x11ctx.map_input_device_to_entire_screen(
+                                    &self.name_stylus_device,
+                                    true,
+                                );
+                            }
+                        } else {
+                            x11ctx
+                                .map_input_device_to_entire_screen(&self.name_stylus_device, true);
+                        }
                     }
                     self.num_touch_mapping_tries += 1;
                 }
                 match event.event_type {
-                    PointerEventType::DOWN | PointerEventType::MOVE => {
+                    PointerEventType::DOWN
+                    | PointerEventType::MOVE
+                    | PointerEventType::OVER
+                    | PointerEventType::ENTER => {
                         if let PointerEventType::DOWN = event.event_type {
                             self.pen_touching = true;
                             self.send(self.stylus_fd, ET_KEY, EC_KEY_TOUCH, 1);
@@ -496,7 +544,10 @@ impl InputDevice for UInputDevice {
                             event.tilt_y,
                         );
                     }
-                    PointerEventType::UP | PointerEventType::CANCEL => {
+                    PointerEventType::UP
+                    | PointerEventType::CANCEL
+                    | PointerEventType::LEAVE
+                    | PointerEventType::OUT => {
                         self.send(self.stylus_fd, ET_KEY, EC_KEY_TOUCH, 0);
                         self.send(self.stylus_fd, ET_KEY, EC_KEY_TOOL_PEN, 0);
                         self.send(self.stylus_fd, ET_KEY, EC_KEY_TOOL_RUBBER, 0);
@@ -504,7 +555,6 @@ impl InputDevice for UInputDevice {
                         self.tool_pen_active = false;
                         self.pen_touching = false;
                     }
-                    PointerEventType::ENTER | PointerEventType::LEAVE => ()
                 }
                 self.send(
                     self.stylus_fd,
@@ -517,12 +567,27 @@ impl InputDevice for UInputDevice {
             PointerType::Mouse | PointerType::Unknown => {
                 if self.num_mouse_mapping_tries < MAX_SCREEN_MAPPING_TRIES {
                     if let Some(x11ctx) = &mut self.x11ctx {
-                        x11ctx.map_input_device_to_entire_screen(&self.name_mouse_device, false);
+                        // Mapping input does not work on XWayland as xinput list does not expose
+                        // device names and thus we can not identify the devices created by uinput
+                        if let Ok(session_type) = std::env::var("XDG_SESSION_TYPE") {
+                            if session_type != "wayland" {
+                                x11ctx.map_input_device_to_entire_screen(
+                                    &self.name_mouse_device,
+                                    false,
+                                );
+                            }
+                        } else {
+                            x11ctx
+                                .map_input_device_to_entire_screen(&self.name_mouse_device, false);
+                        }
                     }
                     self.num_touch_mapping_tries += 1;
                 }
                 match event.event_type {
-                    PointerEventType::DOWN | PointerEventType::MOVE => {
+                    PointerEventType::DOWN
+                    | PointerEventType::MOVE
+                    | PointerEventType::OVER
+                    | PointerEventType::ENTER => {
                         if let PointerEventType::DOWN = event.event_type {
                             match event.button {
                                 Button::PRIMARY => {
@@ -550,7 +615,10 @@ impl InputDevice for UInputDevice {
                             self.transform_y(event.y),
                         );
                     }
-                    PointerEventType::UP | PointerEventType::CANCEL => match event.button {
+                    PointerEventType::UP
+                    | PointerEventType::CANCEL
+                    | PointerEventType::LEAVE
+                    | PointerEventType::OUT => match event.button {
                         Button::PRIMARY => self.send(self.mouse_fd, ET_KEY, EC_KEY_MOUSE_LEFT, 0),
                         Button::SECONDARY => {
                             self.send(self.mouse_fd, ET_KEY, EC_KEY_MOUSE_RIGHT, 0)
@@ -560,7 +628,6 @@ impl InputDevice for UInputDevice {
                         }
                         _ => (),
                     },
-                    PointerEventType::ENTER | PointerEventType::LEAVE => (),
                 }
                 self.send(
                     self.mouse_fd,

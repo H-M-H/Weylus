@@ -21,6 +21,7 @@ pub enum MessageInbound {
     Config(ClientConfiguration),
     PauseVideo,
     ResumeVideo,
+    ChooseCustomInputAreas,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -28,11 +29,38 @@ pub enum MessageOutbound {
     CapturableList(Vec<String>),
     NewVideo,
     ConfigOk,
+    CustomInputAreas(CustomInputAreas),
     ConfigError(String),
     Error(String),
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+pub struct Rect {
+    pub x: f64,
+    pub y: f64,
+    pub w: f64,
+    pub h: f64,
+}
+
+impl Default for Rect {
+    fn default() -> Self {
+        Self {
+            x: 0.0,
+            y: 0.0,
+            w: 1.0,
+            h: 1.0,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Default)]
+pub struct CustomInputAreas {
+    pub mouse: Option<Rect>,
+    pub touch: Option<Rect>,
+    pub pen: Option<Rect>,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum PointerType {
     #[serde(rename = "")]
     Unknown,
@@ -44,7 +72,7 @@ pub enum PointerType {
     Touch,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 pub enum PointerEventType {
     #[serde(rename = "pointerdown")]
     DOWN,
@@ -54,10 +82,14 @@ pub enum PointerEventType {
     CANCEL,
     #[serde(rename = "pointermove")]
     MOVE,
+    #[serde(rename = "pointerover")]
+    OVER,
     #[serde(rename = "pointerenter")]
     ENTER,
     #[serde(rename = "pointerleave")]
     LEAVE,
+    #[serde(rename = "pointerout")]
+    OUT,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

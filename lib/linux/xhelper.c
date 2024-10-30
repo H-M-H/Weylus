@@ -21,7 +21,8 @@ int x11_error_handler(Display* disp, XErrorEvent* err)
 	return 0;
 }
 
-void x11_set_error_handler() {
+void x11_set_error_handler()
+{
 	// setting an error handler is required as otherwise xlib may just exit the process, even though
 	// the error was recoverable.
 	XSetErrorHandler(x11_error_handler);
@@ -176,7 +177,8 @@ Window* get_client_list(Display* disp, unsigned long* size, Error* err)
 	return client_list;
 }
 
-int create_capturables(Display* disp, Capturable** capturables, int* num_monitors, int size, Error* err)
+int create_capturables(
+	Display* disp, Capturable** capturables, int* num_monitors, int size, Error* err)
 {
 	if (size <= 0)
 		return 0;

@@ -50,6 +50,18 @@ function run(level: string) {
 function log(level: LogLevel, msg: string) {
     if (level > log_level)
         return;
+
+    if (level == LogLevel.TRACE)
+        console.trace(msg);
+    else if (level == LogLevel.DEBUG)
+        console.debug(msg);
+    else if (level == LogLevel.INFO)
+        console.info(msg);
+    else if (level == LogLevel.WARN)
+        console.warn(msg);
+    else if (level == LogLevel.ERROR)
+        console.error(msg);
+
     if (no_log_messages) {
         no_log_messages = false;
         document.getElementById("log_section").classList.remove("hide");
@@ -82,6 +94,19 @@ function fresh_canvas() {
     return canvas;
 }
 
+class Rect {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+}
+
+class CustomInputAreas {
+    mouse: Rect;
+    touch: Rect;
+    pen: Rect;
+}
+
 class Settings {
     webSocket: WebSocket;
     checks: Map<string, HTMLInputElement>;
@@ -94,6 +119,7 @@ class Settings {
     check_aggressive_seek: HTMLInputElement;
     client_name_input: HTMLInputElement;
     visible: boolean;
+    custom_input_areas: CustomInputAreas;
     settings: HTMLElement;
 
     constructor(webSocket: WebSocket) {
@@ -108,10 +134,10 @@ class Settings {
         this.scale_video_output = this.scale_video_input.nextElementSibling as HTMLOutputElement;
         this.range_min_pressure = document.getElementById("min_pressure") as HTMLInputElement;
         this.client_name_input = document.getElementById("client_name") as HTMLInputElement;
-        this.frame_rate_input.oninput = (e) => {
+        this.frame_rate_input.oninput = () => {
             this.frame_rate_output.value = Math.round(frame_rate_scale(this.frame_rate_input.valueAsNumber)).toString();
         }
-        this.scale_video_input.oninput = (e) => {
+        this.scale_video_input.oninput = () => {
             let [w, h] = calc_max_video_resolution(this.scale_video_input.valueAsNumber)
             this.scale_video_output.value = w + "x" + h
         }
@@ -145,13 +171,23 @@ class Settings {
             this.settings.classList.add("vanish");
         }
 
-        this.checks.get("stretch").onchange = (e) => {
+        this.checks.get("stretch").onchange = () => {
             stretch_video();
             this.save_settings();
         };
 
+        this.checks.get("enable_debug_overlay").onchange = (e) => {
+            let enabled = (e.target as HTMLInputElement).checked;
+            if (enabled) {
+                debug_overlay.classList.remove("hide");
+            } else {
+                debug_overlay.classList.add("hide");
+            }
+            this.save_settings();
+        };
+
         this.check_aggressive_seek = this.checks.get("aggressive_seeking");
-        this.check_aggressive_seek.onchange = (e) => {
+        this.check_aggressive_seek.onchange = () => {
             this.save_settings();
         };
 
@@ -180,6 +216,10 @@ class Settings {
             this.toggle_energysaving((e.target as HTMLInputElement).checked);
         };
 
+        this.checks.get("enable_custom_input_areas").onchange = () => {
+            this.save_settings();
+        };
+
         this.frame_rate_input.onchange = () => this.save_settings();
         this.range_min_pressure.onchange = () => this.save_settings();
 
@@ -192,6 +232,9 @@ class Settings {
         this.frame_rate_input.onchange = upd_server_config;
 
         document.getElementById("refresh").onclick = () => this.webSocket.send('"GetCapturableList"');
+        document.getElementById("custom_input_areas").onclick = () => {
+            this.webSocket.send('"ChooseCustomInputAreas"');
+        };
         this.capturable_select.onchange = () => this.send_server_config();
     }
 
@@ -218,6 +261,7 @@ class Settings {
         settings["frame_rate"] = frame_rate_scale(this.frame_rate_input.valueAsNumber).toString();
         settings["scale_video"] = this.scale_video_input.value;
         settings["min_pressure"] = this.range_min_pressure.value;
+        settings["custom_input_areas"] = this.custom_input_areas;
         settings["client_name"] = this.client_name_input.value;
         localStorage.setItem("settings", JSON.stringify(settings));
     }
@@ -254,6 +298,8 @@ class Settings {
             if (min_pressure)
                 this.range_min_pressure.value = min_pressure;
 
+            this.custom_input_areas = settings["custom_input_areas"];
+
             if (this.checks.get("lefty").checked) {
                 this.settings.classList.add("lefty");
             }
@@ -268,6 +314,15 @@ class Settings {
 
             if (this.checks.get("energysaving").checked) {
                 this.toggle_energysaving(true);
+            }
+
+            if (this.checks.get("enable_debug_overlay").checked) {
+                debug_overlay.classList.remove("hide");
+            }
+
+
+            if (document.getElementById("custom_input_areas").classList.contains("hide")) {
+                this.checks.get("enable_custom_input_areas").checked = false;
             }
 
             let client_name = settings["client_name"];
@@ -345,6 +400,8 @@ class Settings {
 }
 
 let settings: Settings;
+let debug_overlay: HTMLElement;
+let last_pointer_data: Object;
 
 class PEvent {
     event_type: string;
@@ -381,8 +438,28 @@ class PEvent {
             btn = 2;
         this.button = (btn < 0 ? 0 : 1 << btn);
         this.buttons = event.buttons;
-        this.x = (event.clientX - targetRect.left) / targetRect.width;
-        this.y = (event.clientY - targetRect.top) / targetRect.height;
+        let x_offset = 0;
+        let y_offset = 0;
+        let x_scale = 1;
+        let y_scale = 1;
+        if (settings.checks.get("enable_custom_input_areas").checked) {
+            let custom_input_area: Rect = null;
+            if (event.pointerType == "mouse") {
+                custom_input_area = settings.custom_input_areas.mouse;
+            } else if (event.pointerType == "touch") {
+                custom_input_area = settings.custom_input_areas.touch;
+            } else if (event.pointerType == "pen") {
+                custom_input_area = settings.custom_input_areas.pen;
+            }
+            if (custom_input_area) {
+                x_scale = custom_input_area.w;
+                y_scale = custom_input_area.h;
+                x_offset = custom_input_area.x;
+                y_offset = custom_input_area.y;
+            }
+        }
+        this.x = (event.clientX - targetRect.left) / targetRect.width * x_scale + x_offset;
+        this.y = (event.clientY - targetRect.top) / targetRect.height * y_scale + y_offset;
         this.movement_x = event.movementX ? event.movementX : 0;
         this.movement_y = event.movementY ? event.movementY : 0;
         this.pressure = Math.max(event.pressure, settings.range_min_pressure.valueAsNumber);
@@ -623,8 +700,10 @@ class PointerHandler {
         video.onpointerup = (e) => this.onEvent(e, "pointerup");
         video.onpointercancel = (e) => this.onEvent(e, "pointercancel");
         video.onpointermove = (e) => this.onEvent(e, "pointermove");
-        video.onpointerenter = (e) => this.onEvent(e, "pointerenter");
+        video.onpointerout = (e) => this.onEvent(e, "pointerout");
         video.onpointerleave = (e) => this.onEvent(e, "pointerleave");
+        video.onpointerenter = (e) => this.onEvent(e, "pointerenter");
+        video.onpointerover = (e) => this.onEvent(e, "pointerover");
 
         let painter: Painter;
         if (!settings.checks.get("energysaving").checked)
@@ -635,11 +714,19 @@ class PointerHandler {
             canvas.onpointerup = (e) => { this.onEvent(e, "pointerup"); painter.onstop(e); };
             canvas.onpointercancel = (e) => { this.onEvent(e, "pointercancel"); painter.onstop(e); };
             canvas.onpointermove = (e) => { this.onEvent(e, "pointermove"); painter.onmove(e); };
+            canvas.onpointerout = (e) => { this.onEvent(e, "pointerout"); painter.onstop(e); };
+            canvas.onpointerleave = (e) => { this.onEvent(e, "pointerleave"); painter.onstop(e); };
+            canvas.onpointerenter = (e) => { this.onEvent(e, "pointerenter"); painter.onmove(e); };
+            canvas.onpointerover = (e) => { this.onEvent(e, "pointerover"); painter.onmove(e); };
         } else {
             canvas.onpointerdown = (e) => this.onEvent(e, "pointerdown");
             canvas.onpointerup = (e) => this.onEvent(e, "pointerup");
             canvas.onpointercancel = (e) => this.onEvent(e, "pointercancel");
             canvas.onpointermove = (e) => this.onEvent(e, "pointermove");
+            canvas.onpointerout = (e) => this.onEvent(e, "pointerout");
+            canvas.onpointerleave = (e) => this.onEvent(e, "pointerleave");
+            canvas.onpointerenter = (e) => this.onEvent(e, "pointerenter");
+            canvas.onpointerover = (e) => this.onEvent(e, "pointerover");
         }
         canvas.onpointerenter = (e) => this.onEvent(e, "pointerenter");
         canvas.onpointerleave = (e) => this.onEvent(e, "pointerleave");
@@ -658,6 +745,65 @@ class PointerHandler {
     }
 
     onEvent(event: PointerEvent, event_type: string) {
+        if (settings.checks.get("enable_debug_overlay").checked) {
+            let props = [
+                "altKey",
+                "altitudeAngle",
+                "azimuthAngle",
+                "button",
+                "buttons",
+                "clientX",
+                "clientY",
+                "ctrlKey",
+                "height",
+                "isPrimary",
+                "metaKey",
+                "movementX",
+                "movementY",
+                "offsetX",
+                "offsetY",
+                "pageX",
+                "pageY",
+                "pointerId",
+                "pointerType",
+                "pressure",
+                "screenX",
+                "screenY",
+                "shiftKey",
+                "tangentialPressure",
+                "tiltX",
+                "tiltY",
+                "timeStamp",
+                "twist",
+                "type",
+                "width",
+                "x",
+                "y",
+            ];
+            if (!last_pointer_data) {
+                last_pointer_data = {};
+                for (let prop of props) {
+                    let span_id = `prop_${prop}_span`;
+                    let span = document.getElementById(span_id);
+                    span = document.createElement("span");
+                    span.id = span_id;
+                    debug_overlay.appendChild(span);
+                    debug_overlay.appendChild(document.createElement("br"));
+                }
+            }
+            for (let prop of props) {
+                let span_id = `prop_${prop}_span`;
+                let span = document.getElementById(span_id);
+                let v = event[prop];
+                span.textContent = `${prop}: ${v}`;
+                if (last_pointer_data[prop] == v) {
+                    span.classList.remove("updated");
+                } else {
+                    span.classList.add("updated");
+                    last_pointer_data[prop] = v;
+                }
+            }
+        }
         if (this.pointerTypes.includes(event.pointerType)) {
             let rect = (event.target as HTMLElement).getBoundingClientRect();
             const events = event_type === "pointermove" && typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [event];
@@ -824,6 +970,10 @@ function handle_messages(
                     alert(msg["Error"]);
                 else if ("ConfigError" in msg) {
                     onConfigError(msg["ConfigError"]);
+                } else if ("CustomInputAreas" in msg) {
+                    settings.custom_input_areas = msg["CustomInputAreas"];
+                    settings.checks.get("enable_custom_input_areas").checked = true;
+                    settings.save_settings();
                 }
             }
 
@@ -884,12 +1034,18 @@ function init() {
     );
     webSocket.binaryType = "arraybuffer";
 
+    debug_overlay = document.getElementById("debug_overlay");
     settings = new Settings(webSocket);
 
     let video = document.getElementById("video") as HTMLVideoElement;
     let canvas = document.getElementById("canvas") as HTMLCanvasElement;
 
     video.oncontextmenu = function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        return false;
+    };
+    canvas.oncontextmenu = function(event) {
         event.preventDefault();
         event.stopPropagation();
         return false;
