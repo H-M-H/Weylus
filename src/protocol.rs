@@ -21,6 +21,7 @@ pub enum MessageInbound {
     Config(ClientConfiguration),
     PauseVideo,
     ResumeVideo,
+    RestartVideo,
     ChooseCustomInputAreas,
 }
 

@@ -31,6 +31,7 @@ enum VideoCommands {
     Start(VideoConfig),
     Pause,
     Resume,
+    Restart,
 }
 
 fn send_message<S>(sender: &mut S, message: MessageOutbound)
@@ -119,6 +120,9 @@ impl<S, R, FnUInput> WeylusClientHandler<S, R, FnUInput> {
                         }
                         MessageInbound::ResumeVideo => {
                             self.video_sender.send(VideoCommands::Resume).unwrap()
+                        }
+                        MessageInbound::RestartVideo => {
+                            self.video_sender.send(VideoCommands::Restart).unwrap()
                         }
                         MessageInbound::ChooseCustomInputAreas => {
                             let (sender, receiver) = std::sync::mpsc::channel();
@@ -371,6 +375,9 @@ fn handle_video<S: WeylusSender + Clone + 'static>(
             }
             Ok(VideoCommands::Resume) => {
                 paused = false;
+            }
+            Ok(VideoCommands::Restart) => {
+                video_encoder = None;
             }
             Err(RecvTimeoutError::Timeout) => {
                 if recorder.is_none() {
