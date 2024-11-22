@@ -171,7 +171,7 @@ impl Recorder for PipeWireRecorder {
     fn capture(&mut self) -> Result<PixelProvider, Box<dyn Error>> {
         if let Some(sample) = self
             .appsink
-            .try_pull_sample(gst::ClockTime::from_mseconds(33))
+            .try_pull_sample(gst::ClockTime::from_mseconds(16))
         {
             let cap = sample.caps().unwrap().structure(0).unwrap();
             let w: i32 = cap.value("width")?.get()?;
