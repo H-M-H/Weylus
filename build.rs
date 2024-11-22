@@ -2,7 +2,7 @@ use std::env;
 use std::path::Path;
 use std::process::Command;
 
-fn build_ffmpeg(dist_dir: &Path) {
+fn build_ffmpeg(dist_dir: &Path, enable_libnpp: bool) {
     if dist_dir.exists() {
         return;
     }
@@ -11,12 +11,13 @@ fn build_ffmpeg(dist_dir: &Path) {
         .arg(Path::new("clean.sh"))
         .current_dir("deps")
         .status()
-        .expect("Failed to run clean ffmpeg build!");
+        .expect("Failed to clean ffmpeg build!");
 
     if !Command::new("bash")
         .arg(Path::new("build.sh"))
         .current_dir("deps")
         .env("DIST", dist_dir)
+        .env("ENABLE_LIBNPP", if enable_libnpp { "y" } else { "n" })
         .status()
         .expect("Failed to run bash!")
         .success()
@@ -34,8 +35,12 @@ fn main() {
         .unwrap()
         .join(format!("dist_{}", target_os));
 
+    let enable_libnpp = env::var("I_AM_BUILDING_THIS_AT_HOME_AND_WANT_LIBNPP").map_or(false, |v| {
+        ["y", "yes", "true", "1"].contains(&v.to_lowercase().as_str())
+    });
+
     if env::var("CARGO_FEATURE_FFMPEG_SYSTEM").is_err() {
-        build_ffmpeg(&dist_dir);
+        build_ffmpeg(&dist_dir, enable_libnpp);
     }
 
     println!("cargo:rerun-if-changed=ts/lib.ts");
@@ -88,6 +93,9 @@ fn main() {
     if target_os == "windows" {
         cc_video.define("HAS_MEDIAFOUNDATION", None);
     }
+    if enable_libnpp {
+        cc_video.define("HAS_LIBNPP", None);
+    }
     cc_video.compile("video");
 
     println!("cargo:rerun-if-changed=lib/error.h");
@@ -115,6 +123,18 @@ fn main() {
     println!("cargo:rustc-link-lib={}=avutil", ffmpeg_link_kind);
     println!("cargo:rustc-link-lib={}=postproc", ffmpeg_link_kind);
     println!("cargo:rustc-link-lib={}=x264", ffmpeg_link_kind);
+    if enable_libnpp {
+        if let Ok(lib_paths) = env::var("LIBRARY_PATH") {
+            for lib_path in lib_paths.split(':') {
+                println!("cargo:rustc-link-search={}", lib_path);
+            }
+        }
+        println!("cargo:rustc-link-lib=dylib=nppig");
+        println!("cargo:rustc-link-lib=dylib=nppicc");
+        println!("cargo:rustc-link-lib=dylib=nppc");
+        println!("cargo:rustc-link-lib=dylib=nppidei");
+        println!("cargo:rustc-link-lib=dylib=nppif");
+    }
     if env::var("CARGO_FEATURE_FFMPEG_SYSTEM").is_err() {
         println!(
             "cargo:rustc-link-search={}",

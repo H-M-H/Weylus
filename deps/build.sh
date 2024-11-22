@@ -26,14 +26,15 @@ export NPROCS="$(nproc || echo 4)"
 if [ "$TARGET_OS" == "windows" ]; then
     if [ "$HOST_OS" == "linux" ]; then
         export CROSS_COMPILE="x86_64-w64-mingw32-"
-        export FFMPEG_EXTRA_ARGS="--arch=x86_64 --target-os=mingw64 --cross-prefix=x86_64-w64-mingw32- \
-            --enable-nvenc --enable-ffnvcodec --enable-mediafoundation --pkg-config=pkg-config"
+        export FFMPEG_EXTRA_ARGS="--arch=x86_64 --target-os=mingw64 \
+            --cross-prefix=x86_64-w64-mingw32- --enable-nvenc --enable-ffnvcodec \
+            --enable-cuda-llvm --enable-mediafoundation --pkg-config=pkg-config"
         export FFMPEG_CFLAGS="-I$DIST/include"
         export FFMPEG_LIBRARY_PATH="-L$DIST/lib"
     else
         export CC="cl"
         export FFMPEG_EXTRA_ARGS="--toolchain=msvc --enable-nvenc --enable-ffnvcodec \
-            --enable-mediafoundation"
+            --enable-cuda-llvm --enable-mediafoundation"
         export FFMPEG_CFLAGS="-I$DIST/include"
         export FFMPEG_LIBRARY_PATH="-LIBPATH:$DIST/lib"
     fi
@@ -43,6 +44,7 @@ else
     if [ "$TARGET_OS" == "linux" ]; then
         export FFMPEG_EXTRA_ARGS="--enable-nvenc \
             --enable-ffnvcodec \
+            --enable-cuda-llvm \
             --enable-vaapi \
             --enable-libdrm \
             --enable-xlib"
@@ -50,6 +52,10 @@ else
     if [ "$TARGET_OS" == "macos" ]; then
         export FFMPEG_EXTRA_ARGS="--enable-videotoolbox"
     fi
+fi
+
+if [ "$ENABLE_LIBNPP" == "y" ]; then
+    export FFMPEG_EXTRA_ARGS="$FFMPEG_EXTRA_ARGS --enable-libnpp --enable-nonfree"
 fi
 
 if [ "$TARGET_OS" == "windows" ] && [ "$HOST_OS" == "linux" ]; then
