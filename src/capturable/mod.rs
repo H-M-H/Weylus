@@ -150,10 +150,14 @@ pub fn get_capturables(
         ]
         .iter()
         {
-            capturables.push(Box::new(testsrc::TestCapturable {
-                width: *width,
-                height: *height,
-            }));
+            use testsrc::PixelFormat;
+            for pixel_format in [PixelFormat::BGR0, PixelFormat::RGB0, PixelFormat::RGB] {
+                capturables.push(Box::new(testsrc::TestCapturable {
+                    width: *width,
+                    height: *height,
+                    pixel_format,
+                }));
+            }
         }
     }
 
