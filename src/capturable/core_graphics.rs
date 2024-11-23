@@ -242,11 +242,41 @@ struct WindowInfo {
 fn get_window_infos() -> Vec<WindowInfo> {
     let mut win_infos = vec![];
     let wins = CGDisplay::window_list_info(
-        display::kCGWindowListExcludeDesktopElements | display::kCGWindowListOptionOnScreenOnly,
+        display::kCGWindowListExcludeDesktopElements ,
         None,
     );
     if let Some(wins) = wins {
         for w in wins.iter() {
+            let w: CFDictionary<*const c_void, *const c_void> =
+                unsafe { CFDictionary::wrap_under_get_rule(*w as CFDictionaryRef) };
+            let id = w.get(unsafe { window::kCGWindowNumber }.to_void());
+            let id = unsafe { CFNumber::wrap_under_get_rule(*id as CFNumberRef) }
+                .to_i64()
+                .unwrap() as CGWindowID;
+
+            let bounds = w.get(unsafe { window::kCGWindowBounds }.to_void());
+            let bounds = unsafe { CFDictionary::wrap_under_get_rule(*bounds as CFDictionaryRef) };
+            let bounds = CGRect::from_dict_representation(&bounds).unwrap();
+
+            let name = match w.find(unsafe { window::kCGWindowName }.to_void()) {
+                Some(n) => n,
+                None => continue,
+            };
+
+            let name = unsafe { CFString::wrap_under_get_rule(*name as CFStringRef) };
+            win_infos.push(WindowInfo {
+                id,
+                name: name.to_string(),
+                bounds,
+            });
+        }
+    }
+    let wins_ = CGDisplay::window_list_info(
+        display::kCGWindowListOptionOnScreenOnly,
+        None,
+    );
+    if let Some(wins_) = wins_ {
+        for w in wins_.iter() {
             let w: CFDictionary<*const c_void, *const c_void> =
                 unsafe { CFDictionary::wrap_under_get_rule(*w as CFDictionaryRef) };
             let id = w.get(unsafe { window::kCGWindowNumber }.to_void());
