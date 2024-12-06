@@ -268,7 +268,8 @@ Debian or Ubuntu they can be installed via:
 apt-get install -y libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev \
 libxfixes-dev libxtst-dev libxrandr-dev libxcomposite-dev libxi-dev libxv-dev autoconf libtool-bin \
 nvidia-cuda-dev pkg-config libdrm-dev libpango1.0-dev libgstreamer1.0-dev \
-libgstreamer-plugins-base1.0-dev libdbus-1-dev
+libgstreamer-plugins-base1.0-dev libdbus-1-dev libxcb-dri3-dev libva-dev libavdevice-dev \
+libx264-dev
 ```
 
 On Fedora, they can be installed via:
