@@ -728,6 +728,8 @@ class PointerHandler {
             canvas.onpointerenter = (e) => this.onEvent(e, "pointerenter");
             canvas.onpointerover = (e) => this.onEvent(e, "pointerover");
         }
+        canvas.onpointerenter = (e) => this.onEvent(e, "pointerenter");
+        canvas.onpointerleave = (e) => this.onEvent(e, "pointerleave");
 
         // This is a workaround for the following Safari/WebKit bug:
         // https://bugs.webkit.org/show_bug.cgi?id=217430
