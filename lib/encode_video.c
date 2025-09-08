@@ -234,12 +234,14 @@ void init_scaler(
 		goto end;
 	}
 
-	ret = av_opt_set_bin(
+	ret = av_opt_set_array(
 		ctx->buffersink_scale_ctx,
-		"pix_fmts",
-		(uint8_t*)&pix_fmt_out,
-		sizeof(pix_fmt_out),
-		AV_OPT_SEARCH_CHILDREN);
+		"pixel_formats",
+		AV_OPT_SEARCH_CHILDREN,
+		0,
+		1,
+		AV_OPT_TYPE_PIXEL_FMT,
+		&pix_fmt_out);
 	if (ret < 0)
 	{
 		log_warn("Cannot set output pixel format: %s", av_err2str(ret));
