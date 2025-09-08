@@ -121,7 +121,6 @@ fn main() {
     println!("cargo:rustc-link-lib={}=swresample", ffmpeg_link_kind);
     println!("cargo:rustc-link-lib={}=swscale", ffmpeg_link_kind);
     println!("cargo:rustc-link-lib={}=avutil", ffmpeg_link_kind);
-    println!("cargo:rustc-link-lib={}=postproc", ffmpeg_link_kind);
     println!("cargo:rustc-link-lib={}=x264", ffmpeg_link_kind);
     if enable_libnpp {
         if let Ok(lib_paths) = env::var("LIBRARY_PATH") {

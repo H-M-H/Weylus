@@ -225,25 +225,31 @@ void init_scaler(
 	}
 
 	/* buffer video sink: to terminate the filter chain. */
-	ret = avfilter_graph_create_filter(
-		&ctx->buffersink_scale_ctx, buffersink, "out", NULL, NULL, ctx->filter_graph_scale);
-	if (ret < 0)
+	ctx->buffersink_scale_ctx =
+		avfilter_graph_alloc_filter(ctx->filter_graph_scale, buffersink, "out");
+
+	if (ctx->buffersink_scale_ctx == NULL)
 	{
-		log_warn("Cannot create buffer sink");
+		log_warn("Cannot allocate buffer sink");
 		goto end;
 	}
 
-	enum AVPixelFormat pix_fmts_out[] = {pix_fmt_out, AV_PIX_FMT_NONE};
-
-	ret = av_opt_set_int_list(
+	ret = av_opt_set_bin(
 		ctx->buffersink_scale_ctx,
 		"pix_fmts",
-		pix_fmts_out,
-		AV_PIX_FMT_NONE,
+		(uint8_t*)&pix_fmt_out,
+		sizeof(pix_fmt_out),
 		AV_OPT_SEARCH_CHILDREN);
 	if (ret < 0)
 	{
-		log_warn("Cannot set output pixel format");
+		log_warn("Cannot set output pixel format: %s", av_err2str(ret));
+		goto end;
+	}
+
+	ret = avfilter_init_dict(ctx->buffersink_scale_ctx, NULL);
+	if (ret < 0)
+	{
+		log_warn("Cannot init buffer sink");
 		goto end;
 	}
 
