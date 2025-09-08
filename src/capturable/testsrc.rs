@@ -80,7 +80,7 @@ impl Capturable for TestCapturable {
 }
 
 impl Recorder for TestRecorder {
-    fn capture(&mut self) -> Result<PixelProvider, Box<dyn Error>> {
+    fn capture(&mut self) -> Result<PixelProvider<'_>, Box<dyn Error>> {
         const N: usize = 120;
         let dh = self.capturable.height / N;
         let buf_ref = self.buf.as_mut();

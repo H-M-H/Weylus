@@ -321,7 +321,7 @@ impl Drop for RecorderX11 {
 }
 
 impl Recorder for RecorderX11 {
-    fn capture(&mut self) -> Result<PixelProvider, Box<dyn Error>> {
+    fn capture(&mut self) -> Result<PixelProvider<'_>, Box<dyn Error>> {
         let mut err = CError::new();
         self.capturable.disp.lock();
         unsafe {

@@ -168,7 +168,7 @@ impl PipeWireRecorder {
 }
 
 impl Recorder for PipeWireRecorder {
-    fn capture(&mut self) -> Result<PixelProvider, Box<dyn Error>> {
+    fn capture(&mut self) -> Result<PixelProvider<'_>, Box<dyn Error>> {
         if let Some(sample) = self
             .appsink
             .try_pull_sample(gst::ClockTime::from_mseconds(16))
@@ -305,7 +305,7 @@ where
         })
 }
 
-fn get_portal(conn: &SyncConnection) -> Proxy<&SyncConnection> {
+fn get_portal(conn: &SyncConnection) -> Proxy<'_, &SyncConnection> {
     conn.with_proxy(
         "org.freedesktop.portal.Desktop",
         "/org/freedesktop/portal/desktop",

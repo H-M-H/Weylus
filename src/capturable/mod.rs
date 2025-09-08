@@ -18,7 +18,7 @@ pub mod win_ctx;
 #[cfg(target_os = "linux")]
 pub mod x11;
 pub trait Recorder {
-    fn capture(&mut self) -> Result<crate::video::PixelProvider, Box<dyn Error>>;
+    fn capture(&mut self) -> Result<crate::video::PixelProvider<'_>, Box<dyn Error>>;
 }
 
 pub trait BoxCloneCapturable {
