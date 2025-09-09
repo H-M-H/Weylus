@@ -28,13 +28,13 @@ if [ "$TARGET_OS" == "windows" ]; then
         export CROSS_COMPILE="x86_64-w64-mingw32-"
         export FFMPEG_EXTRA_ARGS="--arch=x86_64 --target-os=mingw64 \
             --cross-prefix=x86_64-w64-mingw32- --enable-nvenc --enable-ffnvcodec \
-            --enable-cuda-llvm --enable-mediafoundation --pkg-config=pkg-config"
+            --enable-cuda-llvm --enable-mediafoundation --pkg-config=pkg-config --enable-d3d11va"
         export FFMPEG_CFLAGS="-I$DIST/include"
         export FFMPEG_LIBRARY_PATH="-L$DIST/lib"
     else
         export CC="cl"
         export FFMPEG_EXTRA_ARGS="--toolchain=msvc --enable-nvenc --enable-ffnvcodec \
-            --enable-cuda-llvm --enable-mediafoundation"
+            --enable-cuda-llvm --enable-mediafoundation --enable-d3d11va"
         export FFMPEG_CFLAGS="-I$DIST/include"
         export FFMPEG_LIBRARY_PATH="-LIBPATH:$DIST/lib"
     fi
