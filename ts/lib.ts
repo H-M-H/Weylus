@@ -1083,6 +1083,7 @@ function init() {
         settings.send_server_config();
     }
     video.controls = false;
+    video.disableRemotePlayback = true;
     video.onloadeddata = () => stretch_video();
     let is_connected = false;
     handle_messages(webSocket, video, () => {
