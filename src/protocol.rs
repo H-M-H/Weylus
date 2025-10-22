@@ -61,7 +61,7 @@ pub struct CustomInputAreas {
     pub pen: Option<Rect>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum PointerType {
     #[serde(rename = "")]
     Unknown,
@@ -73,7 +73,7 @@ pub enum PointerType {
     Touch,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 pub enum PointerEventType {
     #[serde(rename = "pointerdown")]
     DOWN,

@@ -94,7 +94,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 [[package]]
 name = "autopilot"
 version = "0.4.0"
-source = "git+https://github.com/H-M-H/autopilot-rs.git?rev=63eed09c715bfb665bb23172a3930a528e11691c#63eed09c715bfb665bb23172a3930a528e11691c"
+source = "git+https://github.com/lyonbot/autopilot-rs.git?rev=a92b41edb4818d0d4b4289d49e65420dbe9ab081#a92b41edb4818d0d4b4289d49e65420dbe9ab081"
 dependencies = [
  "cocoa",
  "core-foundation 0.7.0",
