@@ -9,7 +9,7 @@ description = "Use your iPad or Android tablet as graphic tablet."
 [dependencies]
 autopilot = { git = "https://github.com/H-M-H/autopilot-rs.git", rev = "63eed09c715bfb665bb23172a3930a528e11691c" }
 bitflags = { version = "^2.6", features = ["serde"] }
-bytes = "1.7.1"
+bytes = "1.11.1"
 clap = { version = "4.5.18", features = ["derive"] }
 clap_complete = "4.5.29"
 dirs = "^5.0"
