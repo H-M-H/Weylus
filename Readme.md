@@ -83,11 +83,35 @@ full screen mode (on iOS/iPadOS this needs to be done with Safari). If you are n
 there is a button to toggle full screen mode.
 
 ### Touchpad Mode
-Touchpad mode uses touch input for relative cursor control instead of mapping touches to absolute
-screen positions. A one-finger tap clicks, a double-tap followed by movement drags, a two-finger
-gesture scrolls, and two- and three-finger taps produce right and middle clicks. The input settings
-allow these gestures, their sensitivity, tap timing, and movement tolerances to be customized and
-saved on the client device.
+Touchpad mode makes the tablet screen behave like a laptop touchpad. Touch input moves the pointer
+relative to its current position instead of mapping each touch to an absolute screen coordinate.
+This is useful when absolute positioning is inconvenient or behaves unexpectedly in applications
+such as MediBang Paint. Pen and stylus input continue to use their normal behavior.
+
+Available gestures:
+
+- **One-finger drag:** Move the mouse pointer.
+- **One-finger tap:** Perform a left click.
+- **Double-tap and drag:** Hold the left mouse button while moving, for drawing, selecting, or
+  dragging objects.
+- **Two-finger drag:** Scroll vertically or horizontally.
+- **Two-finger tap:** Perform a right click.
+- **Three-finger tap:** Perform a middle click.
+- **Gesture cancellation or disconnection:** Safely release any mouse buttons held by touchpad
+  mode.
+
+The following options can be customized independently:
+
+- Cursor and scrolling sensitivity
+- Maximum tap duration
+- Maximum interval and distance between double taps
+- Movement tolerance used to distinguish a tap from a drag
+- Tap-to-click, double-tap-and-drag, and two-finger scrolling
+- Reverse scrolling
+- Two-finger right-click and three-finger middle-click
+
+Touchpad preferences are saved locally in the client browser. The settings panel also provides a
+button to restore all touchpad options to their defaults.
 
 ### Keyboard Input
 Weylus supports keyboard input for physical keyboards, so if you have a Bluetooth keyboard, just
