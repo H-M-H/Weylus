@@ -6,17 +6,29 @@ use autopilot::screen::size as screen_size;
 use tracing::warn;
 
 use crate::input::device::{InputDevice, InputDeviceType};
-use crate::protocol::{Button, KeyboardEvent, KeyboardEventType, PointerEvent, WheelEvent};
+use crate::protocol::{
+    Button, KeyboardEvent, KeyboardEventType, PointerEvent, RelativePointerEvent, WheelEvent,
+};
 
 use crate::capturable::{Capturable, Geometry};
 
 pub struct AutoPilotDevice {
     capturable: Box<dyn Capturable>,
+    pressed_buttons: Button,
 }
 
 impl AutoPilotDevice {
     pub fn new(capturable: Box<dyn Capturable>) -> Self {
-        Self { capturable }
+        Self {
+            capturable,
+            pressed_buttons: Button::NONE,
+        }
+    }
+}
+
+impl Drop for AutoPilotDevice {
+    fn drop(&mut self) {
+        <Self as InputDevice>::release_buttons(self);
     }
 }
 
@@ -27,6 +39,10 @@ impl InputDevice for AutoPilotDevice {
             i32::MIN..=-1 => mouse::scroll(ScrollDirection::Down, 1),
             0 => {}
         }
+    }
+
+    fn send_touchpad_wheel_event(&mut self, event: &WheelEvent) {
+        self.send_wheel_event(event);
     }
 
     fn send_pointer_event(&mut self, event: &PointerEvent) {
@@ -73,6 +89,67 @@ impl InputDevice for AutoPilotDevice {
             }
             _ => (),
         }
+        if event
+            .button
+            .intersects(Button::PRIMARY | Button::SECONDARY | Button::AUXILARY)
+        {
+            if event.buttons.contains(event.button) {
+                self.pressed_buttons.insert(event.button);
+            } else {
+                self.pressed_buttons.remove(event.button);
+            }
+        }
+    }
+
+    fn send_relative_pointer_event(&mut self, event: &RelativePointerEvent) {
+        if let Err(err) = self.capturable.before_input() {
+            warn!("Failed to activate window, sending no input ({})", err);
+            return;
+        }
+        match event.button {
+            Button::PRIMARY => {
+                mouse::toggle(mouse::Button::Left, event.buttons.contains(event.button))
+            }
+            Button::AUXILARY => {
+                mouse::toggle(mouse::Button::Middle, event.buttons.contains(event.button))
+            }
+            Button::SECONDARY => {
+                mouse::toggle(mouse::Button::Right, event.buttons.contains(event.button))
+            }
+            _ => (),
+        }
+        if event.dx != 0 || event.dy != 0 {
+            let location = mouse::location();
+            if let Err(err) = mouse::move_to(autopilot::geometry::Point::new(
+                location.x + event.dx as f64,
+                location.y + event.dy as f64,
+            )) {
+                warn!("Could not move mouse: {}", err);
+            }
+        }
+        if event
+            .button
+            .intersects(Button::PRIMARY | Button::SECONDARY | Button::AUXILARY)
+        {
+            if event.buttons.contains(event.button) {
+                self.pressed_buttons.insert(event.button);
+            } else {
+                self.pressed_buttons.remove(event.button);
+            }
+        }
+    }
+
+    fn release_buttons(&mut self) {
+        if self.pressed_buttons.contains(Button::PRIMARY) {
+            mouse::toggle(mouse::Button::Left, false);
+        }
+        if self.pressed_buttons.contains(Button::SECONDARY) {
+            mouse::toggle(mouse::Button::Right, false);
+        }
+        if self.pressed_buttons.contains(Button::AUXILARY) {
+            mouse::toggle(mouse::Button::Middle, false);
+        }
+        self.pressed_buttons = Button::NONE;
     }
 
     fn send_keyboard_event(&mut self, event: &KeyboardEvent) {

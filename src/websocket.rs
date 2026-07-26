@@ -13,7 +13,7 @@ use crate::capturable::{get_capturables, Capturable, Recorder};
 use crate::input::device::{InputDevice, InputDeviceType};
 use crate::protocol::{
     ClientConfiguration, KeyboardEvent, MessageInbound, MessageOutbound, PointerEvent,
-    WeylusReceiver, WeylusSender, WheelEvent,
+    RelativePointerEvent, WeylusReceiver, WeylusSender, WheelEvent,
 };
 
 use crate::cerror::CErrorCode;
@@ -111,7 +111,14 @@ impl<S, R, FnUInput> WeylusClientHandler<S, R, FnUInput> {
                     trace!("Received message: {message:?}");
                     match message {
                         MessageInbound::PointerEvent(event) => self.process_pointer_event(&event),
+                        MessageInbound::RelativePointerEvent(event) => {
+                            self.process_relative_pointer_event(&event)
+                        }
+                        MessageInbound::ReleaseButtons => self.release_buttons(),
                         MessageInbound::WheelEvent(event) => self.process_wheel_event(&event),
+                        MessageInbound::TouchpadWheelEvent(event) => {
+                            self.process_touchpad_wheel_event(&event)
+                        }
                         MessageInbound::KeyboardEvent(event) => self.process_keyboard_event(&event),
                         MessageInbound::GetCapturableList => self.send_capturable_list(),
                         MessageInbound::Config(config) => self.update_config(config),
@@ -168,6 +175,13 @@ impl<S, R, FnUInput> WeylusClientHandler<S, R, FnUInput> {
         }
     }
 
+    fn process_touchpad_wheel_event(&mut self, event: &WheelEvent) {
+        match &mut self.input_device {
+            Some(i) => i.send_touchpad_wheel_event(event),
+            None => warn!("Input device is not initalized, can not process TouchpadWheelEvent!"),
+        }
+    }
+
     fn process_pointer_event(&mut self, event: &PointerEvent) {
         if self.input_device.is_some() {
             self.input_device
@@ -176,6 +190,19 @@ impl<S, R, FnUInput> WeylusClientHandler<S, R, FnUInput> {
                 .send_pointer_event(event)
         } else {
             warn!("Input device is not initalized, can not process PointerEvent!");
+        }
+    }
+
+    fn process_relative_pointer_event(&mut self, event: &RelativePointerEvent) {
+        match &mut self.input_device {
+            Some(i) => i.send_relative_pointer_event(event),
+            None => warn!("Input device is not initalized, can not process RelativePointerEvent!"),
+        }
+    }
+
+    fn release_buttons(&mut self) {
+        if let Some(input_device) = self.input_device.as_mut() {
+            input_device.release_buttons();
         }
     }
 

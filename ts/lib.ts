@@ -116,6 +116,14 @@ class Settings {
     scale_video_input: HTMLInputElement;
     scale_video_output: HTMLOutputElement;
     range_min_pressure: HTMLInputElement;
+    touchpad_sensitivity_input: HTMLInputElement;
+    touchpad_sensitivity_output: HTMLOutputElement;
+    touchpad_scroll_sensitivity_input: HTMLInputElement;
+    touchpad_tap_duration_input: HTMLInputElement;
+    touchpad_double_tap_interval_input: HTMLInputElement;
+    touchpad_movement_tolerance_input: HTMLInputElement;
+    touchpad_double_tap_distance_input: HTMLInputElement;
+    touchpad_options: HTMLFieldSetElement;
     check_aggressive_seek: HTMLInputElement;
     client_name_input: HTMLInputElement;
     visible: boolean;
@@ -133,6 +141,14 @@ class Settings {
         this.scale_video_input = document.getElementById("scale_video") as HTMLInputElement;
         this.scale_video_output = this.scale_video_input.nextElementSibling as HTMLOutputElement;
         this.range_min_pressure = document.getElementById("min_pressure") as HTMLInputElement;
+        this.touchpad_sensitivity_input = document.getElementById("touchpad_sensitivity") as HTMLInputElement;
+        this.touchpad_sensitivity_output = this.touchpad_sensitivity_input.nextElementSibling as HTMLOutputElement;
+        this.touchpad_scroll_sensitivity_input = document.getElementById("touchpad_scroll_sensitivity") as HTMLInputElement;
+        this.touchpad_tap_duration_input = document.getElementById("touchpad_tap_duration") as HTMLInputElement;
+        this.touchpad_double_tap_interval_input = document.getElementById("touchpad_double_tap_interval") as HTMLInputElement;
+        this.touchpad_movement_tolerance_input = document.getElementById("touchpad_movement_tolerance") as HTMLInputElement;
+        this.touchpad_double_tap_distance_input = document.getElementById("touchpad_double_tap_distance") as HTMLInputElement;
+        this.touchpad_options = document.getElementById("touchpad_options") as HTMLFieldSetElement;
         this.client_name_input = document.getElementById("client_name") as HTMLInputElement;
         this.frame_rate_input.oninput = () => {
             this.frame_rate_output.value = Math.round(frame_rate_scale(this.frame_rate_input.valueAsNumber)).toString();
@@ -141,6 +157,19 @@ class Settings {
             let [w, h] = calc_max_video_resolution(this.scale_video_input.valueAsNumber)
             this.scale_video_output.value = w + "x" + h
         }
+        this.touchpad_sensitivity_input.oninput = () => {
+            this.touchpad_sensitivity_output.value = this.touchpad_sensitivity_input.valueAsNumber.toFixed(2) + "x";
+        }
+        let bind_touchpad_range = (input: HTMLInputElement, format: (value: number) => string) => {
+            let output = input.nextElementSibling as HTMLOutputElement;
+            input.oninput = () => output.value = format(input.valueAsNumber);
+            input.onchange = () => this.save_settings();
+        };
+        bind_touchpad_range(this.touchpad_scroll_sensitivity_input, (value) => value.toFixed(2) + "x");
+        bind_touchpad_range(this.touchpad_tap_duration_input, (value) => value.toFixed(0) + " ms");
+        bind_touchpad_range(this.touchpad_double_tap_interval_input, (value) => value.toFixed(0) + " ms");
+        bind_touchpad_range(this.touchpad_movement_tolerance_input, (value) => value.toFixed(0) + " px");
+        bind_touchpad_range(this.touchpad_double_tap_distance_input, (value) => value.toFixed(0) + " px");
         this.visible = true;
 
         // Settings UI
@@ -210,6 +239,21 @@ class Settings {
         this.checks.get("enable_mouse").onchange = upd_pointer;
         this.checks.get("enable_stylus").onchange = upd_pointer;
         this.checks.get("enable_touch").onchange = upd_pointer;
+        this.checks.get("touchpad_mode").onchange = () => {
+            this.update_touchpad_options();
+            upd_pointer();
+        };
+        for (const key of [
+            "touchpad_tap_to_click",
+            "touchpad_double_tap_drag",
+            "touchpad_two_finger_scroll",
+            "touchpad_reverse_scroll",
+            "touchpad_two_finger_tap",
+            "touchpad_three_finger_tap"])
+            this.checks.get(key).onchange = upd_pointer;
+        this.touchpad_sensitivity_input.onchange = () => this.save_settings();
+        document.getElementById("reset_touchpad").onclick = () => this.reset_touchpad_defaults();
+        this.update_touchpad_options();
 
         this.checks.get("energysaving").onchange = (e) => {
             this.save_settings();
@@ -261,6 +305,12 @@ class Settings {
         settings["frame_rate"] = frame_rate_scale(this.frame_rate_input.valueAsNumber).toString();
         settings["scale_video"] = this.scale_video_input.value;
         settings["min_pressure"] = this.range_min_pressure.value;
+        settings["touchpad_sensitivity"] = this.touchpad_sensitivity_input.value;
+        settings["touchpad_scroll_sensitivity"] = this.touchpad_scroll_sensitivity_input.value;
+        settings["touchpad_tap_duration"] = this.touchpad_tap_duration_input.value;
+        settings["touchpad_double_tap_interval"] = this.touchpad_double_tap_interval_input.value;
+        settings["touchpad_movement_tolerance"] = this.touchpad_movement_tolerance_input.value;
+        settings["touchpad_double_tap_distance"] = this.touchpad_double_tap_distance_input.value;
         settings["custom_input_areas"] = this.custom_input_areas;
         settings["client_name"] = this.client_name_input.value;
         localStorage.setItem("settings", JSON.stringify(settings));
@@ -297,6 +347,16 @@ class Settings {
             let min_pressure = settings["min_pressure"];
             if (min_pressure)
                 this.range_min_pressure.value = min_pressure;
+
+            let touchpad_sensitivity = Number(settings["touchpad_sensitivity"]);
+            if (touchpad_sensitivity >= 0.25 && touchpad_sensitivity <= 3)
+                this.touchpad_sensitivity_input.value = touchpad_sensitivity.toString();
+            this.touchpad_sensitivity_output.value = this.touchpad_sensitivity_input.valueAsNumber.toFixed(2) + "x";
+            this.load_range_setting(settings, "touchpad_scroll_sensitivity", this.touchpad_scroll_sensitivity_input, (value) => value.toFixed(2) + "x");
+            this.load_range_setting(settings, "touchpad_tap_duration", this.touchpad_tap_duration_input, (value) => value.toFixed(0) + " ms");
+            this.load_range_setting(settings, "touchpad_double_tap_interval", this.touchpad_double_tap_interval_input, (value) => value.toFixed(0) + " ms");
+            this.load_range_setting(settings, "touchpad_movement_tolerance", this.touchpad_movement_tolerance_input, (value) => value.toFixed(0) + " px");
+            this.load_range_setting(settings, "touchpad_double_tap_distance", this.touchpad_double_tap_distance_input, (value) => value.toFixed(0) + " px");
 
             this.custom_input_areas = settings["custom_input_areas"];
 
@@ -348,6 +408,74 @@ class Settings {
         if (this.checks.get("enable_touch").checked)
             ptrs.push("touch");
         return ptrs;
+    }
+
+    touchpad_sensitivity() {
+        return this.touchpad_sensitivity_input.valueAsNumber;
+    }
+
+    touchpad_scroll_sensitivity() {
+        return this.touchpad_scroll_sensitivity_input.valueAsNumber;
+    }
+
+    touchpad_tap_duration() {
+        return this.touchpad_tap_duration_input.valueAsNumber;
+    }
+
+    touchpad_double_tap_interval() {
+        return this.touchpad_double_tap_interval_input.valueAsNumber;
+    }
+
+    touchpad_movement_tolerance() {
+        return this.touchpad_movement_tolerance_input.valueAsNumber;
+    }
+
+    touchpad_double_tap_distance() {
+        return this.touchpad_double_tap_distance_input.valueAsNumber;
+    }
+
+    load_range_setting(saved: any, key: string, input: HTMLInputElement, format: (value: number) => string) {
+        let value = Number(saved[key]);
+        let min = Number(input.min);
+        let max = Number(input.max);
+        if (Number.isFinite(value) && value >= min && value <= max)
+            input.value = value.toString();
+        (input.nextElementSibling as HTMLOutputElement).value = format(input.valueAsNumber);
+    }
+
+    update_touchpad_options() {
+        let enabled = this.checks.get("touchpad_mode").checked;
+        this.touchpad_options.classList.toggle("touchpad_disabled", !enabled);
+        this.touchpad_options.querySelectorAll("input, button").forEach((element) => {
+            if ((element as HTMLElement).id != "touchpad_mode")
+                (element as HTMLInputElement | HTMLButtonElement).disabled = !enabled;
+        });
+    }
+
+    reset_touchpad_defaults() {
+        let defaults = {
+            "touchpad_sensitivity": "1",
+            "touchpad_scroll_sensitivity": "1",
+            "touchpad_tap_duration": "200",
+            "touchpad_double_tap_interval": "300",
+            "touchpad_movement_tolerance": "8",
+            "touchpad_double_tap_distance": "25",
+        };
+        for (const key of Object.keys(defaults)) {
+            let input = document.getElementById(key) as HTMLInputElement;
+            input.value = defaults[key];
+            input.dispatchEvent(new Event("input"));
+        }
+        for (const key of [
+            "touchpad_tap_to_click",
+            "touchpad_double_tap_drag",
+            "touchpad_two_finger_scroll",
+            "touchpad_two_finger_tap",
+            "touchpad_three_finger_tap"])
+            this.checks.get(key).checked = true;
+        this.checks.get("touchpad_reverse_scroll").checked = false;
+        this.save_settings();
+        new PointerHandler(this.webSocket);
     }
 
     toggle() {
@@ -686,15 +814,54 @@ class Painter {
     }
 }
 
+interface TouchContact {
+    x: number;
+    y: number;
+    startX: number;
+    startY: number;
+    maxMovement: number;
+}
+
+let active_pointer_handler: PointerHandler = null;
+
 class PointerHandler {
     webSocket: WebSocket;
     pointerTypes: string[];
+    touches: Map<number, TouchContact>;
+    touchGestureStarted: number;
+    gestureFingerCount: number;
+    gestureMoved: boolean;
+    dragCandidate: boolean;
+    dragging: boolean;
+    lastTapTime: number;
+    lastTapX: number;
+    lastTapY: number;
+    relativeRemainderX: number;
+    relativeRemainderY: number;
+    scrollRemainderX: number;
+    scrollRemainderY: number;
 
     constructor(webSocket: WebSocket) {
+        if (active_pointer_handler)
+            active_pointer_handler.cleanup();
+        active_pointer_handler = this;
         let video = document.getElementById("video");
         let canvas = document.getElementById("canvas");
         this.webSocket = webSocket;
         this.pointerTypes = settings.pointer_types();
+        this.touches = new Map();
+        this.touchGestureStarted = 0;
+        this.gestureFingerCount = 0;
+        this.gestureMoved = false;
+        this.dragCandidate = false;
+        this.dragging = false;
+        this.lastTapTime = 0;
+        this.lastTapX = 0;
+        this.lastTapY = 0;
+        this.relativeRemainderX = 0;
+        this.relativeRemainderY = 0;
+        this.scrollRemainderX = 0;
+        this.scrollRemainderY = 0;
 
         video.onpointerdown = (e) => this.onEvent(e, "pointerdown");
         video.onpointerup = (e) => this.onEvent(e, "pointerup");
@@ -710,14 +877,14 @@ class PointerHandler {
             painter = new Painter(canvas as HTMLCanvasElement);
 
         if (painter && painter.initialized) {
-            canvas.onpointerdown = (e) => { this.onEvent(e, "pointerdown"); painter.onstart(e); };
-            canvas.onpointerup = (e) => { this.onEvent(e, "pointerup"); painter.onstop(e); };
-            canvas.onpointercancel = (e) => { this.onEvent(e, "pointercancel"); painter.onstop(e); };
-            canvas.onpointermove = (e) => { this.onEvent(e, "pointermove"); painter.onmove(e); };
-            canvas.onpointerout = (e) => { this.onEvent(e, "pointerout"); painter.onstop(e); };
-            canvas.onpointerleave = (e) => { this.onEvent(e, "pointerleave"); painter.onstop(e); };
-            canvas.onpointerenter = (e) => { this.onEvent(e, "pointerenter"); painter.onmove(e); };
-            canvas.onpointerover = (e) => { this.onEvent(e, "pointerover"); painter.onmove(e); };
+            canvas.onpointerdown = (e) => { if (this.onEvent(e, "pointerdown")) painter.onstart(e); };
+            canvas.onpointerup = (e) => { if (this.onEvent(e, "pointerup")) painter.onstop(e); };
+            canvas.onpointercancel = (e) => { if (this.onEvent(e, "pointercancel")) painter.onstop(e); };
+            canvas.onpointermove = (e) => { if (this.onEvent(e, "pointermove")) painter.onmove(e); };
+            canvas.onpointerout = (e) => { if (this.onEvent(e, "pointerout")) painter.onstop(e); };
+            canvas.onpointerleave = (e) => { if (this.onEvent(e, "pointerleave")) painter.onstop(e); };
+            canvas.onpointerenter = (e) => { if (this.onEvent(e, "pointerenter")) painter.onmove(e); };
+            canvas.onpointerover = (e) => { if (this.onEvent(e, "pointerover")) painter.onmove(e); };
         } else {
             canvas.onpointerdown = (e) => this.onEvent(e, "pointerdown");
             canvas.onpointerup = (e) => this.onEvent(e, "pointerup");
@@ -738,6 +905,187 @@ class PointerHandler {
         for (let elem of [video, canvas]) {
             elem.onwheel = (e) => {
                 this.webSocket.send(JSON.stringify({ "WheelEvent": new WEvent(e) }));
+            }
+        }
+    }
+
+    send(message: object | string) {
+        if (this.webSocket.readyState === WebSocket.OPEN)
+            this.webSocket.send(JSON.stringify(message));
+    }
+
+    sendRelative(dx: number, dy: number, button: number = 0, buttons: number = 0) {
+        this.relativeRemainderX += dx;
+        this.relativeRemainderY += dy;
+        let moveX = Math.trunc(this.relativeRemainderX);
+        let moveY = Math.trunc(this.relativeRemainderY);
+        this.relativeRemainderX -= moveX;
+        this.relativeRemainderY -= moveY;
+        if (moveX || moveY || button)
+            this.send({ "RelativePointerEvent": { "dx": moveX, "dy": moveY, "button": button, "buttons": buttons } });
+    }
+
+    sendButton(button: number, down: boolean) {
+        this.sendRelative(0, 0, button, down ? button : 0);
+    }
+
+    click(button: number) {
+        this.sendButton(button, true);
+        this.sendButton(button, false);
+    }
+
+    releaseButtons() {
+        this.send("ReleaseButtons");
+        this.dragCandidate = false;
+        this.dragging = false;
+    }
+
+    cleanup() {
+        this.releaseButtons();
+        this.touches.clear();
+        this.gestureFingerCount = 0;
+        this.gestureMoved = false;
+        this.touchGestureStarted = 0;
+        this.relativeRemainderX = 0;
+        this.relativeRemainderY = 0;
+        this.scrollRemainderX = 0;
+        this.scrollRemainderY = 0;
+    }
+
+    contactMovement(contact: TouchContact) {
+        return Math.hypot(contact.x - contact.startX, contact.y - contact.startY);
+    }
+
+    resetTouchGesture() {
+        this.touches.clear();
+        this.touchGestureStarted = 0;
+        this.gestureFingerCount = 0;
+        this.gestureMoved = false;
+        this.dragCandidate = false;
+        this.relativeRemainderX = 0;
+        this.relativeRemainderY = 0;
+        this.scrollRemainderX = 0;
+        this.scrollRemainderY = 0;
+    }
+
+    handleTouchpadEvent(event: PointerEvent, event_type: string) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (event_type == "pointercancel") {
+            this.cleanup();
+            return;
+        }
+
+        if (event_type == "pointerdown") {
+            (event.target as HTMLElement).setPointerCapture(event.pointerId);
+            this.touches.set(event.pointerId, {
+                x: event.clientX,
+                y: event.clientY,
+                startX: event.clientX,
+                startY: event.clientY,
+                maxMovement: 0,
+            });
+
+            if (this.touches.size == 1) {
+                this.touchGestureStarted = performance.now();
+                this.gestureFingerCount = 1;
+                this.gestureMoved = false;
+                let closeToLastTap = Math.hypot(event.clientX - this.lastTapX, event.clientY - this.lastTapY) <
+                    settings.touchpad_double_tap_distance();
+                if (settings.checks.get("touchpad_double_tap_drag").checked &&
+                    this.lastTapTime &&
+                    performance.now() - this.lastTapTime < settings.touchpad_double_tap_interval() &&
+                    closeToLastTap) {
+                    this.dragCandidate = true;
+                    this.lastTapTime = 0;
+                }
+            } else {
+                if (this.dragging)
+                    this.releaseButtons();
+                this.gestureFingerCount = Math.max(this.gestureFingerCount, this.touches.size);
+                this.lastTapTime = 0;
+                this.scrollRemainderX = 0;
+                this.scrollRemainderY = 0;
+            }
+            return;
+        }
+
+        let contact = this.touches.get(event.pointerId);
+        if (!contact)
+            return;
+
+        if (event_type == "pointermove") {
+            let dx = event.clientX - contact.x;
+            let dy = event.clientY - contact.y;
+            contact.x = event.clientX;
+            contact.y = event.clientY;
+            contact.maxMovement = Math.max(contact.maxMovement, this.contactMovement(contact));
+            if (contact.maxMovement >= settings.touchpad_movement_tolerance())
+                this.gestureMoved = true;
+
+            if (this.gestureFingerCount == 2 && this.touches.size == 2 &&
+                settings.checks.get("touchpad_two_finger_scroll").checked) {
+                this.scrollRemainderX += dx / 2;
+                this.scrollRemainderY += dy / 2;
+                const scrollStep = 8 / settings.touchpad_scroll_sensitivity();
+                const scrollDirection = settings.checks.get("touchpad_reverse_scroll").checked ? -1 : 1;
+                while (Math.abs(this.scrollRemainderX) >= scrollStep ||
+                    Math.abs(this.scrollRemainderY) >= scrollStep) {
+                    let wheelX = Math.abs(this.scrollRemainderX) >= scrollStep ?
+                        Math.sign(this.scrollRemainderX) * scrollDirection : 0;
+                    let wheelY = Math.abs(this.scrollRemainderY) >= scrollStep ?
+                        Math.sign(this.scrollRemainderY) * scrollDirection : 0;
+                    this.send({ "TouchpadWheelEvent": { "dx": wheelX, "dy": wheelY, "timestamp": Math.round(event.timeStamp * 1000) } });
+                    this.scrollRemainderX -= wheelX * scrollStep * scrollDirection;
+                    this.scrollRemainderY -= wheelY * scrollStep * scrollDirection;
+                }
+            } else if (this.gestureFingerCount == 1 && this.touches.size == 1) {
+                let sensitivity = settings.touchpad_sensitivity();
+                if (this.dragCandidate && (dx != 0 || dy != 0)) {
+                    this.dragCandidate = false;
+                    this.dragging = true;
+                    this.sendRelative(dx * sensitivity, dy * sensitivity, 1, 1);
+                } else {
+                    this.sendRelative(dx * sensitivity, dy * sensitivity);
+                }
+            }
+            return;
+        }
+
+        if (event_type == "pointerup") {
+            let elapsed = performance.now() - this.touchGestureStarted;
+            contact.x = event.clientX;
+            contact.y = event.clientY;
+            contact.maxMovement = Math.max(contact.maxMovement, this.contactMovement(contact));
+            if (contact.maxMovement >= settings.touchpad_movement_tolerance())
+                this.gestureMoved = true;
+            this.touches.delete(event.pointerId);
+
+            if (this.dragging) {
+                this.releaseButtons();
+                if (this.touches.size == 0)
+                    this.resetTouchGesture();
+                return;
+            }
+
+            if (this.touches.size == 0) {
+                if (elapsed < settings.touchpad_tap_duration() && !this.gestureMoved) {
+                    if (this.gestureFingerCount == 1 &&
+                        settings.checks.get("touchpad_tap_to_click").checked) {
+                        this.click(1);
+                        this.lastTapTime = performance.now();
+                        this.lastTapX = event.clientX;
+                        this.lastTapY = event.clientY;
+                    } else if (this.gestureFingerCount == 2 &&
+                        settings.checks.get("touchpad_two_finger_tap").checked) {
+                        this.click(2);
+                    } else if (this.gestureFingerCount == 3 &&
+                        settings.checks.get("touchpad_three_finger_tap").checked) {
+                        this.click(4);
+                    }
+                }
+                this.resetTouchGesture();
             }
         }
     }
@@ -803,6 +1151,12 @@ class PointerHandler {
             }
         }
         if (this.pointerTypes.includes(event.pointerType)) {
+            if (event.pointerType == "touch" && settings.checks.get("touchpad_mode").checked) {
+                this.handleTouchpadEvent(event, event_type);
+                if (settings.visible)
+                    settings.toggle();
+                return false;
+            }
             let rect = (event.target as HTMLElement).getBoundingClientRect();
             const events = event_type === "pointermove" && typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [event];
             for (let event of events) {
@@ -821,7 +1175,9 @@ class PointerHandler {
             if (settings.visible) {
                 settings.toggle();
             }
+            return true;
         }
+        return false;
     }
 }
 

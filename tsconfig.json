@@ -4,6 +4,8 @@
     "lib": ["es2020", "dom", "es6"],
     "module": "commonjs",
     "outDir": "www/static",
+    "rootDir": "ts",
+    "strict": false,
     "sourceMap": false
   },
   "include": [

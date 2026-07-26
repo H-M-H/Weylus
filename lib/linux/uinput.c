@@ -106,6 +106,10 @@ void init_mouse(int fd, const char* name, Error* err)
 	// enable scrolling
 	if (ioctl(fd, UI_SET_EVBIT, EV_REL) < 0)
 		ERROR(err, 1, "error: ioctl UI_SET_EVBIT EV_REL");
+	if (ioctl(fd, UI_SET_RELBIT, REL_X) < 0)
+		ERROR(err, 1, "error: ioctl UI_SET_RELBIT REL_X");
+	if (ioctl(fd, UI_SET_RELBIT, REL_Y) < 0)
+		ERROR(err, 1, "error: ioctl UI_SET_RELBIT REL_Y");
 	if (ioctl(fd, UI_SET_RELBIT, REL_WHEEL) < 0)
 		ERROR(err, 1, "error: ioctl UI_SET_RELBIT REL_WHEEL");
 	if (ioctl(fd, UI_SET_RELBIT, REL_HWHEEL) < 0)

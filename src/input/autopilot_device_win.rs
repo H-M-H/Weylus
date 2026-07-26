@@ -7,7 +7,8 @@ use tracing::warn;
 use crate::input::autopilot_device::AutoPilotDevice;
 use crate::input::device::{InputDevice, InputDeviceType};
 use crate::protocol::{
-    Button, KeyboardEvent, PointerEvent, PointerEventType, PointerType, WheelEvent,
+    Button, KeyboardEvent, PointerEvent, PointerEventType, PointerType, RelativePointerEvent,
+    WheelEvent,
 };
 
 use crate::capturable::{Capturable, Geometry};
@@ -18,6 +19,7 @@ pub struct WindowsInput {
     pointer_device_handle: *mut HSYNTHETICPOINTERDEVICE__,
     touch_device_handle: *mut HSYNTHETICPOINTERDEVICE__,
     multitouch_map: std::collections::HashMap<i64, POINTER_TYPE_INFO>,
+    pressed_buttons: Button,
 }
 
 impl WindowsInput {
@@ -30,14 +32,46 @@ impl WindowsInput {
                 pointer_device_handle: CreateSyntheticPointerDevice(PT_PEN, 1, 1),
                 touch_device_handle: CreateSyntheticPointerDevice(PT_TOUCH, 5, 1),
                 multitouch_map: std::collections::HashMap::new(),
+                pressed_buttons: Button::NONE,
             }
         }
+    }
+}
+
+impl Drop for WindowsInput {
+    fn drop(&mut self) {
+        <Self as InputDevice>::release_buttons(self);
     }
 }
 
 impl InputDevice for WindowsInput {
     fn send_wheel_event(&mut self, event: &WheelEvent) {
         unsafe { mouse_event(MOUSEEVENTF_WHEEL, 0, 0, event.dy as DWORD, 0) };
+    }
+
+    fn send_touchpad_wheel_event(&mut self, event: &WheelEvent) {
+        if event.dy != 0 {
+            unsafe {
+                mouse_event(
+                    MOUSEEVENTF_WHEEL,
+                    0,
+                    0,
+                    (event.dy.signum() * i32::from(WHEEL_DELTA)) as DWORD,
+                    0,
+                )
+            };
+        }
+        if event.dx != 0 {
+            unsafe {
+                mouse_event(
+                    MOUSEEVENTF_HWHEEL,
+                    0,
+                    0,
+                    (event.dx.signum() * i32::from(WHEEL_DELTA)) as DWORD,
+                    0,
+                )
+            };
+        }
     }
 
     fn send_pointer_event(&mut self, event: &PointerEvent) {
@@ -211,6 +245,60 @@ impl InputDevice for WindowsInput {
             }
             PointerType::Unknown => todo!(),
         }
+    }
+
+    fn send_relative_pointer_event(&mut self, event: &RelativePointerEvent) {
+        if let Err(err) = self.capturable.before_input() {
+            warn!("Failed to activate window, sending no input ({})", err);
+            return;
+        }
+
+        let mut flags = 0;
+        if event.dx != 0 || event.dy != 0 {
+            flags |= MOUSEEVENTF_MOVE;
+        }
+        flags |= match (event.button, event.buttons.contains(event.button)) {
+            (Button::PRIMARY, true) => MOUSEEVENTF_LEFTDOWN,
+            (Button::PRIMARY, false) => MOUSEEVENTF_LEFTUP,
+            (Button::SECONDARY, true) => MOUSEEVENTF_RIGHTDOWN,
+            (Button::SECONDARY, false) => MOUSEEVENTF_RIGHTUP,
+            (Button::AUXILARY, true) => MOUSEEVENTF_MIDDLEDOWN,
+            (Button::AUXILARY, false) => MOUSEEVENTF_MIDDLEUP,
+            _ => 0,
+        };
+        if flags != 0 {
+            // Keep the initial drag movement and button-down in one native event.
+            // Drawing applications may otherwise see the move before the button.
+            unsafe { mouse_event(flags, event.dx as DWORD, event.dy as DWORD, 0, 0) };
+        }
+
+        if event
+            .button
+            .intersects(Button::PRIMARY | Button::SECONDARY | Button::AUXILARY)
+        {
+            if event.buttons.contains(event.button) {
+                self.pressed_buttons.insert(event.button);
+            } else {
+                self.pressed_buttons.remove(event.button);
+            }
+        }
+    }
+
+    fn release_buttons(&mut self) {
+        let mut flags = 0;
+        if self.pressed_buttons.contains(Button::PRIMARY) {
+            flags |= MOUSEEVENTF_LEFTUP;
+        }
+        if self.pressed_buttons.contains(Button::SECONDARY) {
+            flags |= MOUSEEVENTF_RIGHTUP;
+        }
+        if self.pressed_buttons.contains(Button::AUXILARY) {
+            flags |= MOUSEEVENTF_MIDDLEUP;
+        }
+        if flags != 0 {
+            unsafe { mouse_event(flags, 0, 0, 0, 0) };
+        }
+        self.pressed_buttons = Button::NONE;
     }
 
     fn send_keyboard_event(&mut self, event: &KeyboardEvent) {

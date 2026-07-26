@@ -15,7 +15,10 @@ pub struct ClientConfiguration {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum MessageInbound {
     PointerEvent(PointerEvent),
+    RelativePointerEvent(RelativePointerEvent),
+    ReleaseButtons,
     WheelEvent(WheelEvent),
+    TouchpadWheelEvent(WheelEvent),
     KeyboardEvent(KeyboardEvent),
     GetCapturableList,
     Config(ClientConfiguration),
@@ -179,6 +182,16 @@ pub struct PointerEvent {
     pub twist: i32,
     pub width: f64,
     pub height: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RelativePointerEvent {
+    pub dx: i32,
+    pub dy: i32,
+    #[serde(deserialize_with = "button_from")]
+    pub button: Button,
+    #[serde(deserialize_with = "button_from")]
+    pub buttons: Button,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
