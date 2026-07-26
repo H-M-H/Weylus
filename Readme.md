@@ -13,6 +13,7 @@ Weylus in action with [Xournal++](https://github.com/xournalpp/xournalpp):
     * [Packages](#packages)
 * [Running](#running)
     * [Fullscreen](#fullscreen)
+    * [Touchpad Mode](#touchpad-mode)
     * [Keyboard Input](#keyboard-input)
     * [Automation](#automation)
     * [Linux](#linux)
@@ -80,6 +81,13 @@ Please only run Weylus in networks you trust as there is no encryption to enable
 You may want to add a bookmark to your home screen on your tablet as this enables running Weylus in
 full screen mode (on iOS/iPadOS this needs to be done with Safari). If you are not on iOS/iPadOS
 there is a button to toggle full screen mode.
+
+### Touchpad Mode
+Touchpad mode uses touch input for relative cursor control instead of mapping touches to absolute
+screen positions. A one-finger tap clicks, a double-tap followed by movement drags, a two-finger
+gesture scrolls, and two- and three-finger taps produce right and middle clicks. The input settings
+allow these gestures, their sensitivity, tap timing, and movement tolerances to be customized and
+saved on the client device.
 
 ### Keyboard Input
 Weylus supports keyboard input for physical keyboards, so if you have a Bluetooth keyboard, just

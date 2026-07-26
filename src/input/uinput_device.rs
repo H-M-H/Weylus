@@ -8,7 +8,7 @@ use crate::capturable::{Capturable, Geometry};
 use crate::input::device::{InputDevice, InputDeviceType};
 use crate::protocol::{
     Button, KeyboardEvent, KeyboardEventType, KeyboardLocation, PointerEvent, PointerEventType,
-    PointerType, Rect, WheelEvent,
+    PointerType, Rect, RelativePointerEvent, WheelEvent,
 };
 
 use crate::cerror::CError;
@@ -46,6 +46,7 @@ pub struct UInputDevice {
     num_stylus_mapping_tries: usize,
     num_touch_mapping_tries: usize,
     x11ctx: Option<X11Context>,
+    pressed_buttons: Button,
 }
 
 impl UInputDevice {
@@ -111,6 +112,7 @@ impl UInputDevice {
             num_stylus_mapping_tries: 0,
             num_touch_mapping_tries: 0,
             x11ctx: X11Context::new(),
+            pressed_buttons: Button::NONE,
         })
     }
 
@@ -161,6 +163,7 @@ impl UInputDevice {
 
 impl Drop for UInputDevice {
     fn drop(&mut self) {
+        <Self as InputDevice>::release_buttons(self);
         unsafe {
             destroy_uinput_device(self.keyboard_fd);
             destroy_uinput_device(self.stylus_fd);
@@ -191,8 +194,8 @@ const EC_KEY_TOOL_DOUBLETAP: c_int = 0x14d;
 const EC_KEY_TOOL_TRIPLETAP: c_int = 0x14e;
 const EC_KEY_TOOL_QUADTAP: c_int = 0x14f; /* Four fingers on trackpad */
 const EC_KEY_TOOL_QUINTTAP: c_int = 0x148; /* Five fingers on trackpad */
-//const EC_RELATIVE_X: c_int = 0x00;
-//const EC_RELATIVE_Y: c_int = 0x01;
+const EC_RELATIVE_X: c_int = 0x00;
+const EC_RELATIVE_Y: c_int = 0x01;
 
 const EC_REL_HWHEEL: c_int = 0x06;
 const EC_REL_WHEEL: c_int = 0x08;
@@ -273,6 +276,10 @@ impl InputDevice for UInputDevice {
             (event.timestamp % (i32::MAX as u64 + 1)) as i32,
         );
         self.send(self.mouse_fd, ET_SYNC, EC_SYNC_REPORT, 0);
+    }
+
+    fn send_touchpad_wheel_event(&mut self, event: &WheelEvent) {
+        self.send_wheel_event(event);
     }
 
     fn send_pointer_event(&mut self, event: &PointerEvent) {
@@ -638,6 +645,67 @@ impl InputDevice for UInputDevice {
                 self.send(self.mouse_fd, ET_SYNC, EC_SYNC_REPORT, 0);
             }
         }
+    }
+
+    fn send_relative_pointer_event(&mut self, event: &RelativePointerEvent) {
+        if let Err(err) = self.capturable.before_input() {
+            warn!("Failed to activate window, sending no input ({})", err);
+            return;
+        }
+        match event.button {
+            Button::PRIMARY => self.send(
+                self.mouse_fd,
+                ET_KEY,
+                EC_KEY_MOUSE_LEFT,
+                i32::from(event.buttons.contains(event.button)),
+            ),
+            Button::SECONDARY => self.send(
+                self.mouse_fd,
+                ET_KEY,
+                EC_KEY_MOUSE_RIGHT,
+                i32::from(event.buttons.contains(event.button)),
+            ),
+            Button::AUXILARY => self.send(
+                self.mouse_fd,
+                ET_KEY,
+                EC_KEY_MOUSE_MIDDLE,
+                i32::from(event.buttons.contains(event.button)),
+            ),
+            _ => (),
+        }
+        if event.dx != 0 {
+            self.send(self.mouse_fd, ET_RELATIVE, EC_RELATIVE_X, event.dx);
+        }
+        if event.dy != 0 {
+            self.send(self.mouse_fd, ET_RELATIVE, EC_RELATIVE_Y, event.dy);
+        }
+        if event
+            .button
+            .intersects(Button::PRIMARY | Button::SECONDARY | Button::AUXILARY)
+        {
+            if event.buttons.contains(event.button) {
+                self.pressed_buttons.insert(event.button);
+            } else {
+                self.pressed_buttons.remove(event.button);
+            }
+        }
+        self.send(self.mouse_fd, ET_SYNC, EC_SYNC_REPORT, 0);
+    }
+
+    fn release_buttons(&mut self) {
+        if self.pressed_buttons.contains(Button::PRIMARY) {
+            self.send(self.mouse_fd, ET_KEY, EC_KEY_MOUSE_LEFT, 0);
+        }
+        if self.pressed_buttons.contains(Button::SECONDARY) {
+            self.send(self.mouse_fd, ET_KEY, EC_KEY_MOUSE_RIGHT, 0);
+        }
+        if self.pressed_buttons.contains(Button::AUXILARY) {
+            self.send(self.mouse_fd, ET_KEY, EC_KEY_MOUSE_MIDDLE, 0);
+        }
+        if !self.pressed_buttons.is_empty() {
+            self.send(self.mouse_fd, ET_SYNC, EC_SYNC_REPORT, 0);
+        }
+        self.pressed_buttons = Button::NONE;
     }
 
     fn send_keyboard_event(&mut self, event: &KeyboardEvent) {

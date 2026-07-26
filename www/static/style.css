@@ -131,6 +131,43 @@ input[type='range']::-webkit-slider-runnable-track, input[type="range"]::-moz-ra
     display: block;
     margin-top: 0.5em;
 }
+#touchpad_options {
+    border: 1px solid #7778;
+    border-radius: 0.4em;
+    margin-top: 0.7em;
+    padding: 0.35em 0.6em 0.7em;
+}
+#touchpad_options legend label {
+    margin: 0;
+    font-weight: bold;
+}
+.setting_hint {
+    color: #888;
+    font-size: 0.82em;
+    line-height: 1.25;
+    margin: 0.25em 0 0.65em;
+}
+.touchpad_range {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 0.4em;
+    margin-top: 0.75em;
+}
+.touchpad_range label {
+    grid-column: 1 / -1;
+    margin: 0 0 0.15em !important;
+}
+.touchpad_range input {
+    min-width: 0;
+    width: 100%;
+}
+.touchpad_range output {
+    min-width: 4.5em;
+    text-align: right;
+}
+#touchpad_options.touchpad_disabled > :not(legend):not(.setting_hint) {
+    opacity: 0.45;
+}
 #settings section.hide, section label.hide, section button.hide, #debug_overlay.hide {
     display: none !important;
 }

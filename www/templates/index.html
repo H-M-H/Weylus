@@ -51,6 +51,48 @@
                 <label><input type="checkbox" id="enable_mouse" checked /> <span>Enable Mouse</span></label>
                 <label><input type="checkbox" id="enable_stylus" checked /> <span>Enable Stylus</span></label>
                 <label><input type="checkbox" id="enable_touch" checked /> <span>Enable Touch</span></label>
+                <fieldset id="touchpad_options">
+                    <legend><label><input type="checkbox" id="touchpad_mode" /> <span>Touchpad Mode</span></label></legend>
+                    <p class="setting_hint">Use the screen like a laptop touchpad. These controls are saved on this device.</p>
+                    <label><input type="checkbox" id="touchpad_tap_to_click" checked /> <span>Tap to click</span></label>
+                    <label><input type="checkbox" id="touchpad_double_tap_drag" checked /> <span>Double-tap and drag</span></label>
+                    <label><input type="checkbox" id="touchpad_two_finger_scroll" checked /> <span>Two-finger scrolling</span></label>
+                    <label><input type="checkbox" id="touchpad_reverse_scroll" /> <span>Reverse scroll direction</span></label>
+                    <label><input type="checkbox" id="touchpad_two_finger_tap" checked /> <span>Two-finger tap = right click</span></label>
+                    <label><input type="checkbox" id="touchpad_three_finger_tap" checked /> <span>Three-finger tap = middle click</span></label>
+
+                    <div class="touchpad_range">
+                        <label for="touchpad_sensitivity">Cursor sensitivity</label>
+                        <input type="range" id="touchpad_sensitivity" min="0.25" max="3" step="0.05" value="1" />
+                        <output>1.00x</output>
+                    </div>
+                    <div class="touchpad_range">
+                        <label for="touchpad_scroll_sensitivity">Scroll sensitivity</label>
+                        <input type="range" id="touchpad_scroll_sensitivity" min="0.25" max="4" step="0.05" value="1" />
+                        <output>1.00x</output>
+                    </div>
+                    <div class="touchpad_range">
+                        <label for="touchpad_tap_duration">Maximum tap time</label>
+                        <input type="range" id="touchpad_tap_duration" min="80" max="600" step="10" value="200" />
+                        <output>200 ms</output>
+                    </div>
+                    <div class="touchpad_range">
+                        <label for="touchpad_double_tap_interval">Time between double taps</label>
+                        <input type="range" id="touchpad_double_tap_interval" min="100" max="800" step="10" value="300" />
+                        <output>300 ms</output>
+                    </div>
+                    <div class="touchpad_range">
+                        <label for="touchpad_movement_tolerance">Tap movement tolerance</label>
+                        <input type="range" id="touchpad_movement_tolerance" min="2" max="30" step="1" value="8" />
+                        <output>8 px</output>
+                    </div>
+                    <div class="touchpad_range">
+                        <label for="touchpad_double_tap_distance">Double-tap distance</label>
+                        <input type="range" id="touchpad_double_tap_distance" min="5" max="80" step="1" value="25" />
+                        <output>25 px</output>
+                    </div>
+                    <button type="button" id="reset_touchpad">Reset touchpad defaults</button>
+                </fieldset>
                 <label {{#if (not uinput_enabled)}}class="hide" {{/if}}>
                     <input type="checkbox" id="uinput_support" checked />
                     <span>Enable uinput</span>
