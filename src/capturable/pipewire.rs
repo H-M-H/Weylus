@@ -17,6 +17,7 @@ use gstreamer::prelude::*;
 use gstreamer_app::AppSink;
 
 use crate::capturable::{Capturable, Geometry, Recorder};
+use crate::config::PipewirePipeline;
 use crate::video::PixelProvider;
 
 use crate::capturable::remote_desktop_dbus::{
@@ -61,15 +62,22 @@ pub struct PipeWireCapturable {
     fd: OwnedFd,
     path: u64,
     source_type: u64,
+    pipeline: PipewirePipeline,
 }
 
 impl PipeWireCapturable {
-    fn new(conn: Arc<SyncConnection>, fd: OwnedFd, stream: PwStreamInfo) -> Self {
+    fn new(
+        conn: Arc<SyncConnection>,
+        fd: OwnedFd,
+        stream: PwStreamInfo,
+        pipeline: PipewirePipeline,
+    ) -> Self {
         Self {
             dbus_conn: conn,
             fd,
             path: stream.path,
             source_type: stream.source_type,
+            pipeline,
         }
     }
 }
@@ -78,11 +86,12 @@ impl std::fmt::Debug for PipeWireCapturable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "PipeWireCapturable {{dbus: {}, fd: {}, path: {}, source_type: {}}}",
+            "PipeWireCapturable {{dbus: {}, fd: {}, path: {}, source_type: {}, pipeline: {:?}}}",
             self.dbus_conn.unique_name(),
             self.fd.as_raw_fd(),
             self.path,
-            self.source_type
+            self.source_type,
+            self.pipeline,
         )
     }
 }
@@ -123,22 +132,72 @@ pub struct PipeWireRecorder {
 
 impl PipeWireRecorder {
     pub fn new(capturable: PipeWireCapturable) -> Result<Self, Box<dyn Error>> {
-        let pipeline = gst::Pipeline::new();
+        // Two pipelines can turn a PipeWire screen-cast stream into the system-memory
+        // `BGRx`/`RGBx` the appsink (and x264 encoder) need:
+        //
+        //  * DIRECT  `pipewiresrc -> appsink` -- the historic path. Works only where the
+        //    compositor/backend hands back CPU-mappable buffers (system memory, or a
+        //    linear dmabuf pipewiresrc can map). Cheapest: no GPU, no colour convert.
+        //  * GL      `pipewiresrc -> capsfilter -> glupload -> glcolorconvert ->
+        //    gldownload -> videoconvert -> appsink` -- required for compositors that only
+        //    offer tiled/modified DMA-BUF (niri, modern sway/KDE/GNOME). Imports the
+        //    dmabuf on the GPU and downloads it. Costs an EGL import + GPU convert + a
+        //    read-back per frame, and needs a working GL/EGL context.
+        //
+        // The strategy comes from the GUI / config (`--pipewire-pipeline`), stored on the
+        // capturable. The `WEYLUS_PIPEWIRE_PIPELINE` env var still overrides it for quick
+        // debugging without touching config.
+        //    Auto   -- try DIRECT, fall back to GL if it fails to negotiate.
+        //    Direct -- force DIRECT.
+        //    Gl     -- force GL.
+        // `Auto` keeps the direct path (and its zero overhead) on setups where it always
+        // worked, and only pays the GL cost where the direct path can't negotiate.
+        let mode = match std::env::var("WEYLUS_PIPEWIRE_PIPELINE")
+            .unwrap_or_default()
+            .to_ascii_lowercase()
+            .as_str()
+        {
+            "direct" => PipewirePipeline::Direct,
+            "gl" => PipewirePipeline::Gl,
+            "auto" => PipewirePipeline::Auto,
+            _ => capturable.pipeline,
+        };
 
+        match mode {
+            PipewirePipeline::Direct => Self::start(Self::build_direct(&capturable)?),
+            PipewirePipeline::Gl => Self::start(Self::build_gl(&capturable)?),
+            PipewirePipeline::Auto => {
+                // probe the cheap direct path first.
+                let (pipeline, appsink) = Self::build_direct(&capturable)?;
+                if Self::try_reach_playing(&pipeline, 3) {
+                    return Ok(Self::finish(pipeline, appsink));
+                }
+                let _ = pipeline.set_state(gst::State::Null);
+                debug!(
+                    "Direct pipewiresrc path did not negotiate ({}); falling back to \
+                     GL DMA-BUF import.",
+                    Self::drain_bus_errors(&pipeline)
+                );
+                Self::start(Self::build_gl(&capturable)?)
+            }
+        }
+    }
+
+    fn make_src(
+        capturable: &PipeWireCapturable,
+        always_copy: bool,
+    ) -> Result<gst::Element, Box<dyn Error>> {
         let src = gst::ElementFactory::make("pipewiresrc").build()?;
         src.set_property("fd", &capturable.fd.as_raw_fd());
         src.set_property("path", &format!("{}", capturable.path));
+        src.set_property("always-copy", &always_copy);
+        Ok(src)
+    }
 
-        // For some reason pipewire blocks on destruction of AppSink if this is not set to true,
-        // see: https://gitlab.freedesktop.org/pipewire/pipewire/-/issues/982
-        src.set_property("always-copy", &true);
-
+    fn make_appsink() -> Result<AppSink, Box<dyn Error>> {
         let sink = gst::ElementFactory::make("appsink").build()?;
         sink.set_property("drop", &true);
         sink.set_property("max-buffers", &1u32);
-
-        pipeline.add_many(&[&src, &sink])?;
-        src.link(&sink)?;
         let appsink = sink
             .dynamic_cast::<AppSink>()
             .map_err(|_| GStreamerError("Sink element is expected to be an appsink!".into()))?;
@@ -152,9 +211,159 @@ impl PipeWireRecorder {
             [("format", "RGBx".into())],
         ));
         appsink.set_caps(Some(&caps));
+        Ok(appsink)
+    }
 
-        pipeline.set_state(gst::State::Playing)?;
-        Ok(Self {
+    /// Historic `pipewiresrc -> appsink` path. `always-copy=true` matches the original
+    /// behaviour (it also works around a PipeWire teardown hang, pw#982) and is safe here
+    /// because this path only negotiates CPU-mappable buffers.
+    fn build_direct(
+        capturable: &PipeWireCapturable,
+    ) -> Result<(gst::Pipeline, AppSink), Box<dyn Error>> {
+        let pipeline = gst::Pipeline::new();
+        let src = Self::make_src(capturable, true)?;
+        let appsink = Self::make_appsink()?;
+        let sink = appsink.clone().upcast::<gst::Element>();
+        pipeline.add_many([&src, &sink])?;
+        src.link(&sink)
+            .map_err(|e| GStreamerError(format!("Failed to link pipewiresrc -> appsink: {e}")))?;
+        Ok((pipeline, appsink))
+    }
+
+    /// GL DMA-BUF import path for compositors that only offer tiled/modified DMA-BUF.
+    ///
+    /// glupload imports the dmabuf as an EGLImage (fd + fourcc + modifier), the GPU does
+    /// the de-tiling / colour convert, `gldownload` copies it back to system memory and
+    /// `videoconvert` guarantees the `BGRx`/`RGBx` the appsink wants.
+    ///
+    /// The capsfilter restricts negotiation to single-plane, non-CCS modifiers
+    /// (LINEAR + X_TILED + Y_TILED). niri defaults to a *CCS* modifier
+    /// (Y_TILED_GEN12_MC_CCS = 0x0100000000000008); CCS is multi-plane (colour buffer +
+    /// a control-surface plane) but the screen-cast stream carries only one plane, so
+    /// `eglCreateImage` rejects it with `EGL_BAD_MATCH` and glupload falls through to a
+    /// CPU path that cannot map the buffer -> black screen. A bare fourcc (no
+    /// `:modifier`) means LINEAR and doubles as the portable fallback for non-Intel GPUs.
+    /// `always-copy` MUST be false: niri sets chunk->size = maxsize = 1 on its dmabufs
+    /// (the data lives in the fd), so a copy would keep a 1-byte system buffer and drop
+    /// the fd the GL importer needs.
+    ///
+    /// NB: a *list* of alternative drm-formats must use `{ }` (GstValueList). `< >` builds
+    /// a GstValueArray (an ordered fixed tuple) that does NOT intersect the list-valued
+    /// `drm-format` sink caps downstream, so the link fails silently.
+    fn build_gl(
+        capturable: &PipeWireCapturable,
+    ) -> Result<(gst::Pipeline, AppSink), Box<dyn Error>> {
+        if gst::ElementFactory::find("glupload").is_none()
+            || gst::ElementFactory::find("gldownload").is_none()
+        {
+            return Err(Box::new(GStreamerError(
+                "GL DMA-BUF import needed for this compositor but glupload/gldownload are \
+                 unavailable (install gstreamer gl plugins)."
+                    .into(),
+            )));
+        }
+
+        let pipeline = gst::Pipeline::new();
+        let src = Self::make_src(capturable, false)?;
+
+        let dmabuf_caps: gst::Caps = "video/x-raw(memory:DMABuf), format=(string)DMA_DRM, \
+             width=(int)[1,32767], height=(int)[1,32767], \
+             framerate=(fraction)[0/1,2147483647/1], drm-format=(list){ \
+             (string)XR24, (string)XR24:0x0100000000000001, (string)XR24:0x0100000000000002, \
+             (string)AR24, (string)AR24:0x0100000000000001, (string)AR24:0x0100000000000002 }"
+            .parse()
+            .map_err(|e| GStreamerError(format!("Failed to parse DMA-BUF caps: {e}")))?;
+        let capsfilter = gst::ElementFactory::make("capsfilter").build()?;
+        capsfilter.set_property("caps", &dmabuf_caps);
+
+        let glupload = gst::ElementFactory::make("glupload").build()?;
+        let glcolorconvert = gst::ElementFactory::make("glcolorconvert").build()?;
+        let gldownload = gst::ElementFactory::make("gldownload").build()?;
+        let videoconvert = gst::ElementFactory::make("videoconvert").build()?;
+        let appsink = Self::make_appsink()?;
+        let sink = appsink.clone().upcast::<gst::Element>();
+
+        let elements = [
+            src,
+            capsfilter,
+            glupload,
+            glcolorconvert,
+            gldownload,
+            videoconvert,
+            sink,
+        ];
+        pipeline.add_many(&elements)?;
+        for w in elements.windows(2) {
+            w[0].link(&w[1]).map_err(|e| {
+                GStreamerError(format!("Failed to link {} -> {}: {e}", w[0].name(), w[1].name()))
+            })?;
+        }
+        Ok((pipeline, appsink))
+    }
+
+    /// Drive a pipeline to PLAYING, returning `true` if it actually got there. Used to
+    /// probe the direct path in `auto` mode: a compositor that only offers DMA-BUF makes
+    /// negotiation fail (`not-negotiated`) and the state change reports failure quickly.
+    fn try_reach_playing(pipeline: &gst::Pipeline, timeout_secs: u64) -> bool {
+        match pipeline.set_state(gst::State::Playing) {
+            Err(_) => false,
+            Ok(gst::StateChangeSuccess::Success) | Ok(gst::StateChangeSuccess::NoPreroll) => true,
+            Ok(gst::StateChangeSuccess::Async) => pipeline
+                .state(gst::ClockTime::from_seconds(timeout_secs))
+                .0
+                .is_ok(),
+        }
+    }
+
+    /// Collect ERROR messages from the pipeline bus. GStreamer's own GST_DEBUG output does
+    /// not reach stderr from weylus, so the bus is the only place the real
+    /// caps-negotiation / import reason (e.g. pipewiresrc "not-negotiated" or "Internal
+    /// data stream error") is available.
+    fn drain_bus_errors(pipeline: &gst::Pipeline) -> String {
+        let bus = match pipeline.bus() {
+            Some(b) => b,
+            None => return "no bus available".into(),
+        };
+        let mut msgs = Vec::new();
+        while let Some(msg) = bus
+            .timed_pop_filtered(gst::ClockTime::from_mseconds(500), &[gst::MessageType::Error])
+        {
+            if let gst::MessageView::Error(err) = msg.view() {
+                let src = err
+                    .src()
+                    .map(|s| s.path_string().to_string())
+                    .unwrap_or_else(|| "?".into());
+                msgs.push(format!(
+                    "[{src}] {} (debug: {})",
+                    err.error(),
+                    err.debug().unwrap_or_else(|| "none".into())
+                ));
+            }
+        }
+        if msgs.is_empty() {
+            "no error message on bus".into()
+        } else {
+            msgs.join("; ")
+        }
+    }
+
+    /// Start a pre-built pipeline, surfacing the real GStreamer error if it cannot reach
+    /// PLAYING (instead of the generic "Element failed to change its state!").
+    fn start(built: (gst::Pipeline, AppSink)) -> Result<Self, Box<dyn Error>> {
+        let (pipeline, appsink) = built;
+        if Self::try_reach_playing(&pipeline, 5) {
+            Ok(Self::finish(pipeline, appsink))
+        } else {
+            let reason = Self::drain_bus_errors(&pipeline);
+            let _ = pipeline.set_state(gst::State::Null);
+            Err(Box::new(GStreamerError(format!(
+                "Failed to start pipewire pipeline: {reason}"
+            ))))
+        }
+    }
+
+    fn finish(pipeline: gst::Pipeline, appsink: AppSink) -> Self {
+        Self {
             pipeline,
             appsink,
             buffer: None,
@@ -163,7 +372,7 @@ impl PipeWireRecorder {
             height: 0,
             buffer_cropped: vec![],
             is_cropped: false,
-        })
+        }
     }
 }
 
@@ -527,7 +736,6 @@ fn on_start_response(
     if let Some(Some(t)) = r.results.get("restore_token").map(|t| t.as_str()) {
         context.restore_token = Some(t.to_string());
     }
-    dbg!(&context.restore_token);
     if context.has_remote_desktop {
         debug!("Remote Desktop Session started");
     } else {
@@ -599,11 +807,14 @@ fn request_remote_desktop(
     }
 }
 
-pub fn get_capturables(capture_cursor: bool) -> Result<Vec<PipeWireCapturable>, Box<dyn Error>> {
+pub fn get_capturables(
+    capture_cursor: bool,
+    pipeline: PipewirePipeline,
+) -> Result<Vec<PipeWireCapturable>, Box<dyn Error>> {
     let (conn, fd, streams) = request_remote_desktop(capture_cursor)?;
     let conn = Arc::new(conn);
     Ok(streams
         .into_iter()
-        .map(|s| PipeWireCapturable::new(conn.clone(), fd.clone(), s))
+        .map(|s| PipeWireCapturable::new(conn.clone(), fd.clone(), s, pipeline))
         .collect())
 }

@@ -70,6 +70,8 @@ impl Weylus {
                 encoder_options,
                 #[cfg(target_os = "linux")]
                 wayland_support: config.wayland_support,
+                #[cfg(target_os = "linux")]
+                pipewire_pipeline: config.pipewire_pipeline,
                 no_gui: config.no_gui,
             },
         );

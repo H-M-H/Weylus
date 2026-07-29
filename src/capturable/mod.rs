@@ -66,13 +66,14 @@ impl Clone for Box<dyn Capturable> {
 pub fn get_capturables(
     #[cfg(target_os = "linux")] wayland_support: bool,
     #[cfg(target_os = "linux")] capture_cursor: bool,
+    #[cfg(target_os = "linux")] pipewire_pipeline: crate::config::PipewirePipeline,
 ) -> Vec<Box<dyn Capturable>> {
     let mut capturables: Vec<Box<dyn Capturable>> = vec![];
     #[cfg(target_os = "linux")]
     {
         if wayland_support {
             use crate::capturable::pipewire::get_capturables as get_capturables_pw;
-            match get_capturables_pw(capture_cursor) {
+            match get_capturables_pw(capture_cursor, pipewire_pipeline) {
                 Ok(captrs) => {
                     for c in captrs {
                         capturables.push(Box::new(c));

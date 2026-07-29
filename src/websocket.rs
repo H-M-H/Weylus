@@ -62,6 +62,8 @@ pub struct WeylusClientConfig {
     pub encoder_options: EncoderOptions,
     #[cfg(target_os = "linux")]
     pub wayland_support: bool,
+    #[cfg(target_os = "linux")]
+    pub pipewire_pipeline: crate::config::PipewirePipeline,
     pub no_gui: bool,
 }
 
@@ -200,6 +202,8 @@ impl<S, R, FnUInput> WeylusClientHandler<S, R, FnUInput> {
             self.config.wayland_support,
             #[cfg(target_os = "linux")]
             self.capture_cursor,
+            #[cfg(target_os = "linux")]
+            self.config.pipewire_pipeline,
         );
         self.capturables.iter().for_each(|c| {
             windows.push(c.name());
