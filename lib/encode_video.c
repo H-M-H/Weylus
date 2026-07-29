@@ -265,6 +265,9 @@ void init_scaler(
 	inputs->pad_idx = 0;
 	inputs->next = NULL;
 
+	int hwupload_created = 0;
+	AVFilterContext* hwupload_ctx = NULL;
+
 	switch (pix_fmt_out)
 	{
 	case AV_PIX_FMT_CUDA:
@@ -293,22 +296,61 @@ void init_scaler(
 		}
 		break;
 	case AV_PIX_FMT_VAAPI:
+	{
+		// Create hwupload filter manually so hw_device_ctx is set
+		// before the filter's init() is called.
+		const AVFilter* hwupload_filter = avfilter_get_by_name("hwupload");
+		if (!hwupload_filter)
+		{
+			ret = AVERROR(ENOSYS);
+			log_warn("hwupload filter not found");
+			goto end;
+		}
+		hwupload_ctx = avfilter_graph_alloc_filter(
+			ctx->filter_graph_scale, hwupload_filter, "hwupload");
+		if (!hwupload_ctx)
+		{
+			ret = AVERROR(ENOMEM);
+			log_warn("Cannot allocate hwupload filter");
+			goto end;
+		}
+		hwupload_ctx->hw_device_ctx = av_buffer_ref(hw_device_ctx);
+		ret = avfilter_init_dict(hwupload_ctx, NULL);
+		if (ret < 0)
+		{
+			log_warn("Cannot init hwupload filter: %s", av_err2str(ret));
+			goto end;
+		}
+		hwupload_created = 1;
+
 		if (pix_fmt_in == AV_PIX_FMT_RGB24)
+		{
+			// Chain: buffersrc -> scale -> hwupload -> buffersink
+			// Parsed "scale" connects to hwupload; we link
+			// hwupload -> buffersink manually below.
+			inputs->filter_ctx = hwupload_ctx;
 			snprintf(
 				args,
 				sizeof(args),
-				"scale=w=%d:h=%d:flags=fast_bilinear,hwupload",
+				"scale=w=%d:h=%d:flags=fast_bilinear",
 				width_out,
 				height_out);
+		}
 		else
+		{
+			// Chain: buffersrc -> hwupload -> scale_vaapi -> buffersink
+			// buffersrc -> hwupload is linked manually below.
+			outputs->filter_ctx = hwupload_ctx;
 			snprintf(
 				args,
 				sizeof(args),
-				"hwupload,scale_vaapi=w=%d:h=%d:format=%s:mode=fast",
+				"scale_vaapi=w=%d:h=%d:format=%s:mode=fast",
 				width_out,
 				height_out,
 				av_get_pix_fmt_name(pix_fmt_sw_out));
+		}
 		break;
+	}
 	default:
 		snprintf(args, sizeof(args), "scale=w=%d:h=%d:flags=fast_bilinear", width_out, height_out);
 	}
@@ -320,12 +362,30 @@ void init_scaler(
 		goto end;
 	}
 
-	for (unsigned int i = 0; i < ctx->filter_graph_scale->nb_filters; i++)
+	// For VAAPI with the hwupload filter created manually, complete the links.
+	if (hwupload_created)
 	{
-		AVFilterContext* filt = ctx->filter_graph_scale->filters[i];
-		if (strcmp(filt->filter->name, "hwupload") == 0)
+		if (pix_fmt_in == AV_PIX_FMT_RGB24)
 		{
-			filt->hw_device_ctx = av_buffer_ref(hw_device_ctx);
+			// buffersink receives from hwupload instead of directly
+			// from the parsed chain.
+			ret = avfilter_link(hwupload_ctx, 0, ctx->buffersink_scale_ctx, 0);
+			if (ret < 0)
+			{
+				log_warn("Cannot link hwupload to buffersink");
+				goto end;
+			}
+		}
+		else
+		{
+			// buffersrc feeds into hwupload.
+			ret = avfilter_link(
+				ctx->buffersrc_scale_ctx, 0, hwupload_ctx, 0);
+			if (ret < 0)
+			{
+				log_warn("Cannot link buffersrc to hwupload");
+				goto end;
+			}
 		}
 	}
 
