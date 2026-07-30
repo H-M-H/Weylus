@@ -971,6 +971,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "gstreamer-allocators"
+version = "0.24.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "995fcebc51d14f09b269a8c0e1875b81196240aad6b56836db1041c3d4094e1e"
+dependencies = [
+ "glib",
+ "gstreamer",
+ "gstreamer-allocators-sys",
+ "libc",
+]
+
+[[package]]
+name = "gstreamer-allocators-sys"
+version = "0.24.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f488cbd148fe6ccddb1095bd9131fb4f6a58419966d33fb40154053eb8d376f4"
+dependencies = [
+ "glib-sys",
+ "gobject-sys",
+ "gstreamer-sys",
+ "libc",
+ "system-deps",
+]
+
+[[package]]
 name = "gstreamer-app"
 version = "0.24.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2754,6 +2779,7 @@ dependencies = [
  "fltk",
  "fltk-theme",
  "gstreamer",
+ "gstreamer-allocators",
  "gstreamer-app",
  "gstreamer-video",
  "handlebars",

@@ -21,6 +21,13 @@ pub mod win_ctx;
 pub mod x11;
 pub trait Recorder {
     fn capture(&mut self) -> Result<crate::video::PixelProvider<'_>, Box<dyn Error>>;
+
+    /// True when `capture()` yields `PixelProvider::DmaBuf` (zero-copy VAAPI path).
+    /// The encoder must be put in dmabuf-input mode iff this is true. Defaults to
+    /// false for CPU-frame recorders.
+    fn is_dmabuf(&self) -> bool {
+        false
+    }
 }
 
 pub trait BoxCloneCapturable {
@@ -56,7 +63,15 @@ pub trait Capturable: Send + BoxCloneCapturable {
     fn before_input(&mut self) -> Result<(), Box<dyn Error>>;
 
     /// Return a Recorder that can record the current capturable.
-    fn recorder(&self, capture_cursor: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>>;
+    ///
+    /// `prefer_dmabuf` asks the capturer to attempt a zero-copy dmabuf path when
+    /// available (only the PipeWire capturer acts on it); implementors that can
+    /// not are free to ignore it.
+    fn recorder(
+        &self,
+        capture_cursor: bool,
+        prefer_dmabuf: bool,
+    ) -> Result<Box<dyn Recorder>, Box<dyn Error>>;
 }
 
 impl Clone for Box<dyn Capturable> {

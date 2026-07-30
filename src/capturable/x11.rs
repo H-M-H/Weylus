@@ -136,7 +136,11 @@ impl Capturable for X11Capturable {
         }
     }
 
-    fn recorder(&self, capture_cursor: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
+    fn recorder(
+        &self,
+        capture_cursor: bool,
+        _prefer_dmabuf: bool,
+    ) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
         match RecorderX11::new(self.clone(), capture_cursor) {
             Ok(recorder) => Ok(Box::new(recorder)),
             Err(err) => Err(Box::new(err)),

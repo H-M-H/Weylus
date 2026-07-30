@@ -199,8 +199,42 @@ impl Capturable for PipeWireCapturable {
         Ok(())
     }
 
-    fn recorder(&self, _capture_cursor: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
-        Ok(Box::new(PipeWireRecorder::new(self.clone())?))
+    fn recorder(
+        &self,
+        _capture_cursor: bool,
+        prefer_dmabuf: bool,
+    ) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
+        Ok(Box::new(PipeWireRecorder::new(self.clone(), prefer_dmabuf)?))
+    }
+}
+
+// Non-CCS XR24 modifiers (LINEAR + X_TILED + Y_TILED), safe for both VA import
+// (zero-copy dmabuf path) and GL de-tile. Excludes niri's default CCS modifier
+// which is multi-plane and rejected by single-plane consumers.
+const XR24_NONCCS: &str = "video/x-raw(memory:DMABuf), format=(string)DMA_DRM, \
+     width=(int)[1,32767], height=(int)[1,32767], \
+     framerate=(fraction)[0/1,2147483647/1], drm-format=(list){ \
+     (string)XR24, (string)XR24:0x0100000000000001, (string)XR24:0x0100000000000002 }";
+// LINEAR only (bare fourcc = DRM_FORMAT_MOD_LINEAR), for the cheap-readback CPU
+// path: no de-tile needed on download.
+const XR24_LINEAR: &str = "video/x-raw(memory:DMABuf), format=(string)DMA_DRM, \
+     width=(int)[1,32767], height=(int)[1,32767], \
+     framerate=(fraction)[0/1,2147483647/1], drm-format=(string)XR24";
+
+/// Parse the DRM modifier out of a negotiated `drm-format` caps value, e.g.
+/// `"XR24:0x0100000000000002"` -> `0x0100000000000002` (Y_TILED). A bare fourcc
+/// (`"XR24"`) or an unparseable suffix means LINEAR (`0`). This MUST be threaded
+/// into the DRM-PRIME descriptor: if the buffer is tiled but we tell VAAPI it is
+/// linear, the import reads tiled memory as linear and the frame comes out
+/// spatially scrambled.
+fn parse_drm_modifier(drm_format: &str) -> u64 {
+    match drm_format.split_once(':') {
+        Some((_, m)) => {
+            let m = m.trim();
+            let hex = m.strip_prefix("0x").or_else(|| m.strip_prefix("0X")).unwrap_or(m);
+            u64::from_str_radix(hex, 16).unwrap_or(0)
+        }
+        None => 0,
     }
 }
 
@@ -213,10 +247,19 @@ pub struct PipeWireRecorder {
     appsink: AppSink,
     width: usize,
     height: usize,
+    // Zero-copy dmabuf path: when set, `capture()` returns `PixelProvider::DmaBuf`
+    // instead of a mapped CPU buffer.
+    is_dmabuf: bool,
+    // Retained backing buffer (holds the fd alive) + extracted DRM layout:
+    // (buffer, width, height, stride, offset, fd, modifier).
+    dmabuf: Option<(gst::Buffer, usize, usize, u32, u32, i32, u64)>,
 }
 
 impl PipeWireRecorder {
-    pub fn new(capturable: PipeWireCapturable) -> Result<Self, Box<dyn Error>> {
+    pub fn new(
+        capturable: PipeWireCapturable,
+        prefer_dmabuf: bool,
+    ) -> Result<Self, Box<dyn Error>> {
         // Two pipelines can turn a PipeWire screen-cast stream into the system-memory
         // `BGRx`/`RGBx` the appsink (and x264 encoder) need:
         //
@@ -244,6 +287,8 @@ impl PipeWireRecorder {
         {
             "direct" => PipewirePipeline::Direct,
             "gl" => PipewirePipeline::Gl,
+            "dmabuf" => PipewirePipeline::Dmabuf,
+            "linear-cpu" => PipewirePipeline::LinearCpu,
             "auto" => PipewirePipeline::Auto,
             _ => capturable.pipeline,
         };
@@ -251,18 +296,43 @@ impl PipeWireRecorder {
         match mode {
             PipewirePipeline::Direct => Self::start(Self::build_direct(&capturable)?),
             PipewirePipeline::Gl => Self::start(Self::build_gl(&capturable)?),
+            PipewirePipeline::Dmabuf => {
+                let mut r = Self::start(Self::build_dmabuf(&capturable)?)?;
+                r.is_dmabuf = true;
+                Ok(r)
+            }
+            PipewirePipeline::LinearCpu => Self::start(Self::build_linear_cpu(&capturable)?),
             PipewirePipeline::Auto => {
-                // probe the cheap direct path first.
+                // Probe the cheap direct path first (unchanged).
                 let (pipeline, appsink) = Self::build_direct(&capturable)?;
                 if Self::try_reach_playing(&pipeline, 3) {
                     return Ok(Self::finish(pipeline, appsink));
                 }
                 let _ = pipeline.set_state(gst::State::Null);
                 debug!(
-                    "Direct pipewiresrc path did not negotiate ({}); falling back to \
-                     GL DMA-BUF import.",
+                    "Direct pipewiresrc path did not negotiate ({}); trying the zero-copy \
+                     / GL cascade.",
                     Self::drain_bus_errors(&pipeline)
                 );
+                // Zero-copy dmabuf -> VAAPI, only when the caller confirmed VAAPI is usable.
+                if prefer_dmabuf {
+                    if let Ok((p, a)) = Self::build_dmabuf(&capturable) {
+                        if Self::try_reach_playing(&p, 3) {
+                            let mut r = Self::finish(p, a);
+                            r.is_dmabuf = true;
+                            return Ok(r);
+                        }
+                        let _ = p.set_state(gst::State::Null);
+                    }
+                    debug!("Dmabuf path unavailable; falling back to LinearCpu.");
+                }
+                if let Ok((p, a)) = Self::build_linear_cpu(&capturable) {
+                    if Self::try_reach_playing(&p, 3) {
+                        return Ok(Self::finish(p, a));
+                    }
+                    let _ = p.set_state(gst::State::Null);
+                }
+                debug!("LinearCpu path unavailable; falling back to GL.");
                 Self::start(Self::build_gl(&capturable)?)
             }
         }
@@ -386,6 +456,97 @@ impl PipeWireRecorder {
         Ok((pipeline, appsink))
     }
 
+    /// Zero-copy path: keep the PipeWire buffer as a DMA_DRM dmabuf and hand its fd
+    /// downstream (to `lib/encode_video.c`'s hwmap import). No GPU download, no colour
+    /// convert — the VAAPI encoder consumes the tiled buffer directly.
+    ///
+    /// `always-copy` MUST be false (same reason as `build_gl`): niri stores the data in
+    /// the fd with a 1-byte system chunk, so a copy would drop the fd we need. The
+    /// capsfilter restricts to single-plane non-CCS modifiers `XR24_NONCCS`.
+    fn build_dmabuf(
+        capturable: &PipeWireCapturable,
+    ) -> Result<(gst::Pipeline, AppSink), Box<dyn Error>> {
+        let pipeline = gst::Pipeline::new();
+        let src = Self::make_src(capturable, false)?;
+        let capsfilter = gst::ElementFactory::make("capsfilter").build()?;
+        capsfilter.set_property(
+            "caps",
+            &XR24_NONCCS
+                .parse::<gst::Caps>()
+                .map_err(|e| GStreamerError(format!("Failed to parse dmabuf caps: {e}")))?,
+        );
+        let appsink = gst::ElementFactory::make("appsink").build()?;
+        appsink.set_property("drop", &true);
+        appsink.set_property("max-buffers", &1u32);
+        let appsink = appsink
+            .dynamic_cast::<AppSink>()
+            .map_err(|_| GStreamerError("Sink element is expected to be an appsink!".into()))?;
+        // Keep the buffer as a DMA_DRM dmabuf — do NOT download to system memory.
+        appsink.set_caps(Some(
+            &"video/x-raw(memory:DMABuf), format=(string)DMA_DRM"
+                .parse::<gst::Caps>()
+                .map_err(|e| GStreamerError(format!("Failed to parse appsink caps: {e}")))?,
+        ));
+        let sink = appsink.clone().upcast::<gst::Element>();
+        pipeline.add_many([&src, &capsfilter, &sink])?;
+        src.link(&capsfilter)
+            .map_err(|e| GStreamerError(format!("Failed to link pipewiresrc -> capsfilter: {e}")))?;
+        capsfilter
+            .link(&sink)
+            .map_err(|e| GStreamerError(format!("Failed to link capsfilter -> appsink: {e}")))?;
+        Ok((pipeline, appsink))
+    }
+
+    /// Cheap-readback CPU path: identical to `build_gl` but the capsfilter forces a LINEAR
+    /// modifier (`XR24_LINEAR`), so `gldownload` copies untiled pixels back to system
+    /// memory with no de-tile cost. Yields the same `BGRx`/`RGBx` any encoder accepts.
+    fn build_linear_cpu(
+        capturable: &PipeWireCapturable,
+    ) -> Result<(gst::Pipeline, AppSink), Box<dyn Error>> {
+        if gst::ElementFactory::find("glupload").is_none()
+            || gst::ElementFactory::find("gldownload").is_none()
+        {
+            return Err(Box::new(GStreamerError(
+                "GL DMA-BUF import needed for the linear-cpu path but glupload/gldownload are \
+                 unavailable (install gstreamer gl plugins)."
+                    .into(),
+            )));
+        }
+
+        let pipeline = gst::Pipeline::new();
+        let src = Self::make_src(capturable, false)?;
+
+        let dmabuf_caps: gst::Caps = XR24_LINEAR
+            .parse()
+            .map_err(|e| GStreamerError(format!("Failed to parse LINEAR DMA-BUF caps: {e}")))?;
+        let capsfilter = gst::ElementFactory::make("capsfilter").build()?;
+        capsfilter.set_property("caps", &dmabuf_caps);
+
+        let glupload = gst::ElementFactory::make("glupload").build()?;
+        let glcolorconvert = gst::ElementFactory::make("glcolorconvert").build()?;
+        let gldownload = gst::ElementFactory::make("gldownload").build()?;
+        let videoconvert = gst::ElementFactory::make("videoconvert").build()?;
+        let appsink = Self::make_appsink()?;
+        let sink = appsink.clone().upcast::<gst::Element>();
+
+        let elements = [
+            src,
+            capsfilter,
+            glupload,
+            glcolorconvert,
+            gldownload,
+            videoconvert,
+            sink,
+        ];
+        pipeline.add_many(&elements)?;
+        for w in elements.windows(2) {
+            w[0].link(&w[1]).map_err(|e| {
+                GStreamerError(format!("Failed to link {} -> {}: {e}", w[0].name(), w[1].name()))
+            })?;
+        }
+        Ok((pipeline, appsink))
+    }
+
     /// Drive a pipeline to PLAYING, returning `true` if it actually got there. Used to
     /// probe the direct path in `auto` mode: a compositor that only offers DMA-BUF makes
     /// negotiation fail (`not-negotiated`) and the state change reports failure quickly.
@@ -457,12 +618,82 @@ impl PipeWireRecorder {
             height: 0,
             buffer_cropped: vec![],
             is_cropped: false,
+            is_dmabuf: false,
+            dmabuf: None,
         }
     }
 }
 
 impl Recorder for PipeWireRecorder {
+    fn is_dmabuf(&self) -> bool {
+        self.is_dmabuf
+    }
+
     fn capture(&mut self) -> Result<PixelProvider<'_>, Box<dyn Error>> {
+        // Zero-copy path: pull a DMA_DRM dmabuf, retain the buffer (keeps the fd valid)
+        // and hand its DRM layout downstream. Reuse the previous frame if none is ready.
+        if self.is_dmabuf {
+            if let Some(sample) = self
+                .appsink
+                .try_pull_sample(gst::ClockTime::from_mseconds(16))
+            {
+                let caps = sample
+                    .caps()
+                    .ok_or_else(|| GStreamerError("dmabuf sample has no caps".into()))?;
+                let s = caps
+                    .structure(0)
+                    .ok_or_else(|| GStreamerError("dmabuf caps has no structure".into()))?;
+                let w: i32 = s.value("width")?.get()?;
+                let h: i32 = s.value("height")?.get()?;
+                // The negotiated drm-format carries the ACTUAL modifier the compositor
+                // chose (LINEAR / X_TILED / Y_TILED). It must reach the DRM-PRIME
+                // descriptor or a tiled buffer is imported as linear -> scrambled frame.
+                let drm_format = s
+                    .value("drm-format")
+                    .ok()
+                    .and_then(|v| v.get::<String>().ok())
+                    .unwrap_or_default();
+                let modifier = parse_drm_modifier(&drm_format);
+                let buffer = sample
+                    .buffer_owned()
+                    .ok_or_else(|| GStreamerError("dmabuf sample has no buffer".into()))?;
+                let vmeta = buffer.meta::<gstreamer_video::VideoMeta>();
+                let stride = vmeta.as_ref().map(|m| m.stride()[0]).unwrap_or(w * 4) as u32;
+                let offset = vmeta.as_ref().map(|m| m.offset()[0]).unwrap_or(0) as u32;
+                let fd = buffer
+                    .peek_memory(0)
+                    .downcast_memory_ref::<gstreamer_allocators::DmaBufMemory>()
+                    .map(|m| m.fd())
+                    .ok_or_else(|| GStreamerError("buffer memory is not a DmaBufMemory".into()))?;
+                // Log the negotiated layout once (or whenever it changes) for diagnosis.
+                let changed = self
+                    .dmabuf
+                    .as_ref()
+                    .map(|d| d.6 != modifier || d.3 != stride || d.1 != w as usize)
+                    .unwrap_or(true);
+                if changed {
+                    debug!(
+                        "dmabuf frame: {}x{} drm-format={:?} modifier={:#018x} stride={} offset={}",
+                        w, h, drm_format, modifier, stride, offset
+                    );
+                }
+                self.dmabuf = Some((buffer, w as usize, h as usize, stride, offset, fd, modifier));
+            }
+            let (_, w, h, stride, offset, fd, modifier) = self
+                .dmabuf
+                .as_ref()
+                .ok_or_else(|| GStreamerError("No dmabuf frame available!".into()))?;
+            return Ok(PixelProvider::DmaBuf {
+                fd: *fd,
+                // DRM_FORMAT_XRGB8888 = 'X','R','2','4' little-endian.
+                fourcc: u32::from_le_bytes([b'X', b'R', b'2', b'4']),
+                modifier: *modifier,
+                width: *w,
+                height: *h,
+                stride: *stride,
+                offset: *offset,
+            });
+        }
         if let Some(sample) = self
             .appsink
             .try_pull_sample(gst::ClockTime::from_mseconds(16))
@@ -926,6 +1157,28 @@ pub fn get_capturables(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn drm_modifier_bare_fourcc_is_linear() {
+        assert_eq!(parse_drm_modifier("XR24"), 0);
+    }
+
+    #[test]
+    fn drm_modifier_parses_tiled_suffix() {
+        // Y_TILED and X_TILED as niri/Intel negotiate them.
+        assert_eq!(parse_drm_modifier("XR24:0x0100000000000002"), 0x0100000000000002);
+        assert_eq!(parse_drm_modifier("XR24:0x0100000000000001"), 0x0100000000000001);
+    }
+
+    #[test]
+    fn drm_modifier_explicit_linear_suffix() {
+        assert_eq!(parse_drm_modifier("XR24:0x0000000000000000"), 0);
+    }
+
+    #[test]
+    fn drm_modifier_garbage_falls_back_to_linear() {
+        assert_eq!(parse_drm_modifier("XR24:nonsense"), 0);
+    }
 
     fn rel(g: &Geometry) -> (f64, f64, f64, f64) {
         match g {

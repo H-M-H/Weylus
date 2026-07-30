@@ -48,6 +48,8 @@ dbus = "^0.9"
 gstreamer = "^0.24"
 gstreamer-app = { version = "^0.24", features = ["v1_16"] }
 gstreamer-video = "^0.24"
+# DmaBufMemory downcast for the zero-copy VAAPI capture path.
+gstreamer-allocators = "^0.24"
 # Wayland output enumeration (xdg-output logical geometry) for the PipeWire/Wayland
 # capturable's stylus mapping. Gated to Linux, same as the rest of the Wayland path;
 # only exercised at runtime when the Wayland capture checkbox is enabled.

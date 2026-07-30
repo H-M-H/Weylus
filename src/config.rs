@@ -81,13 +81,21 @@ pub enum PipewirePipeline {
     Direct,
     /// Force the GL DMA-BUF import path (`glupload -> ... -> gldownload`).
     Gl,
+    /// Force zero-copy dmabuf import into VAAPI (`pipewiresrc -> appsink(DMA_DRM)`
+    /// then ffmpeg hwmap). Only works with the VAAPI encoder.
+    Dmabuf,
+    /// Force the GL download path pinned to a LINEAR modifier for a cheap
+    /// (no de-tile) readback to system memory.
+    LinearCpu,
 }
 
 #[cfg(target_os = "linux")]
-const PIPEWIRE_PIPELINE_LIST: [PipewirePipeline; 3] = [
+const PIPEWIRE_PIPELINE_LIST: [PipewirePipeline; 5] = [
     PipewirePipeline::Auto,
-    PipewirePipeline::Direct,
+    PipewirePipeline::Dmabuf,
+    PipewirePipeline::LinearCpu,
     PipewirePipeline::Gl,
+    PipewirePipeline::Direct,
 ];
 
 #[cfg(target_os = "linux")]
@@ -105,6 +113,8 @@ impl PipewirePipeline {
             PipewirePipeline::Auto => "Auto",
             PipewirePipeline::Direct => "Direct",
             PipewirePipeline::Gl => "GL",
+            PipewirePipeline::Dmabuf => "Zero-copy (DMA-BUF)",
+            PipewirePipeline::LinearCpu => "Linear CPU",
         }
         .to_string()
     }
@@ -176,7 +186,7 @@ pub struct Config {
         long,
         value_enum,
         default_value = "auto",
-        help = "PipeWire capture pipeline: auto (probe direct, fall back to GL), direct, or gl."
+        help = "PipeWire capture pipeline: auto, dmabuf (zero-copy VAAPI), linear-cpu, gl, or direct."
     )]
     #[serde(default)]
     pub pipewire_pipeline: crate::config::PipewirePipeline,
@@ -275,5 +285,22 @@ pub fn get_config() -> Config {
         config
     } else {
         Config::parse()
+    }
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod tests {
+    use super::*;
+    #[test]
+    fn pipeline_list_has_all_five_variants() {
+        let v = PipewirePipeline::variants();
+        assert_eq!(v.len(), 5);
+        assert!(v.contains(&PipewirePipeline::Dmabuf));
+        assert!(v.contains(&PipewirePipeline::LinearCpu));
+    }
+    #[test]
+    fn pipeline_names_are_stable() {
+        assert_eq!(PipewirePipeline::Dmabuf.name(), "Zero-copy (DMA-BUF)");
+        assert_eq!(PipewirePipeline::LinearCpu.name(), "Linear CPU");
     }
 }

@@ -22,6 +22,9 @@
 #include "log.h"
 
 #ifdef HAS_VAAPI
+#include <unistd.h>
+
+#include <libavutil/hwcontext_drm.h>
 #include <libavutil/hwcontext_vaapi.h>
 #include <va/va.h>
 #endif
@@ -73,6 +76,15 @@ typedef struct VideoContext
 	int try_nvenc;
 	int try_videotoolbox;
 	int try_mediafoundation;
+
+	// Zero-copy dmabuf input (VAAPI only).
+	int input_dmabuf;            // 1 when frames arrive as DRM-PRIME dmabufs
+	AVBufferRef* drm_device_ctx; // DRM device for wrapping the incoming fd
+	AVBufferRef* drm_frames_ctx; // DRM_PRIME frames pool (format descriptor)
+	AVFilterGraph* dmabuf_graph;
+	AVFilterContext* dmabuf_src;  // buffersrc (DRM_PRIME)
+	AVFilterContext* dmabuf_sink; // buffersink (VAAPI NV12)
+	AVFrame* dmabuf_out;          // reused output frame
 } VideoContext;
 
 // this is a rust function and lives in src/video.rs
@@ -130,6 +142,23 @@ void log_callback(void* _ptr, int level, const char* fmt_orig, va_list args)
 
 // called in src/log.rs
 void init_ffmpeg_logger() { av_log_set_callback(log_callback); }
+
+// Startup probe: 1 if a VAAPI device opens AND the h264_vaapi encoder exists,
+// else 0. Gates the zero-copy dmabuf path so it never has to serve a software
+// encoder. Called from src/video.rs.
+int vaapi_encoder_available(void)
+{
+#ifdef HAS_VAAPI
+	const char* dev = getenv("WEYLUS_VAAPI_DEVICE");
+	AVBufferRef* d = NULL;
+	if (av_hwdevice_ctx_create(&d, AV_HWDEVICE_TYPE_VAAPI, dev, NULL, 0) != 0)
+		return 0;
+	av_buffer_unref(&d);
+	return avcodec_find_encoder_by_name("h264_vaapi") ? 1 : 0;
+#else
+	return 0;
+#endif
+}
 
 void set_codec_params(VideoContext* ctx)
 {
@@ -534,6 +563,105 @@ void scale_frame(ScaleContext* ctx, Error* err)
 	}
 }
 
+#ifdef HAS_VAAPI
+// Build the zero-copy import graph:
+//   buffer(DRM_PRIME) -> hwmap=derive_device=vaapi -> scale_vaapi=nv12 -> buffersink
+// Proven end-to-end in lib/vaapi_import_probe.c on branch debug/vaapi-zerocopy-probe.
+// The graph is configured once here; fill_dmabuf() pushes each frame through it.
+static int build_dmabuf_graph(VideoContext* ctx)
+{
+	int ret;
+	// ffmpeg's DRM backend does open(device), so device MUST be a real node path
+	// (passing NULL yields open(NULL) -> EFAULT).
+	const char* drm_node = getenv("WEYLUS_VAAPI_DRM_NODE");
+	if (!drm_node || !drm_node[0])
+		drm_node = "/dev/dri/renderD128";
+	if ((ret = av_hwdevice_ctx_create(
+			 &ctx->drm_device_ctx, AV_HWDEVICE_TYPE_DRM, drm_node, NULL, 0)) < 0)
+		return ret;
+
+	ctx->drm_frames_ctx = av_hwframe_ctx_alloc(ctx->drm_device_ctx);
+	if (!ctx->drm_frames_ctx)
+		return AVERROR(ENOMEM);
+	AVHWFramesContext* fc = (AVHWFramesContext*)ctx->drm_frames_ctx->data;
+	fc->format = AV_PIX_FMT_DRM_PRIME;
+	fc->sw_format = AV_PIX_FMT_BGR0; // XR24 == XRGB8888 little-endian == BGR0
+	fc->width = ctx->width_in;
+	fc->height = ctx->height_in;
+	if ((ret = av_hwframe_ctx_init(ctx->drm_frames_ctx)) < 0)
+		return ret;
+
+	ctx->dmabuf_graph = avfilter_graph_alloc();
+	if (!ctx->dmabuf_graph)
+		return AVERROR(ENOMEM);
+
+	// A hardware pix_fmt cannot be passed via the args string; alloc the filter,
+	// set parameters (incl. hw_frames_ctx), then init with NULL.
+	ctx->dmabuf_src =
+		avfilter_graph_alloc_filter(ctx->dmabuf_graph, avfilter_get_by_name("buffer"), "in");
+	if (!ctx->dmabuf_src)
+		return AVERROR(ENOMEM);
+	AVBufferSrcParameters* p = av_buffersrc_parameters_alloc();
+	p->format = AV_PIX_FMT_DRM_PRIME;
+	p->width = ctx->width_in;
+	p->height = ctx->height_in;
+	p->time_base = TIME_BASE;
+	p->frame_rate = (AVRational){30, 1};
+	p->hw_frames_ctx = av_buffer_ref(ctx->drm_frames_ctx);
+	ret = av_buffersrc_parameters_set(ctx->dmabuf_src, p);
+	av_free(p);
+	if (ret < 0)
+		return ret;
+	if ((ret = avfilter_init_str(ctx->dmabuf_src, NULL)) < 0)
+		return ret;
+
+	AVFilterContext* map_ctx;
+	if ((ret = avfilter_graph_create_filter(
+			 &map_ctx,
+			 avfilter_get_by_name("hwmap"),
+			 "map",
+			 "derive_device=vaapi:mode=read",
+			 NULL,
+			 ctx->dmabuf_graph)) < 0)
+		return ret;
+
+	// scale_vaapi also clamps to the VAAPI H.264 4096x4096 limit via width_out/height_out.
+	char scale_args[128];
+	snprintf(
+		scale_args, sizeof(scale_args), "w=%d:h=%d:format=nv12", ctx->width_out, ctx->height_out);
+	AVFilterContext* scale_ctx;
+	if ((ret = avfilter_graph_create_filter(
+			 &scale_ctx,
+			 avfilter_get_by_name("scale_vaapi"),
+			 "scale",
+			 scale_args,
+			 NULL,
+			 ctx->dmabuf_graph)) < 0)
+		return ret;
+
+	ctx->dmabuf_sink =
+		avfilter_graph_alloc_filter(ctx->dmabuf_graph, avfilter_get_by_name("buffersink"), "out");
+	if (!ctx->dmabuf_sink)
+		return AVERROR(ENOMEM);
+	if ((ret = avfilter_init_str(ctx->dmabuf_sink, NULL)) < 0)
+		return ret;
+
+	if ((ret = avfilter_link(ctx->dmabuf_src, 0, map_ctx, 0)) < 0)
+		return ret;
+	if ((ret = avfilter_link(map_ctx, 0, scale_ctx, 0)) < 0)
+		return ret;
+	if ((ret = avfilter_link(scale_ctx, 0, ctx->dmabuf_sink, 0)) < 0)
+		return ret;
+	if ((ret = avfilter_graph_config(ctx->dmabuf_graph, NULL)) < 0)
+		return ret;
+
+	ctx->dmabuf_out = av_frame_alloc();
+	if (!ctx->dmabuf_out)
+		return AVERROR(ENOMEM);
+	return 0;
+}
+#endif
+
 void open_video(VideoContext* ctx, Error* err)
 {
 	if (ctx->width_out <= 1 || ctx->height_out <= 1)
@@ -556,9 +684,36 @@ void open_video(VideoContext* ctx, Error* err)
 	int using_hw = 0;
 
 #ifdef HAS_VAAPI
+	// Zero-copy path: frames arrive as DRM-PRIME dmabufs. Import them straight into
+	// VAAPI (hwmap) and open h264_vaapi from the graph's sink hw_frames_ctx — no
+	// GPU->CPU->GPU round trip, no init_scalers.
+	if (ctx->try_vaapi && ctx->input_dmabuf)
+	{
+		ret = build_dmabuf_graph(ctx);
+		if (ret < 0)
+			ERROR(err, 1, "dmabuf VAAPI graph setup failed: %s", av_err2str(ret));
+		AVBufferRef* enc_frames = av_buffersink_get_hw_frames_ctx(ctx->dmabuf_sink);
+		if (!enc_frames)
+			ERROR(err, 1, "dmabuf graph produced no hw_frames_ctx");
+		codec = avcodec_find_encoder_by_name("h264_vaapi");
+		if (!codec)
+			ERROR(err, 1, "no h264_vaapi encoder");
+		ctx->c = avcodec_alloc_context3(codec);
+		if (!ctx->c)
+			ERROR(err, 1, "Could not allocate h264_vaapi context");
+		ctx->c->pix_fmt = AV_PIX_FMT_VAAPI;
+		ctx->c->hw_frames_ctx = av_buffer_ref(enc_frames);
+		av_opt_set(ctx->c->priv_data, "quality", "7", 0);
+		av_opt_set(ctx->c->priv_data, "qp", "23", 0);
+		set_codec_params(ctx);
+		if ((ret = avcodec_open2(ctx->c, codec, NULL)) < 0)
+			ERROR(err, 1, "open h264_vaapi (dmabuf): %s", av_err2str(ret));
+		using_hw = 1;
+	}
+
 	char* vaapi_device = getenv("WEYLUS_VAAPI_DEVICE");
 
-	if (ctx->try_vaapi &&
+	if (ctx->try_vaapi && !ctx->input_dmabuf && !using_hw &&
 		av_hwdevice_ctx_create(
 			&ctx->hw_device_ctx, AV_HWDEVICE_TYPE_VAAPI, vaapi_device, NULL, 0) == 0)
 	{
@@ -889,6 +1044,14 @@ void destroy_video_encoder(VideoContext* ctx)
 	}
 	if (ctx->hw_device_ctx)
 		av_buffer_unref(&ctx->hw_device_ctx);
+	if (ctx->dmabuf_out)
+		av_frame_free(&ctx->dmabuf_out);
+	if (ctx->dmabuf_graph)
+		avfilter_graph_free(&ctx->dmabuf_graph);
+	if (ctx->drm_frames_ctx)
+		av_buffer_unref(&ctx->drm_frames_ctx);
+	if (ctx->drm_device_ctx)
+		av_buffer_unref(&ctx->drm_device_ctx);
 	free(ctx);
 }
 
@@ -933,7 +1096,8 @@ VideoContext* init_video_encoder(
 	int try_vaapi,
 	int try_nvenc,
 	int try_videotoolbox,
-	int try_mediafoundation)
+	int try_mediafoundation,
+	int input_dmabuf)
 {
 	VideoContext* ctx = malloc(sizeof(VideoContext));
 	ctx->rust_ctx = rust_ctx;
@@ -949,6 +1113,13 @@ VideoContext* init_video_encoder(
 	ctx->try_videotoolbox = try_videotoolbox;
 	ctx->try_mediafoundation = try_mediafoundation;
 	ctx->hw_device_ctx = NULL;
+	ctx->input_dmabuf = input_dmabuf;
+	ctx->drm_device_ctx = NULL;
+	ctx->drm_frames_ctx = NULL;
+	ctx->dmabuf_graph = NULL;
+	ctx->dmabuf_src = NULL;
+	ctx->dmabuf_sink = NULL;
+	ctx->dmabuf_out = NULL;
 
 	// make sure all scalers are zero initialized so that destroy can always be called
 	memset(&ctx->scalers, 0, sizeof(Scalers));
@@ -991,3 +1162,71 @@ void fill_rgb0(VideoContext* ctx, const void* data, Error* err)
 	OK_OR_ABORT(err)
 	ctx->frame = scaler->frame_out;
 }
+
+// Zero-copy input: wrap the incoming dmabuf fd as a single-plane DRM-PRIME frame,
+// push it through the import graph, and hand the mapped VAAPI NV12 frame to the
+// encoder via ctx->frame. Adapted from lib/vaapi_import_probe.c.
+#ifdef HAS_VAAPI
+// AVBufferRef free callback: frees the AVDRMFrameDescriptor backing the frame.
+// A dedicated wrapper (rather than casting av_free) keeps the signature exact
+// and avoids -Wcast-function-type.
+static void free_drm_descriptor(void* opaque, uint8_t* data)
+{
+	(void)opaque;
+	av_free(data);
+}
+
+void fill_dmabuf(VideoContext* ctx, int fd, unsigned int fourcc,
+	unsigned long long modifier, unsigned int stride, unsigned int offset, Error* err)
+{
+	ctx->frame = NULL;
+	// True dmabuf size: the compositor may report a bogus GstMemory size, so measure the fd.
+	off_t sz = lseek(fd, 0, SEEK_END);
+	if (sz <= 0)
+		sz = (off_t)stride * ctx->height_in;
+
+	AVFrame* drm = av_frame_alloc();
+	if (!drm)
+		ERROR(err, 1, "dmabuf: av_frame_alloc failed");
+	drm->format = AV_PIX_FMT_DRM_PRIME;
+	drm->width = ctx->width_in;
+	drm->height = ctx->height_in;
+	AVDRMFrameDescriptor* d = av_mallocz(sizeof(*d));
+	d->nb_objects = 1;
+	d->objects[0].fd = fd;
+	d->objects[0].size = sz;
+	d->objects[0].format_modifier = modifier;
+	d->nb_layers = 1;
+	d->layers[0].format = fourcc;
+	d->layers[0].nb_planes = 1;
+	d->layers[0].planes[0].object_index = 0;
+	d->layers[0].planes[0].offset = offset;
+	d->layers[0].planes[0].pitch = stride;
+	drm->data[0] = (uint8_t*)d;
+	drm->buf[0] = av_buffer_create((uint8_t*)d, sizeof(*d), free_drm_descriptor, NULL, 0);
+	drm->hw_frames_ctx = av_buffer_ref(ctx->drm_frames_ctx);
+
+	int ret = av_buffersrc_add_frame(ctx->dmabuf_src, drm);
+	av_frame_free(&drm);
+	if (ret < 0)
+		ERROR(err, 1, "dmabuf buffersrc_add_frame: %s", av_err2str(ret));
+
+	av_frame_unref(ctx->dmabuf_out);
+	ret = av_buffersink_get_frame(ctx->dmabuf_sink, ctx->dmabuf_out);
+	if (ret < 0)
+		ERROR(err, 1, "dmabuf buffersink_get_frame: %s", av_err2str(ret));
+	ctx->frame = ctx->dmabuf_out;
+}
+#else
+void fill_dmabuf(VideoContext* ctx, int fd, unsigned int fourcc,
+	unsigned long long modifier, unsigned int stride, unsigned int offset, Error* err)
+{
+	(void)ctx;
+	(void)fd;
+	(void)fourcc;
+	(void)modifier;
+	(void)stride;
+	(void)offset;
+	ERROR(err, 1, "dmabuf capture requires a VAAPI-enabled build");
+}
+#endif
