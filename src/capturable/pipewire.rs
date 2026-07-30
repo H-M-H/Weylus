@@ -29,6 +29,70 @@ use crate::capturable::remote_desktop_dbus::{
 struct PwStreamInfo {
     path: u64,
     source_type: u64,
+    /// Portal `position` (ii): the stream's (x, y) in the compositor's logical
+    /// coordinate space. Monitor streams only; `None` for windows / when absent.
+    position: Option<(i32, i32)>,
+    /// Portal `size` (ii): the stream's (width, height) in logical space.
+    size: Option<(i32, i32)>,
+}
+
+use crate::capturable::wayland_outputs::GlobalBox;
+
+/// Extract a D-Bus `(ii)` value (as the portal reports `position`/`size`) into `(i32, i32)`.
+///
+/// The value arrives wrapped in a Variant around a two-element struct, so we descend
+/// through any container layers and collect the integer leaves; a genuine `(ii)` yields
+/// exactly two.
+fn extract_ii(arg: &dyn RefArg) -> Option<(i32, i32)> {
+    fn collect_ints(arg: &dyn RefArg, out: &mut Vec<i64>) {
+        if let Some(i) = arg.as_i64() {
+            out.push(i);
+            return;
+        }
+        if let Some(it) = arg.as_iter() {
+            for x in it {
+                collect_ints(x, out);
+            }
+        }
+    }
+    let mut ints = Vec::new();
+    collect_ints(arg, &mut ints);
+    match ints.as_slice() {
+        [a, b] => Some((*a as i32, *b as i32)),
+        _ => None,
+    }
+}
+
+/// Compute the `Geometry::Relative` for a monitor stream whose logical rect is
+/// `(px, py, sw, sh)`, normalised against the global bounding box `gbox` (the space the
+/// compositor decodes tablet ABS axes against). Returns whole-screen `(0,0,1,1)` when the
+/// stream has no usable geometry (e.g. a window, which the portal reports as a dummy
+/// `1x1`) or when the global box is unknown/degenerate.
+fn relative_geometry(
+    source_type: u64,
+    position: Option<(i32, i32)>,
+    size: Option<(i32, i32)>,
+    gbox: Option<GlobalBox>,
+) -> Geometry {
+    // source_type 1 == MONITOR; windows (2) report bogus position/size.
+    if source_type != 1 {
+        return Geometry::Relative(0.0, 0.0, 1.0, 1.0);
+    }
+    match (position, size, gbox) {
+        (Some((px, py)), Some((sw, sh)), Some(g))
+            if g.width > 0 && g.height > 0 && sw > 1 && sh > 1 =>
+        {
+            let w = g.width as f64;
+            let h = g.height as f64;
+            Geometry::Relative(
+                (px - g.x) as f64 / w,
+                (py - g.y) as f64 / h,
+                sw as f64 / w,
+                sh as f64 / h,
+            )
+        }
+        _ => Geometry::Relative(0.0, 0.0, 1.0, 1.0),
+    }
 }
 
 #[derive(Debug)]
@@ -62,6 +126,14 @@ pub struct PipeWireCapturable {
     fd: OwnedFd,
     path: u64,
     source_type: u64,
+    /// Stream's logical (x, y) from the portal; used to map stylus input.
+    position: Option<(i32, i32)>,
+    /// Stream's logical (width, height) from the portal.
+    size: Option<(i32, i32)>,
+    /// Global bounding box of all outputs (logical space), queried once at
+    /// enumeration time. `None` when Wayland output geometry is unavailable, in
+    /// which case `geometry()` falls back to the whole screen.
+    global_box: Option<GlobalBox>,
     pipeline: PipewirePipeline,
 }
 
@@ -70,6 +142,7 @@ impl PipeWireCapturable {
         conn: Arc<SyncConnection>,
         fd: OwnedFd,
         stream: PwStreamInfo,
+        global_box: Option<GlobalBox>,
         pipeline: PipewirePipeline,
     ) -> Self {
         Self {
@@ -77,6 +150,9 @@ impl PipeWireCapturable {
             fd,
             path: stream.path,
             source_type: stream.source_type,
+            position: stream.position,
+            size: stream.size,
+            global_box,
             pipeline,
         }
     }
@@ -86,11 +162,15 @@ impl std::fmt::Debug for PipeWireCapturable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "PipeWireCapturable {{dbus: {}, fd: {}, path: {}, source_type: {}, pipeline: {:?}}}",
+            "PipeWireCapturable {{dbus: {}, fd: {}, path: {}, source_type: {}, \
+             position: {:?}, size: {:?}, global_box: {:?}, pipeline: {:?}}}",
             self.dbus_conn.unique_name(),
             self.fd.as_raw_fd(),
             self.path,
             self.source_type,
+            self.position,
+            self.size,
+            self.global_box,
             self.pipeline,
         )
     }
@@ -107,7 +187,17 @@ impl Capturable for PipeWireCapturable {
     }
 
     fn geometry(&self) -> Result<Geometry, Box<dyn Error>> {
-        Ok(Geometry::Relative(0.0, 0.0, 1.0, 1.0))
+        let geometry =
+            relative_geometry(self.source_type, self.position, self.size, self.global_box);
+        // On Linux `Geometry` only has the `Relative` variant, so this destructure is
+        // irrefutable; it is purely to log the resolved mapping.
+        let Geometry::Relative(x, y, w, h) = geometry;
+        debug!(
+            "geometry() for path {} (source_type {}): stream position {:?} size {:?}, \
+             global_box {:?} -> Relative(x={:.4}, y={:.4}, w={:.4}, h={:.4})",
+            self.path, self.source_type, self.position, self.size, self.global_box, x, y, w, h
+        );
+        Ok(geometry)
     }
 
     fn before_input(&mut self) -> Result<(), Box<dyn Error>> {
@@ -554,6 +644,8 @@ fn streams_from_response(response: &OrgFreedesktopPortalRequestResponse) -> Vec<
                         source_type: attributes
                             .get("source_type")
                             .map_or(Some(0), |v| v.as_u64())?,
+                        position: attributes.get("position").and_then(|v| extract_ii(v)),
+                        size: attributes.get("size").and_then(|v| extract_ii(v)),
                     })
                 })
                 .collect::<Vec<PwStreamInfo>>(),
@@ -728,7 +820,19 @@ fn on_start_response(
 ) -> Result<(), Box<dyn Error>> {
     debug!("on_start_response");
     let mut context = context.lock().unwrap();
-    context.streams.append(&mut streams_from_response(&r));
+    let mut new_streams = streams_from_response(&r);
+    for s in &new_streams {
+        let kind = match s.source_type {
+            1 => "monitor",
+            2 => "window",
+            _ => "unknown",
+        };
+        debug!(
+            "Portal stream: node {}, source_type {} ({kind}), position {:?}, size {:?}",
+            s.path, s.source_type, s.position, s.size
+        );
+    }
+    context.streams.append(&mut new_streams);
     let session = context.session.clone();
     context
         .fd
@@ -813,8 +917,73 @@ pub fn get_capturables(
 ) -> Result<Vec<PipeWireCapturable>, Box<dyn Error>> {
     let (conn, fd, streams) = request_remote_desktop(capture_cursor)?;
     let conn = Arc::new(conn);
+    // Query the global output bounding box once so each capturable can map its
+    // portal-reported rect into the compositor's logical coordinate space. If this
+    // fails (no Wayland display / no xdg-output) geometry() falls back to whole-screen.
+    let global_box = crate::capturable::wayland_outputs::global_bounding_box();
+    debug!("Wayland global bounding box for stylus mapping: {global_box:?}");
     Ok(streams
         .into_iter()
-        .map(|s| PipeWireCapturable::new(conn.clone(), fd.clone(), s, pipeline))
+        .map(|s| PipeWireCapturable::new(conn.clone(), fd.clone(), s, global_box, pipeline))
         .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rel(g: &Geometry) -> (f64, f64, f64, f64) {
+        match g {
+            Geometry::Relative(x, y, w, h) => (*x, *y, *w, *h),
+            #[allow(unreachable_patterns)]
+            _ => panic!("expected Relative"),
+        }
+    }
+
+    const BOX_2688: GlobalBox = GlobalBox {
+        x: 0,
+        y: 0,
+        width: 4096,
+        height: 2688,
+    };
+
+    #[test]
+    fn monitor_maps_into_global_box() {
+        // eDP-1 as measured: logical (1328,1728) 1440x960 within the 4096x2688 box.
+        let g = relative_geometry(1, Some((1328, 1728)), Some((1440, 960)), Some(BOX_2688));
+        let (x, y, w, h) = rel(&g);
+        assert!((x - 1328.0 / 4096.0).abs() < 1e-9);
+        assert!((y - 1728.0 / 2688.0).abs() < 1e-9);
+        assert!((w - 1440.0 / 4096.0).abs() < 1e-9);
+        assert!((h - 960.0 / 2688.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn primary_monitor_maps_to_origin() {
+        // DP-1: logical (0,0) 4096x1728 -> covers full width, top portion.
+        let g = relative_geometry(1, Some((0, 0)), Some((4096, 1728)), Some(BOX_2688));
+        let (x, y, w, h) = rel(&g);
+        assert_eq!((x, y), (0.0, 0.0));
+        assert!((w - 1.0).abs() < 1e-9);
+        assert!((h - 1728.0 / 2688.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn window_falls_back_to_whole_screen() {
+        // source_type 2 == window; portal reports a dummy 1x1 we must ignore.
+        let g = relative_geometry(2, Some((0, 0)), Some((1, 1)), Some(BOX_2688));
+        assert_eq!(rel(&g), (0.0, 0.0, 1.0, 1.0));
+    }
+
+    #[test]
+    fn no_global_box_falls_back_to_whole_screen() {
+        let g = relative_geometry(1, Some((1328, 1728)), Some((1440, 960)), None);
+        assert_eq!(rel(&g), (0.0, 0.0, 1.0, 1.0));
+    }
+
+    #[test]
+    fn missing_position_falls_back_to_whole_screen() {
+        let g = relative_geometry(1, None, Some((1440, 960)), Some(BOX_2688));
+        assert_eq!(rel(&g), (0.0, 0.0, 1.0, 1.0));
+    }
 }

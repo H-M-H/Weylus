@@ -9,6 +9,8 @@ pub mod pipewire;
 #[cfg(target_os = "linux")]
 #[allow(dead_code)]
 pub mod remote_desktop_dbus;
+#[cfg(target_os = "linux")]
+pub mod wayland_outputs;
 pub mod testsrc;
 
 #[cfg(target_os = "windows")]
