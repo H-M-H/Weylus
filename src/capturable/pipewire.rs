@@ -187,17 +187,12 @@ impl Capturable for PipeWireCapturable {
     }
 
     fn geometry(&self) -> Result<Geometry, Box<dyn Error>> {
-        let geometry =
-            relative_geometry(self.source_type, self.position, self.size, self.global_box);
-        // On Linux `Geometry` only has the `Relative` variant, so this destructure is
-        // irrefutable; it is purely to log the resolved mapping.
-        let Geometry::Relative(x, y, w, h) = geometry;
-        debug!(
-            "geometry() for path {} (source_type {}): stream position {:?} size {:?}, \
-             global_box {:?} -> Relative(x={:.4}, y={:.4}, w={:.4}, h={:.4})",
-            self.path, self.source_type, self.position, self.size, self.global_box, x, y, w, h
-        );
-        Ok(geometry)
+        Ok(relative_geometry(
+            self.source_type,
+            self.position,
+            self.size,
+            self.global_box,
+        ))
     }
 
     fn before_input(&mut self) -> Result<(), Box<dyn Error>> {
