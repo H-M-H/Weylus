@@ -48,6 +48,16 @@ dbus = "^0.9"
 gstreamer = "^0.24"
 gstreamer-app = { version = "^0.24", features = ["v1_16"] }
 gstreamer-video = "^0.24"
+# DmaBufMemory downcast for the zero-copy VAAPI capture path.
+gstreamer-allocators = "^0.24"
+# fcntl(clear CLOEXEC) so the examples/vaapi_pipe_probe harness's per-cell
+# worker subprocesses inherit the portal pipewire fd. Present transitively;
+# declared for the diagnostic example.
+libc = "0.2"
+# Wayland output enumeration (xdg-output logical geometry) for the PipeWire/Wayland
+# capturable's stylus mapping. Gated to Linux, same as the rest of the Wayland path;
+# only exercised at runtime when the Wayland capture checkbox is enabled.
+smithay-client-toolkit = "0.19"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 pnet_datalink = "^0.35"
@@ -60,6 +70,9 @@ core-graphics = "^0.24"
 bench = []
 ffmpeg-system = []
 va-static = []
+# Diagnostic-only: compiles lib/vaapi_import_probe.c and enables the
+# examples/vaapi_pipe_probe harness. Never enabled for production builds.
+vaapi-probe = []
 
 [package.metadata.bundle]
 name = "Weylus"
@@ -78,3 +91,10 @@ assets = [
 [profile.release]
 lto = true
 opt-level = 3
+
+# Diagnostic-only zero-copy dmabuf -> VAAPI feasibility harness. Links the
+# lib/vaapi_import_probe.c backend that build.rs compiles under the same
+# feature. Run with: cargo run --example vaapi_pipe_probe --features vaapi-probe
+[[example]]
+name = "vaapi_pipe_probe"
+required-features = ["vaapi-probe"]

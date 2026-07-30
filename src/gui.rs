@@ -37,7 +37,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     let app = App::default().with_scheme(fltk::app::AppScheme::Gtk);
     config.gui_theme.map(|th| th.apply());
     let mut wind = Window::default()
-        .with_size(660, 600)
+        .with_size(660, 640)
         .center_screen()
         .with_label(&format!("Weylus - {}", env!("CARGO_PKG_VERSION")));
     wind.set_xclass("weylus");
@@ -76,10 +76,12 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     check_auto_start.set_tooltip("Start Weylus server immediately on program start.");
     check_auto_start.set_checked(config.auto_start);
 
+    // Wayland/PipeWire support gets its own row (below Auto Start), shared with the
+    // PipeWire capture-pipeline selector.
     #[cfg(target_os = "linux")]
     let mut check_wayland = CheckButton::default()
         .with_size(70, height)
-        .right_of(&check_auto_start, 3 * padding)
+        .below_of(&check_auto_start, padding)
         .with_label("Wayland/\nPipeWire\nSupport");
     #[cfg(target_os = "linux")]
     {
@@ -90,6 +92,46 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         check_wayland.set_checked(config.wayland_support);
     }
 
+    // PipeWire capture pipeline selector, next to the Wayland toggle.
+    #[cfg(target_os = "linux")]
+    let mut choice_pw_pipeline = Choice::default()
+        .with_size(100, height)
+        .right_of(&check_wayland, 3 * padding);
+    #[cfg(target_os = "linux")]
+    {
+        choice_pw_pipeline.set_tooltip(
+            "Screen-capture pipeline for Wayland/PipeWire. Wayland compositors hand out the \
+             screen as a GPU DMA-BUF, and how it reaches the encoder differs per compositor. \
+             Auto (recommended): try direct capture, fall back to GPU DMA-BUF import (needed \
+             for niri and most modern compositors). Direct: only works where the compositor \
+             exposes plain CPU buffers. GL: force the GPU DMA-BUF import path. Change this \
+             only if capture stays black.",
+        );
+        for p in crate::config::PipewirePipeline::variants() {
+            choice_pw_pipeline.add_choice(&p.name());
+        }
+        choice_pw_pipeline.set_value(config.pipewire_pipeline.to_index());
+        // The selector is meaningless unless Wayland/PipeWire capture is enabled.
+        if !config.wayland_support {
+            choice_pw_pipeline.deactivate();
+        }
+        let mut choice_toggle = choice_pw_pipeline.clone();
+        check_wayland.set_callback(move |cb| {
+            if cb.is_checked() {
+                choice_toggle.activate();
+            } else {
+                choice_toggle.deactivate();
+            }
+        });
+    }
+
+    // Hardware-accel section sits below the Wayland row on Linux, below Auto Start elsewhere.
+    #[cfg(target_os = "linux")]
+    let mut label_hw_accel = Frame::default()
+        .with_size(width, height)
+        .below_of(&check_wayland, padding)
+        .with_label("Try Hardware acceleration");
+    #[cfg(not(target_os = "linux"))]
     let mut label_hw_accel = Frame::default()
         .with_size(width, height)
         .below_of(&check_auto_start, padding)
@@ -229,6 +271,8 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     {
                         config.try_vaapi = check_native_hw_accel.is_checked();
                         config.wayland_support = check_wayland.is_checked();
+                        config.pipewire_pipeline =
+                            crate::config::PipewirePipeline::from_index(choice_pw_pipeline.value());
                     }
                     #[cfg(any(target_os = "linux", target_os = "windows"))]
                     {

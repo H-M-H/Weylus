@@ -129,7 +129,7 @@ mod tests {
     fn bench_capture_x11(b: &mut Bencher) {
         let mut x11ctx = capturable::x11::X11Context::new().unwrap();
         let root = x11ctx.capturables().unwrap().remove(0);
-        let mut r = root.recorder(false).unwrap();
+        let mut r = root.recorder(false, false).unwrap();
         b.iter(|| {
             r.capture().unwrap();
         });
@@ -140,7 +140,7 @@ mod tests {
     fn bench_video_x11(b: &mut Bencher) {
         let mut x11ctx = capturable::x11::X11Context::new().unwrap();
         let root = x11ctx.capturables().unwrap().remove(0);
-        let mut r = root.recorder(false).unwrap();
+        let mut r = root.recorder(false, false).unwrap();
         let (width, height) = r.capture().unwrap().size();
 
         let opts = video::EncoderOptions {
@@ -148,6 +148,7 @@ mod tests {
             try_nvenc: true,
             try_videotoolbox: false,
             try_mediafoundation: false,
+            input_is_dmabuf: false,
         };
         let mut encoder =
             video::VideoEncoder::new(width, height, width, height, |_| {}, opts).unwrap();
@@ -158,10 +159,10 @@ mod tests {
     #[bench]
     fn bench_capture_wayland(b: &mut Bencher) {
         gstreamer::init().unwrap();
-        let root = capturable::pipewire::get_capturables(false)
+        let root = capturable::pipewire::get_capturables(false, crate::config::PipewirePipeline::Auto)
             .unwrap()
             .remove(0);
-        let mut r = root.recorder(false).unwrap();
+        let mut r = root.recorder(false, false).unwrap();
         let _ = r.capture();
         b.iter(|| {
             r.capture().unwrap();
@@ -172,10 +173,10 @@ mod tests {
     #[bench]
     fn bench_video_wayland(b: &mut Bencher) {
         gstreamer::init().unwrap();
-        let root = capturable::pipewire::get_capturables(false)
+        let root = capturable::pipewire::get_capturables(false, crate::config::PipewirePipeline::Auto)
             .unwrap()
             .remove(0);
-        let mut r = root.recorder(false).unwrap();
+        let mut r = root.recorder(false, false).unwrap();
         let (width, height) = r.capture().unwrap().size();
 
         let opts = video::EncoderOptions {
@@ -183,6 +184,7 @@ mod tests {
             try_nvenc: true,
             try_videotoolbox: false,
             try_mediafoundation: false,
+            input_is_dmabuf: false,
         };
         let mut encoder =
             video::VideoEncoder::new(width, height, width, height, |_| {}, opts).unwrap();
@@ -207,6 +209,7 @@ mod tests {
             try_nvenc: false,
             try_videotoolbox: false,
             try_mediafoundation: false,
+            input_is_dmabuf: false,
         };
         let mut encoder =
             video::VideoEncoder::new(WIDTH, HEIGHT, WIDTH, HEIGHT, |_| {}, opts).unwrap();
@@ -236,6 +239,7 @@ mod tests {
             try_nvenc: false,
             try_videotoolbox: false,
             try_mediafoundation: false,
+            input_is_dmabuf: false,
         };
         let mut encoder =
             video::VideoEncoder::new(WIDTH, HEIGHT, WIDTH, HEIGHT, |_| {}, opts).unwrap();
@@ -265,6 +269,7 @@ mod tests {
             try_nvenc: true,
             try_videotoolbox: false,
             try_mediafoundation: false,
+            input_is_dmabuf: false,
         };
         let mut encoder =
             video::VideoEncoder::new(WIDTH, HEIGHT, WIDTH, HEIGHT, |_| {}, opts).unwrap();

@@ -16,6 +16,7 @@ extern "C" {
         try_nvenc: c_int,
         try_videotoolbox: c_int,
         try_mediafoundation: c_int,
+        input_dmabuf: c_int,
     ) -> *mut c_void;
     fn open_video(handle: *mut c_void, err: *mut CError);
     fn destroy_video_encoder(handle: *mut c_void);
@@ -24,6 +25,25 @@ extern "C" {
     fn fill_rgb(ctx: *mut c_void, data: *const u8, err: *mut CError);
     fn fill_rgb0(ctx: *mut c_void, data: *const u8, err: *mut CError);
     fn fill_bgr0(ctx: *mut c_void, data: *const u8, stride: c_int, err: *mut CError);
+
+    fn fill_dmabuf(
+        ctx: *mut c_void,
+        fd: c_int,
+        fourcc: u32,
+        modifier: u64,
+        stride: u32,
+        offset: u32,
+        err: *mut CError,
+    );
+
+    fn vaapi_encoder_available() -> c_int;
+}
+
+/// True when a VAAPI device opens and the `h264_vaapi` encoder is present.
+/// Gates the zero-copy dmabuf capture/encode path.
+#[cfg(target_os = "linux")]
+pub fn vaapi_available() -> bool {
+    unsafe { vaapi_encoder_available() != 0 }
 }
 
 // this is used as callback in lib/encode_video.c via ffmpegs AVIOContext
@@ -43,6 +63,17 @@ pub enum PixelProvider<'a> {
     BGR0(usize, usize, &'a [u8]),
     // width, height, stride
     BGR0S(usize, usize, usize, &'a [u8]),
+    // hardware dmabuf: fd + DRM layout, borrows nothing but ties to the
+    // recorder's retained GstBuffer via the PixelProvider<'a> lifetime.
+    DmaBuf {
+        fd: std::os::raw::c_int,
+        fourcc: u32,
+        modifier: u64,
+        width: usize,
+        height: usize,
+        stride: u32,
+        offset: u32,
+    },
 }
 
 impl<'a> PixelProvider<'a> {
@@ -52,6 +83,7 @@ impl<'a> PixelProvider<'a> {
             PixelProvider::RGB0(w, h, _) => (*w, *h),
             PixelProvider::BGR0(w, h, _) => (*w, *h),
             PixelProvider::BGR0S(w, h, _, _) => (*w, *h),
+            PixelProvider::DmaBuf { width, height, .. } => (*width, *height),
         }
     }
 }
@@ -62,6 +94,9 @@ pub struct EncoderOptions {
     pub try_nvenc: bool,
     pub try_videotoolbox: bool,
     pub try_mediafoundation: bool,
+    /// Frames will arrive as DRM-PRIME dmabufs (zero-copy VAAPI import). Set only
+    /// when the selected capture path actually ends up on the dmabuf path.
+    pub input_is_dmabuf: bool,
 }
 
 pub struct VideoEncoder {
@@ -103,6 +138,7 @@ impl VideoEncoder {
                 options.try_nvenc.into(),
                 options.try_videotoolbox.into(),
                 options.try_mediafoundation.into(),
+                options.input_is_dmabuf.into(),
             )
         };
         video_encoder.handle = handle;
@@ -129,6 +165,16 @@ impl VideoEncoder {
             },
             PixelProvider::RGB0(_, _, rgb) => unsafe {
                 fill_rgb0(self.handle, rgb.as_ptr(), &mut err);
+            },
+            PixelProvider::DmaBuf {
+                fd,
+                fourcc,
+                modifier,
+                stride,
+                offset,
+                ..
+            } => unsafe {
+                fill_dmabuf(self.handle, fd, fourcc, modifier, stride, offset, &mut err);
             },
         }
         if err.is_err() {

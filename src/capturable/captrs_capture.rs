@@ -32,7 +32,11 @@ impl Capturable for CaptrsCapturable {
     fn before_input(&mut self) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
-    fn recorder(&self, _capture_cursor: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
+    fn recorder(
+        &self,
+        _capture_cursor: bool,
+        _prefer_dmabuf: bool,
+    ) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
         Ok(Box::new(CaptrsRecorder::new(self.id)?))
     }
     fn geometry(&self) -> Result<Geometry, Box<dyn Error>> {

@@ -68,6 +68,74 @@ impl ThemeType {
     }
 }
 
+/// Which GStreamer pipeline the PipeWire (Wayland) capturer uses to turn the
+/// compositor's screen-cast stream into CPU-mappable pixels.
+#[cfg(target_os = "linux")]
+#[derive(clap::ValueEnum, Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PipewirePipeline {
+    /// Try the cheap direct path, fall back to the GL DMA-BUF import if it can
+    /// not negotiate (needed for niri and most modern Wayland compositors).
+    Auto,
+    /// Force `pipewiresrc -> appsink`. Only works where the compositor exposes
+    /// CPU-mappable buffers; cheapest when it does.
+    Direct,
+    /// Force the GL DMA-BUF import path (`glupload -> ... -> gldownload`).
+    Gl,
+    /// Force zero-copy dmabuf import into VAAPI (`pipewiresrc -> appsink(DMA_DRM)`
+    /// then ffmpeg hwmap). Only works with the VAAPI encoder.
+    Dmabuf,
+    /// Force the GL download path pinned to a LINEAR modifier for a cheap
+    /// (no de-tile) readback to system memory.
+    LinearCpu,
+}
+
+#[cfg(target_os = "linux")]
+const PIPEWIRE_PIPELINE_LIST: [PipewirePipeline; 5] = [
+    PipewirePipeline::Auto,
+    PipewirePipeline::Dmabuf,
+    PipewirePipeline::LinearCpu,
+    PipewirePipeline::Gl,
+    PipewirePipeline::Direct,
+];
+
+#[cfg(target_os = "linux")]
+impl Default for PipewirePipeline {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl PipewirePipeline {
+    /// Human-readable label for the GUI dropdown.
+    pub fn name(&self) -> String {
+        match self {
+            PipewirePipeline::Auto => "Auto",
+            PipewirePipeline::Direct => "Direct",
+            PipewirePipeline::Gl => "GL",
+            PipewirePipeline::Dmabuf => "Zero-copy (DMA-BUF)",
+            PipewirePipeline::LinearCpu => "Linear CPU",
+        }
+        .to_string()
+    }
+
+    pub fn to_index(&self) -> i32 {
+        PIPEWIRE_PIPELINE_LIST
+            .iter()
+            .position(|p| p == self)
+            .unwrap_or(0) as i32
+    }
+
+    pub fn from_index(i: i32) -> Self {
+        let i = i.clamp(0, PIPEWIRE_PIPELINE_LIST.len() as i32 - 1) as usize;
+        PIPEWIRE_PIPELINE_LIST[i]
+    }
+
+    pub fn variants() -> &'static [PipewirePipeline] {
+        &PIPEWIRE_PIPELINE_LIST
+    }
+}
+
 #[derive(Serialize, Deserialize, Parser, Debug, Clone)]
 #[command(version, about, long_about = None)]
 pub struct Config {
@@ -113,6 +181,15 @@ pub struct Config {
     #[arg(long, help = "Wayland/PipeWire Support.")]
     #[serde(default)]
     pub wayland_support: bool,
+    #[cfg(target_os = "linux")]
+    #[arg(
+        long,
+        value_enum,
+        default_value = "auto",
+        help = "PipeWire capture pipeline: auto, dmabuf (zero-copy VAAPI), linear-cpu, gl, or direct."
+    )]
+    #[serde(default)]
+    pub pipewire_pipeline: crate::config::PipewirePipeline,
 
     #[arg(long, help = "Print template of index.html served by Weylus.")]
     #[serde(skip)]
@@ -208,5 +285,22 @@ pub fn get_config() -> Config {
         config
     } else {
         Config::parse()
+    }
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod tests {
+    use super::*;
+    #[test]
+    fn pipeline_list_has_all_five_variants() {
+        let v = PipewirePipeline::variants();
+        assert_eq!(v.len(), 5);
+        assert!(v.contains(&PipewirePipeline::Dmabuf));
+        assert!(v.contains(&PipewirePipeline::LinearCpu));
+    }
+    #[test]
+    fn pipeline_names_are_stable() {
+        assert_eq!(PipewirePipeline::Dmabuf.name(), "Zero-copy (DMA-BUF)");
+        assert_eq!(PipewirePipeline::LinearCpu.name(), "Linear CPU");
     }
 }

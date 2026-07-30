@@ -65,7 +65,11 @@ impl Capturable for CGDisplayCapturable {
     fn before_input(&mut self) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
-    fn recorder(&self, capture_cursor: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
+    fn recorder(
+        &self,
+        capture_cursor: bool,
+        _prefer_dmabuf: bool,
+    ) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
         Ok(Box::new(RecorderCGDisplay::new(
             self.display,
             capture_cursor,
@@ -182,7 +186,11 @@ impl Capturable for CGWindowCapturable {
     fn before_input(&mut self) -> Result<(), Box<dyn Error>> {
         self.update_geometry()
     }
-    fn recorder(&self, capture_cursor: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
+    fn recorder(
+        &self,
+        capture_cursor: bool,
+        _prefer_dmabuf: bool,
+    ) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
         Ok(Box::new(RecorderCGWindow {
             img_data: None,
             capture_cursor,

@@ -9,6 +9,8 @@ pub mod pipewire;
 #[cfg(target_os = "linux")]
 #[allow(dead_code)]
 pub mod remote_desktop_dbus;
+#[cfg(target_os = "linux")]
+pub mod wayland_outputs;
 pub mod testsrc;
 
 #[cfg(target_os = "windows")]
@@ -19,6 +21,13 @@ pub mod win_ctx;
 pub mod x11;
 pub trait Recorder {
     fn capture(&mut self) -> Result<crate::video::PixelProvider<'_>, Box<dyn Error>>;
+
+    /// True when `capture()` yields `PixelProvider::DmaBuf` (zero-copy VAAPI path).
+    /// The encoder must be put in dmabuf-input mode iff this is true. Defaults to
+    /// false for CPU-frame recorders.
+    fn is_dmabuf(&self) -> bool {
+        false
+    }
 }
 
 pub trait BoxCloneCapturable {
@@ -54,7 +63,15 @@ pub trait Capturable: Send + BoxCloneCapturable {
     fn before_input(&mut self) -> Result<(), Box<dyn Error>>;
 
     /// Return a Recorder that can record the current capturable.
-    fn recorder(&self, capture_cursor: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>>;
+    ///
+    /// `prefer_dmabuf` asks the capturer to attempt a zero-copy dmabuf path when
+    /// available (only the PipeWire capturer acts on it); implementors that can
+    /// not are free to ignore it.
+    fn recorder(
+        &self,
+        capture_cursor: bool,
+        prefer_dmabuf: bool,
+    ) -> Result<Box<dyn Recorder>, Box<dyn Error>>;
 }
 
 impl Clone for Box<dyn Capturable> {
@@ -66,13 +83,14 @@ impl Clone for Box<dyn Capturable> {
 pub fn get_capturables(
     #[cfg(target_os = "linux")] wayland_support: bool,
     #[cfg(target_os = "linux")] capture_cursor: bool,
+    #[cfg(target_os = "linux")] pipewire_pipeline: crate::config::PipewirePipeline,
 ) -> Vec<Box<dyn Capturable>> {
     let mut capturables: Vec<Box<dyn Capturable>> = vec![];
     #[cfg(target_os = "linux")]
     {
         if wayland_support {
             use crate::capturable::pipewire::get_capturables as get_capturables_pw;
-            match get_capturables_pw(capture_cursor) {
+            match get_capturables_pw(capture_cursor, pipewire_pipeline) {
                 Ok(captrs) => {
                     for c in captrs {
                         capturables.push(Box::new(c));

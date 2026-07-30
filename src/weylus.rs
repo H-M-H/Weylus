@@ -45,6 +45,9 @@ impl Weylus {
             try_mediafoundation: config.try_mediafoundation,
             #[cfg(not(target_os = "windows"))]
             try_mediafoundation: false,
+
+            // Reconciled against the actual capture path in websocket::handle_video.
+            input_is_dmabuf: false,
         };
 
         let (sender_ui, mut receiver_ui) = tokio::sync::mpsc::channel(100);
@@ -70,6 +73,8 @@ impl Weylus {
                 encoder_options,
                 #[cfg(target_os = "linux")]
                 wayland_support: config.wayland_support,
+                #[cfg(target_os = "linux")]
+                pipewire_pipeline: config.pipewire_pipeline,
                 no_gui: config.no_gui,
             },
         );

@@ -62,6 +62,8 @@ pub struct WeylusClientConfig {
     pub encoder_options: EncoderOptions,
     #[cfg(target_os = "linux")]
     pub wayland_support: bool,
+    #[cfg(target_os = "linux")]
+    pub pipewire_pipeline: crate::config::PipewirePipeline,
     pub no_gui: bool,
 }
 
@@ -200,6 +202,8 @@ impl<S, R, FnUInput> WeylusClientHandler<S, R, FnUInput> {
             self.config.wayland_support,
             #[cfg(target_os = "linux")]
             self.capture_cursor,
+            #[cfg(target_os = "linux")]
+            self.config.pipewire_pipeline,
         );
         self.capturables.iter().for_each(|c| {
             windows.push(c.name());
@@ -310,6 +314,15 @@ fn handle_video<S: WeylusSender + Clone + 'static>(
     let mut recorder: Option<Box<dyn Recorder>> = None;
     let mut video_encoder: Option<Box<VideoEncoder>> = None;
 
+    // VAAPI usable at all? Only then do we ask the capturer for a zero-copy dmabuf
+    // path (it never has to serve a software encoder).
+    #[cfg(target_os = "linux")]
+    let vaapi_ok = encoder_options.try_vaapi && crate::video::vaapi_available();
+    #[cfg(not(target_os = "linux"))]
+    let vaapi_ok = false;
+    // Whether the currently-selected recorder actually ended up on the dmabuf path.
+    let mut input_is_dmabuf = false;
+
     let mut max_width = 1920;
     let mut max_height = 1080;
     let mut frame_duration = EFFECTIVE_INIFINITY;
@@ -342,9 +355,16 @@ fn handle_video<S: WeylusSender + Clone + 'static>(
                     // This shouldn't affect other Recorder trait objects.
                     recorder = None;
                 }
-                match config.capturable.recorder(config.capture_cursor) {
+                match config.capturable.recorder(config.capture_cursor, vaapi_ok) {
                     Ok(r) => {
+                        // Reconcile: only put the encoder in dmabuf mode when the recorder
+                        // actually landed on the dmabuf path (Auto may fall back to
+                        // LinearCpu/GL, or this may be an X11 capturable).
+                        input_is_dmabuf = r.is_dmabuf();
                         recorder = Some(r);
+                        // Force the encoder to be rebuilt so its input mode matches the
+                        // new recorder's actual capture path.
+                        video_encoder = None;
                         max_width = config.max_width;
                         max_height = config.max_height;
                         send_message(&mut sender, MessageOutbound::ConfigOk);
@@ -411,6 +431,8 @@ fn handle_video<S: WeylusSender + Clone + 'static>(
                 {
                     send_message(&mut sender, MessageOutbound::NewVideo);
                     let mut sender = sender.clone();
+                    let mut encoder_options = encoder_options;
+                    encoder_options.input_is_dmabuf = input_is_dmabuf;
                     let res = VideoEncoder::new(
                         width_in,
                         height_in,

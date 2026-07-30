@@ -74,7 +74,7 @@ impl Capturable for TestCapturable {
     fn before_input(&mut self) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
-    fn recorder(&self, _: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
+    fn recorder(&self, _: bool, _: bool) -> Result<Box<dyn Recorder>, Box<dyn Error>> {
         Ok(Box::new(TestRecorder::new(*self)))
     }
 }
