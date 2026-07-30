@@ -2788,6 +2788,7 @@ dependencies = [
  "hyper-util",
  "image 0.22.5",
  "image 0.25.9",
+ "libc",
  "num_cpus",
  "percent-encoding",
  "pnet_datalink",

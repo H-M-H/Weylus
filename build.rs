@@ -98,6 +98,18 @@ fn main() {
     }
     cc_video.compile("video");
 
+    // Diagnostic-only VAAPI dmabuf-import probe (examples/vaapi_pipe_probe).
+    // Gated behind the `vaapi-probe` feature so normal builds never compile it.
+    // Links against the va/va-drm/drm + ffmpeg libs already emitted by linux().
+    if env::var("CARGO_FEATURE_VAAPI_PROBE").is_ok() && target_os == "linux" {
+        println!("cargo:rerun-if-changed=lib/vaapi_import_probe.c");
+        println!("cargo:rerun-if-changed=lib/vaapi_import_probe.h");
+        let mut cc_probe = cc::Build::new();
+        cc_probe.file("lib/vaapi_import_probe.c");
+        cc_probe.include(dist_dir.join("include"));
+        cc_probe.compile("vaapi_import_probe");
+    }
+
     println!("cargo:rerun-if-changed=lib/error.h");
     println!("cargo:rerun-if-changed=lib/error.c");
     println!("cargo:rerun-if-changed=lib/log.h");
