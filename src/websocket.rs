@@ -7,7 +7,7 @@ use std::sync::{mpsc, Arc};
 use std::thread::{spawn, JoinHandle};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::channel;
-use tracing::{error, trace, warn};
+use tracing::{debug, error, trace, warn};
 
 use crate::capturable::{get_capturables, Capturable, Recorder};
 use crate::input::device::{InputDevice, InputDeviceType};
@@ -300,6 +300,19 @@ impl<S, R, FnUInput> WeylusClientHandler<S, R, FnUInput> {
     }
 }
 
+/// On Windows a capture "Timeout" error only means nothing changed on screen since the last
+/// frame - expected on an idle desktop, not worth a warning. Elsewhere every capture error keeps
+/// the level it already had.
+#[cfg(target_os = "windows")]
+fn is_capture_timeout(err: &str) -> bool {
+    err.contains("Timeout")
+}
+
+#[cfg(not(target_os = "windows"))]
+fn is_capture_timeout(_err: &str) -> bool {
+    false
+}
+
 fn handle_video<S: WeylusSender + Clone + 'static>(
     receiver: mpsc::Receiver<VideoCommands>,
     mut sender: S,
@@ -386,7 +399,12 @@ fn handle_video<S: WeylusSender + Clone + 'static>(
                 }
                 let pixel_data = recorder.as_mut().unwrap().capture();
                 if let Err(err) = pixel_data {
-                    warn!("Error capturing screen: {}", err);
+                    let err = err.to_string();
+                    if is_capture_timeout(&err) {
+                        debug!("Error capturing screen: {}", err);
+                    } else {
+                        warn!("Error capturing screen: {}", err);
+                    }
                     continue;
                 }
                 let pixel_data = pixel_data.unwrap();

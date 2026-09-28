@@ -35,7 +35,7 @@ tracing-subscriber = { version = "^0.3", features = ["ansi", "json"], default-fe
 url = "^2.5"
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3.9", features = ["d3d11", "d3dcommon", "dxgi", "dxgi1_2", "dxgitype"] }
+winapi = { version = "0.3.9", features = ["d3d11", "d3dcommon", "dxgi", "dxgi1_2", "dxgitype", "winbase", "winnt"] }
 wio = "0.2.2"
 captrs = "^0.3.1"
 

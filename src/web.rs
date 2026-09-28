@@ -170,6 +170,7 @@ async fn serve(
                         let (sender, receiver) =
                             weylus_websocket_channel(ws, semaphore_websocket_shutdown);
                         std::thread::spawn(move || {
+                            let awake = crate::keep_awake::KeepAwake::new();
                             let client = WeylusClientHandler::new(
                                 sender,
                                 receiver,
@@ -185,6 +186,7 @@ async fn serve(
                                 config,
                             );
                             client.run();
+                            drop(awake);
                             num_clients.fetch_sub(1, Ordering::Relaxed);
                             notify_disconnect.notify_waiters();
                         });

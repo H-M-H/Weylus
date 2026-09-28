@@ -22,6 +22,7 @@ mod cerror;
 mod config;
 mod gui;
 mod input;
+mod keep_awake;
 mod log;
 mod protocol;
 mod video;
