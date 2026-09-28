@@ -2,12 +2,13 @@ use winapi::shared::minwindef::DWORD;
 use winapi::shared::windef::{HWND, POINT};
 use winapi::um::winuser::*;
 
-use tracing::warn;
+use tracing::{debug, warn};
 
-use crate::input::autopilot_device::AutoPilotDevice;
+use crate::input::autopilot_device::{map_key, AutoPilotDevice};
 use crate::input::device::{InputDevice, InputDeviceType};
 use crate::protocol::{
-    Button, KeyboardEvent, PointerEvent, PointerEventType, PointerType, WheelEvent,
+    Button, KeyboardEvent, KeyboardEventType, PointerEvent, PointerEventType, PointerType,
+    WheelEvent,
 };
 
 use crate::capturable::{Capturable, Geometry};
@@ -214,7 +215,24 @@ impl InputDevice for WindowsInput {
     }
 
     fn send_keyboard_event(&mut self, event: &KeyboardEvent) {
-        self.autopilot_device.send_keyboard_event(event);
+        // Named keys (Enter, arrows, F-keys, modifiers ...) go through autopilot's keybd_event path,
+        // which is fine there.
+        if map_key(&event.code).is_some() {
+            self.autopilot_device.send_keyboard_event(event);
+            return;
+        }
+        // Every other key is a character. autopilot's Character path on Windows builds the INPUT
+        // union with transmute_copy from the smaller KEYBDINPUT, which current Rust refuses at run
+        // time ("cannot transmute_copy if Dst is larger than Src", autopilot-rs key.rs:551): the
+        // handler thread panics and the client is dropped. Type characters here instead.
+        let down = match event.event_type {
+            KeyboardEventType::DOWN => true,
+            KeyboardEventType::UP => false,
+            KeyboardEventType::REPEAT => return,
+        };
+        for c in event.key.chars() {
+            type_char(c, down, event.ctrl, event.alt, event.meta, event.shift);
+        }
     }
 
     fn set_capturable(&mut self, capturable: Box<dyn Capturable>) {
@@ -224,4 +242,80 @@ impl InputDevice for WindowsInput {
     fn device_type(&self) -> InputDeviceType {
         InputDeviceType::WindowsInput
     }
+}
+
+fn key_event(vk: i32, down: bool) {
+    let flags = if down { 0 } else { KEYEVENTF_KEYUP };
+    unsafe { keybd_event(vk as u8, 0, flags, 0) };
+}
+
+/// One character, down or up, with the event's modifiers. A character on the current keyboard
+/// layout is sent as its real virtual key (VkKeyScanW), so Ctrl+Z, Ctrl+C and the like reach the
+/// program as the shortcuts they are; anything the layout has no plain key for (an AltGr character,
+/// for instance) goes as KEYEVENTF_UNICODE on a properly initialised INPUT.
+fn type_char(c: char, down: bool, ctrl: bool, alt: bool, meta: bool, shift: bool) {
+    let mut buf = [0u16; 2];
+    let units: Vec<u16> = c.encode_utf16(&mut buf).to_vec();
+    let mut mods: Vec<i32> = Vec::new();
+    if ctrl {
+        mods.push(VK_CONTROL);
+    }
+    if alt {
+        mods.push(VK_MENU);
+    }
+    if meta {
+        mods.push(VK_LWIN);
+    }
+    if units.len() == 1 {
+        let scan = unsafe { VkKeyScanW(units[0]) };
+        // -1 = not on this layout; bit 1 (Ctrl) or bit 2 (Alt) needed = an AltGr character: send as
+        // Unicode instead.
+        if scan != -1 && (scan >> 8) & 0x06 == 0 {
+            let vk = (scan & 0xff) as i32;
+            if shift || (scan >> 8) & 0x01 != 0 {
+                mods.push(VK_SHIFT);
+            }
+            if down {
+                for &m in mods.iter() {
+                    key_event(m, true);
+                }
+                key_event(vk, true);
+            } else {
+                key_event(vk, false);
+                for &m in mods.iter().rev() {
+                    key_event(m, false);
+                }
+            }
+            debug!("typed char as virtual key 0x{:02x} down={} mods={}", vk, down, mods.len());
+            return;
+        }
+    }
+    if shift {
+        mods.push(VK_SHIFT);
+    }
+    if down {
+        for &m in mods.iter() {
+            key_event(m, true);
+        }
+    }
+    for &u in units.iter() {
+        unsafe {
+            let mut input: INPUT = std::mem::zeroed();
+            input.type_ = INPUT_KEYBOARD;
+            *input.u.ki_mut() = KEYBDINPUT {
+                wVk: 0,
+                wScan: u,
+                dwFlags: KEYEVENTF_UNICODE | if down { 0 } else { KEYEVENTF_KEYUP },
+                time: 0,
+                dwExtraInfo: 0,
+            };
+            SendInput(1, &mut input, std::mem::size_of::<INPUT>() as i32);
+        }
+    }
+    if !down {
+        for &m in mods.iter().rev() {
+            key_event(m, false);
+        }
+    }
+    debug!("typed char as unicode units={} down={}", units.len(), down);
 }

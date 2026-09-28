@@ -76,7 +76,7 @@ impl InputDevice for AutoPilotDevice {
     }
 
     fn send_keyboard_event(&mut self, event: &KeyboardEvent) {
-        use autopilot::key::{Character, Code, KeyCode};
+        use autopilot::key::{Character, Code};
 
         let state = match event.event_type {
             KeyboardEventType::UP => false,
@@ -85,54 +85,6 @@ impl InputDevice for AutoPilotDevice {
             KeyboardEventType::REPEAT => return,
         };
 
-        fn map_key(code: &str) -> Option<KeyCode> {
-            match code {
-                "Escape" => Some(KeyCode::Escape),
-                "Enter" => Some(KeyCode::Return),
-                "Backspace" => Some(KeyCode::Backspace),
-                "Tab" => Some(KeyCode::Tab),
-                "Space" => Some(KeyCode::Space),
-                "CapsLock" => Some(KeyCode::CapsLock),
-                "F1" => Some(KeyCode::F1),
-                "F2" => Some(KeyCode::F2),
-                "F3" => Some(KeyCode::F3),
-                "F4" => Some(KeyCode::F4),
-                "F5" => Some(KeyCode::F5),
-                "F6" => Some(KeyCode::F6),
-                "F7" => Some(KeyCode::F7),
-                "F8" => Some(KeyCode::F8),
-                "F9" => Some(KeyCode::F9),
-                "F10" => Some(KeyCode::F10),
-                "F11" => Some(KeyCode::F11),
-                "F12" => Some(KeyCode::F12),
-                "F13" => Some(KeyCode::F13),
-                "F14" => Some(KeyCode::F14),
-                "F15" => Some(KeyCode::F15),
-                "F16" => Some(KeyCode::F16),
-                "F17" => Some(KeyCode::F17),
-                "F18" => Some(KeyCode::F18),
-                "F19" => Some(KeyCode::F19),
-                "F20" => Some(KeyCode::F20),
-                "F21" => Some(KeyCode::F21),
-                "F22" => Some(KeyCode::F22),
-                "F23" => Some(KeyCode::F23),
-                "F24" => Some(KeyCode::F24),
-                "Home" => Some(KeyCode::Home),
-                "ArrowUp" => Some(KeyCode::UpArrow),
-                "PageUp" => Some(KeyCode::PageUp),
-                "ArrowLeft" => Some(KeyCode::LeftArrow),
-                "ArrowRight" => Some(KeyCode::RightArrow),
-                "End" => Some(KeyCode::End),
-                "ArrowDown" => Some(KeyCode::DownArrow),
-                "PageDown" => Some(KeyCode::PageDown),
-                "Delete" => Some(KeyCode::Delete),
-                "ControlLeft" | "ControlRight" => Some(KeyCode::Control),
-                "AltLeft" | "AltRight" => Some(KeyCode::Alt),
-                "MetaLeft" | "MetaRight" => Some(KeyCode::Meta),
-                "ShiftLeft" | "ShiftRight" => Some(KeyCode::Shift),
-                _ => None,
-            }
-        }
         let key = map_key(&event.code);
         let mut flags = Vec::new();
         if event.ctrl {
@@ -163,5 +115,58 @@ impl InputDevice for AutoPilotDevice {
 
     fn device_type(&self) -> InputDeviceType {
         InputDeviceType::AutoPilotDevice
+    }
+}
+
+/// The named keys autopilot types by code. Anything else goes through autopilot's Character path
+/// (on Windows, input::autopilot_device_win types characters itself: autopilot's Character path
+/// panics there).
+pub(crate) fn map_key(code: &str) -> Option<autopilot::key::KeyCode> {
+    use autopilot::key::KeyCode;
+    match code {
+        "Escape" => Some(KeyCode::Escape),
+        "Enter" => Some(KeyCode::Return),
+        "Backspace" => Some(KeyCode::Backspace),
+        "Tab" => Some(KeyCode::Tab),
+        "Space" => Some(KeyCode::Space),
+        "CapsLock" => Some(KeyCode::CapsLock),
+        "F1" => Some(KeyCode::F1),
+        "F2" => Some(KeyCode::F2),
+        "F3" => Some(KeyCode::F3),
+        "F4" => Some(KeyCode::F4),
+        "F5" => Some(KeyCode::F5),
+        "F6" => Some(KeyCode::F6),
+        "F7" => Some(KeyCode::F7),
+        "F8" => Some(KeyCode::F8),
+        "F9" => Some(KeyCode::F9),
+        "F10" => Some(KeyCode::F10),
+        "F11" => Some(KeyCode::F11),
+        "F12" => Some(KeyCode::F12),
+        "F13" => Some(KeyCode::F13),
+        "F14" => Some(KeyCode::F14),
+        "F15" => Some(KeyCode::F15),
+        "F16" => Some(KeyCode::F16),
+        "F17" => Some(KeyCode::F17),
+        "F18" => Some(KeyCode::F18),
+        "F19" => Some(KeyCode::F19),
+        "F20" => Some(KeyCode::F20),
+        "F21" => Some(KeyCode::F21),
+        "F22" => Some(KeyCode::F22),
+        "F23" => Some(KeyCode::F23),
+        "F24" => Some(KeyCode::F24),
+        "Home" => Some(KeyCode::Home),
+        "ArrowUp" => Some(KeyCode::UpArrow),
+        "PageUp" => Some(KeyCode::PageUp),
+        "ArrowLeft" => Some(KeyCode::LeftArrow),
+        "ArrowRight" => Some(KeyCode::RightArrow),
+        "End" => Some(KeyCode::End),
+        "ArrowDown" => Some(KeyCode::DownArrow),
+        "PageDown" => Some(KeyCode::PageDown),
+        "Delete" => Some(KeyCode::Delete),
+        "ControlLeft" | "ControlRight" => Some(KeyCode::Control),
+        "AltLeft" | "AltRight" => Some(KeyCode::Alt),
+        "MetaLeft" | "MetaRight" => Some(KeyCode::Meta),
+        "ShiftLeft" | "ShiftRight" => Some(KeyCode::Shift),
+        _ => None,
     }
 }
