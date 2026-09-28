@@ -29,10 +29,78 @@ mod web;
 mod websocket;
 mod weylus;
 
+/// Frame pacing on Windows. The video loop waits with recv_timeout, and Windows rounds every wait
+/// up to the default 15.6 ms timer tick, so a target frame rate that needs finer pacing gets far
+/// fewer frames than requested (H-M-H/Weylus#564 measured 23 -> 52 fps after setting a 1 ms period).
+/// Windows 11 can also put a windowless background process on EcoQoS (efficiency cores, timer
+/// requests ignored); opt out of both, as a video server should. Failures are logged, never fatal.
+#[cfg(target_os = "windows")]
+fn set_windows_timing() {
+    use std::ffi::c_void;
+    #[repr(C)]
+    struct PowerThrottlingState {
+        version: u32,
+        control_mask: u32,
+        state_mask: u32,
+    }
+    #[link(name = "winmm")]
+    extern "system" {
+        fn timeBeginPeriod(period_ms: u32) -> u32;
+    }
+    extern "system" {
+        fn GetCurrentProcess() -> *mut c_void;
+        fn SetProcessInformation(
+            process: *mut c_void,
+            class: i32,
+            info: *const c_void,
+            size: u32,
+        ) -> i32;
+        fn GetLastError() -> u32;
+    }
+    const PROCESS_POWER_THROTTLING: i32 = 4; // PROCESS_INFORMATION_CLASS::ProcessPowerThrottling
+    const EXECUTION_SPEED: u32 = 0x1;
+    const IGNORE_TIMER_RESOLUTION: u32 = 0x4; // Windows 11
+    unsafe {
+        let timer = timeBeginPeriod(1);
+        let set = |mask: u32| {
+            let state = PowerThrottlingState {
+                version: 1,
+                control_mask: mask,
+                state_mask: 0,
+            };
+            SetProcessInformation(
+                GetCurrentProcess(),
+                PROCESS_POWER_THROTTLING,
+                &state as *const _ as *const c_void,
+                std::mem::size_of::<PowerThrottlingState>() as u32,
+            ) != 0
+        };
+        let mut mask = EXECUTION_SPEED | IGNORE_TIMER_RESOLUTION;
+        let mut ok = set(mask);
+        let err = if ok { 0 } else { GetLastError() };
+        if !ok {
+            // Windows 10 does not know IGNORE_TIMER_RESOLUTION.
+            mask = EXECUTION_SPEED;
+            ok = set(mask);
+        }
+        if timer == 0 && ok {
+            info!("Windows timing: 1 ms timer period, power throttling off (mask={mask:#x}).");
+        } else {
+            warn!(
+                "Windows timing: timeBeginPeriod={timer} (0 = ok), power throttling off={ok} \
+                 (mask={mask:#x}, first error={err}).",
+            );
+        }
+    }
+}
+
 fn main() {
     let (sender, receiver) = mpsc::sync_channel::<String>(100);
 
     log::setup_logging(sender);
+
+    #[cfg(target_os = "windows")]
+    set_windows_timing();
 
     let conf = get_config();
 
