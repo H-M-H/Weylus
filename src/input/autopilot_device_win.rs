@@ -45,15 +45,19 @@ impl InputDevice for WindowsInput {
             warn!("Failed to activate window, sending no input ({})", err);
             return;
         }
-        let Geometry::VirtualScreen(offset_x, offset_y, width, height, left, top) =
+        let Geometry::VirtualScreen(_offset_x, _offset_y, width, height, left, top) =
             self.capturable.geometry().unwrap()
         else {
             unreachable!()
         };
 
+        // Pen and touch go through InjectSyntheticPointerInput, whose ptPixelLocation is in
+        // virtual-screen coordinates (the primary monitor's top-left is 0,0) - the same space the
+        // mouse path below uses for SetCursorPos. The union-relative offset used here before put
+        // pen and touch one monitor off whenever a monitor sat left of or above the primary.
         let (x, y) = (
-            (event.x * width as f64) as i32 + offset_x,
-            (event.y * height as f64) as i32 + offset_y,
+            (event.x * width as f64) as i32 + left,
+            (event.y * height as f64) as i32 + top,
         );
         let mut pointer_flags = match event.event_type {
             PointerEventType::DOWN => {
